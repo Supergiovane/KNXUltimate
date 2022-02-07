@@ -7,7 +7,7 @@
 [![NPM downloads total][npm-downloads-total-image]][npm-url]
 [![MIT License][license-image]][license-url]
 [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
-[![Facebook][facebook-image]][facebook-url]
+[![Youtube][youtube-image]][youtube-url]
 [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square)](https://www.paypal.me/techtoday) 
 
 
@@ -16,7 +16,7 @@ Control your KNX intallation via Node.js!
 
  KNX IP protocol implementation in pure Node.js
 
- This is the official engine of Node-Red node KNX-Ultimate (https://flows.nodered.org/node/node-red-contrib-knx-ultimate)
+ This is the official engine of Node-Red node KNX-Ultimate (https://flows.nodered.org/node/KNXUltimate)
  I had many users asking for a node.js release of that engine, so here is it.
  The node will be KNX Secure compatible. I'm already working on that.
 
@@ -141,18 +141,18 @@ msg.destination = "0/0/1"; // Set the destination
 msg.payload = false; // issues a write or response (based on the options Output Type above) to the KNX bus
 msg.event = "GroupValue_Write"; // "GroupValue_Write" or "GroupValue_Response", overrides the option Output Type above.
 msg.dpt = "1.001"; // for example "1.001", overrides the Datapoint option. (Datapoints can be sent as 9 , "9" , "9.001" or "DPT9.001")
-return msg;`, "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki"
+return msg;`, "helplink": "https://github.com/Supergiovane/KNXUltimate/wiki"
         };
         res.json(jRet);
         return;
     }
-    jRet = { "help": "NO", "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome" };
+    jRet = { "help": "NO", "helplink": "https://github.com/Supergiovane/KNXUltimate/wiki/-SamplesHome" };
     const dpts =
         Object.entries(dptlib)
             .filter(onlyDptKeys)
     for (let index = 0; index < dpts.length; index++) {
         if (dpts[index][0].toUpperCase() === "DPT" + sDPT) {
-            jRet = { "help": (dpts[index][1].basetype.hasOwnProperty("help") ? dpts[index][1].basetype.help : "NO"), "helplink": (dpts[index][1].basetype.hasOwnProperty("helplink") ? dpts[index][1].basetype.helplink : "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome") };
+            jRet = { "help": (dpts[index][1].basetype.hasOwnProperty("help") ? dpts[index][1].basetype.help : "NO"), "helplink": (dpts[index][1].basetype.hasOwnProperty("helplink") ? dpts[index][1].basetype.helplink : "https://github.com/Supergiovane/KNXUltimate/wiki/-SamplesHome") };
             break;
         }
     }
@@ -209,7 +209,7 @@ setTimeout(() => {
 
 ```
 
-Why not to try Node-Red https://nodered.org and the awesome KNX-Ultimate node https://github.com/Supergiovane/node-red-contrib-knx-ultimate ?
+Why not to try Node-Red https://nodered.org and the awesome KNX-Ultimate node https://github.com/Supergiovane/KNXUltimate ?
 
 <br/>
 <br/>
@@ -217,10 +217,10 @@ Why not to try Node-Red https://nodered.org and the awesome KNX-Ultimate node ht
 ![Logo](https://raw.githubusercontent.com/Supergiovane/node-red-contrib-knx-ultimate/master/img/wiki/flags/madeinitaly.png)
 
 [license-image]: https://img.shields.io/badge/license-MIT-blue.svg
-[license-url]: https://github.com/Supergiovane/node-red-contrib-knx-ultimate/master/LICENSE
-[npm-url]: https://npmjs.org/package/node-red-contrib-knx-ultimate
-[npm-version-image]: https://img.shields.io/npm/v/node-red-contrib-knx-ultimate.svg
-[npm-downloads-month-image]: https://img.shields.io/npm/dm/node-red-contrib-knx-ultimate.svg
-[npm-downloads-total-image]: https://img.shields.io/npm/dt/node-red-contrib-knx-ultimate.svg
-[facebook-image]: https://img.shields.io/badge/Visit%20me-Facebook-blue
-[facebook-url]: https://www.facebook.com/supergiovaneDev
+[license-url]: https://github.com/Supergiovane/KNXUltimate/master/LICENSE
+[npm-url]: https://npmjs.org/package/KNXUltimate
+[npm-version-image]: https://img.shields.io/npm/v/KNXUltimate.svg
+[npm-downloads-month-image]: https://img.shields.io/npm/dm/KNXUltimate.svg
+[npm-downloads-total-image]: https://img.shields.io/npm/dt/KNXUltimate.svg
+[youtube-image]: https://img.shields.io/badge/Visit%20me-Youtube-blue
+[youtube-url]: https://www.youtube.com/channel/UCA9RsLps1IthT7fDSeUbRZw/playlists
