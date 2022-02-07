@@ -26,9 +26,7 @@ Control your KNX intallation via Node.js!
 ```
 
 const knx = require("./index.js");
-const KNXAddress = require("./src/protocol/KNXAddress").KNXAddress;
 const dptlib = require('./src/dptlib');
-const KNXDataBuffer = require("./src/protocol/KNXDataBuffer").KNXDataBuffer;
 
 // Create tunnel socket with source knx address 1.1.100
 
