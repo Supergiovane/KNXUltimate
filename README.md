@@ -222,5 +222,5 @@ Why not to try Node-Red https://nodered.org and the awesome KNX-Ultimate node ht
 [npm-version-image]: https://img.shields.io/npm/v/KNXUltimate.svg
 [npm-downloads-month-image]: https://img.shields.io/npm/dm/KNXUltimate.svg
 [npm-downloads-total-image]: https://img.shields.io/npm/dt/KNXUltimate.svg
-[youtube-image]: https://img.shields.io/badge/Visit%20me-Youtube-blue
+[youtube-image]: https://img.shields.io/badge/Visit%20me-Youtube-red
 [youtube-url]: https://www.youtube.com/channel/UCA9RsLps1IthT7fDSeUbRZw/playlists
