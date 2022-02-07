@@ -94,7 +94,7 @@ function handleBusEvents(_datagram, _echoed) {
 
 // Get a list of supported datapoints
 // ######################################
-//Helpers
+// Helpers
 sortBy = (field) => (a, b) => {
     if (a[field] > b[field]) { return 1 } else { return -1 }
 };
