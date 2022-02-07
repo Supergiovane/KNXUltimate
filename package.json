@@ -1,5 +1,5 @@
 {
-  "name": "KNXUltimate",
+  "name": "knxultimate",
   "description": "KNX IP protocol implementation for Node",
   "version": "1.0.0",
   "engines": {

@@ -25,13 +25,12 @@ Control your KNX intallation via Node.js!
 
 ```
 
+
 const knx = require("./index.js");
 const dptlib = require('./src/dptlib');
 
-// Create tunnel socket with source knx address 1.1.100
 
-
-// 25/08/2021 Moved out of node.initKNXConnection 
+// Set the properties
 let knxUltimateClientProperties = {
     ipAddr: "224.0.23.12",
     ipPort: "3671",
@@ -129,6 +128,37 @@ toConcattedSubtypes = (acc, baseType) => {
 
     return acc.concat(subtypes)
 };
+
+dptGetHelp = dpt => {
+    var sDPT = dpt.split(".")[0]; // Takes only the main type
+    var jRet;
+    if (sDPT == "0") { // Special fake datapoint, meaning "Universal Mode"
+        jRet = {
+            "help":
+                `// KNX-Ultimate set as UNIVERSAL NODE
+// Example of a function that sends a message to the KNX-Ultimate
+msg.destination = "0/0/1"; // Set the destination 
+msg.payload = false; // issues a write or response (based on the options Output Type above) to the KNX bus
+msg.event = "GroupValue_Write"; // "GroupValue_Write" or "GroupValue_Response", overrides the option Output Type above.
+msg.dpt = "1.001"; // for example "1.001", overrides the Datapoint option. (Datapoints can be sent as 9 , "9" , "9.001" or "DPT9.001")
+return msg;`, "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki"
+        };
+        res.json(jRet);
+        return;
+    }
+    jRet = { "help": "NO", "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome" };
+    const dpts =
+        Object.entries(dptlib)
+            .filter(onlyDptKeys)
+    for (let index = 0; index < dpts.length; index++) {
+        if (dpts[index][0].toUpperCase() === "DPT" + sDPT) {
+            jRet = { "help": (dpts[index][1].basetype.hasOwnProperty("help") ? dpts[index][1].basetype.help : "NO"), "helplink": (dpts[index][1].basetype.hasOwnProperty("helplink") ? dpts[index][1].basetype.helplink : "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome") };
+            break;
+        }
+    }
+    return (jRet);
+}
+
 const dpts =
     Object.entries(dptlib)
         .filter(onlyDptKeys)
@@ -136,7 +166,8 @@ const dpts =
         .sort(sortBy("base"))
         .reduce(toConcattedSubtypes, [])
 dpts.forEach(element => {
-    console.log(element.text);
+    console.log(element.text + " USAGE: " + dptGetHelp(element.value).help);
+    console.log(" ");
 });
 
 // ######################################
@@ -154,15 +185,24 @@ console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Contro
 setTimeout(() => {
 
     // // Send a WRITE telegram to the KNX BUS
-    // // You need: group address, message (true/false/or any message), datapoint as string
-    knxUltimateClient.write("0/1/1", true, "1.001");
+    // // You need: group address, payload (true/false/or any message), datapoint as string
+    let payload = true;
+    knxUltimateClient.write("0/1/1", payload, "1.001");
+
+    // Send a color RED to an RGB datapoint
+    payload = { red: 125, green: 0, blue: 0 };
+    knxUltimateClient.write("0/1/2", payload, "232.600");
 
     // // Send a READ request to the KNX BUS
-     knxUltimateClient.read("0/0/1");
+    knxUltimateClient.read("0/0/1");
 
-    // // Send a RESPONSE telegram to the KNX BUS
-    // // You need: group address, message (true/false/or any message), datapoint as string
-    knxUltimateClient.respond("0/0/1", true, "1.001");
+    // Send a RESPONSE telegram to the KNX BUS
+    // You need: group address, payload (true/false/or any message), datapoint as string
+    payload = false;
+    knxUltimateClient.respond("0/0/1", payload, "1.001");
+
+
+
 
 
 }, 10000);
