@@ -23,7 +23,7 @@ Control your KNX intallation via Node.js!
  Here the usage sample (you can find this sample in the "sample.js" file):
 
 
-```
+```javascript
 
 
 const knx = require("./index.js");
