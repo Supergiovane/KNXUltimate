@@ -1,5 +1,5 @@
-const {KNXClient,KNXClientEvents} = require("./../KNXEngine/KNXClient.js");
-const KNXSecureKeyring = require('./../KNXEngine/KNXsecureKeyring.js');    
+const {KNXClient,KNXClientEvents} = require("./../KNXUltimate/src/KNXClient.js");
+const KNXSecureKeyring = require('./../KNXUltimate/src/KNXsecureKeyring.js');    
 exports.KNXSecureKeyring = KNXSecureKeyring;    
 
 //exports.KNXClientEvents = KNXClient.KNXClientEvents;

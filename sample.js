@@ -1,7 +1,7 @@
-const KNXClient = require("./KNXClient");
-const KNXAddress = require("./protocol/KNXAddress").KNXAddress;
-const DPTLib = require('./dptlib');
-const KNXDataBuffer = require("./protocol/KNXDataBuffer").KNXDataBuffer;
+const KNXClient = require("./KNXUltimate");
+const KNXAddress = require("./src/protocol/KNXAddress").KNXAddress;
+const DPTLib = require('./src/dptlib');
+const KNXDataBuffer = require("./src/protocol/KNXDataBuffer").KNXDataBuffer;
 
 // Create tunnel socket with source knx address 1.1.100
 const optionsDefaults = {
