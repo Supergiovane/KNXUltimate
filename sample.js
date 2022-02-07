@@ -1,7 +1,7 @@
 
 const knx = require("./index.js");
 const KNXAddress = require("./src/protocol/KNXAddress").KNXAddress;
-const DPTLib = require('./src/dptlib');
+const dptlib = require('./src/dptlib');
 const KNXDataBuffer = require("./src/protocol/KNXDataBuffer").KNXDataBuffer;
 
 // Create tunnel socket with source knx address 1.1.100
@@ -67,3 +67,78 @@ function handleBusEvents(_datagram, _echoed) {
     console.log("src: " + _datagram.cEMIMessage.srcAddress.toString() + " dest: " + _datagram.cEMIMessage.dstAddress.toString(), " event: " + _evt);
 
 }
+
+// Get a list of supported datapoints
+// ######################################
+//Helpers
+sortBy = (field) => (a, b) => {
+    if (a[field] > b[field]) { return 1 } else { return -1 }
+};
+
+
+onlyDptKeys = (kv) => {
+    return kv[0].startsWith("DPT")
+};
+
+extractBaseNo = (kv) => {
+    return {
+        subtypes: kv[1].subtypes,
+        base: parseInt(kv[1].id.replace("DPT", ""))
+    }
+};
+
+convertSubtype = (baseType) => (kv) => {
+    let value = `${baseType.base}.${kv[0]}`;
+    //let sRet = value + " " + kv[1].name + (kv[1].unit === undefined ? "" : " (" + kv[1].unit + ")");
+    let sRet = value + " " + kv[1].name;
+    return {
+        value: value
+        , text: sRet
+    }
+}
+
+toConcattedSubtypes = (acc, baseType) => {
+    let subtypes =
+        Object.entries(baseType.subtypes)
+            .sort(sortBy(0))
+            .map(convertSubtype(baseType))
+
+    return acc.concat(subtypes)
+};
+const dpts =
+    Object.entries(dptlib)
+        .filter(onlyDptKeys)
+        .map(extractBaseNo)
+        .sort(sortBy("base"))
+        .reduce(toConcattedSubtypes, [])
+dpts.forEach(element => {
+    console.log(element.text);
+});
+
+// ######################################
+
+
+
+console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
+console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
+console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
+console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
+console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
+
+// WRITE SOMETHING 
+// WARNING, THIS WILL WRITE TO YOUR BUS !!!!
+setTimeout(() => {
+
+    // // Send a WRITE telegram to the KNX BUS
+    // // You need: group address, message (true/false/or any message), datapoint as string
+    knxUltimateClient.write("0/1/1", true, "1.001");
+
+    // // Send a READ request to the KNX BUS
+     knxUltimateClient.read("0/0/1");
+
+    // // Send a RESPONSE telegram to the KNX BUS
+    // // You need: group address, message (true/false/or any message), datapoint as string
+    knxUltimateClient.respond("0/0/1", true, "1.001");
+
+
+}, 10000);
