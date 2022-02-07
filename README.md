@@ -20,8 +20,12 @@ Control your KNX intallation via Node.js!
  I had many users asking for a node.js release of that engine, so here is it.
  The node will be KNX Secure compatible. I'm already working on that.
 
- Here the usage sample (you can find this sample in the "sample.js" file):
+## CHANGELOG
 
+* See <a href="https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOG.md">here the changelog</a>
+
+
+ Here the usage sample (you can find this sample in the "sample.js" file):
 
 ```javascript
 
