@@ -108,13 +108,7 @@ dptGetHelp = dpt => {
     if (sDPT == "0") { // Special fake datapoint, meaning "Universal Mode"
         jRet = {
             "help":
-                `// KNX-Ultimate set as UNIVERSAL NODE
-// Example of a function that sends a message to the KNX-Ultimate
-msg.destination = "0/0/1"; // Set the destination 
-msg.payload = false; // issues a write or response (based on the options Output Type above) to the KNX bus
-msg.event = "GroupValue_Write"; // "GroupValue_Write" or "GroupValue_Response", overrides the option Output Type above.
-msg.dpt = "1.001"; // for example "1.001", overrides the Datapoint option. (Datapoints can be sent as 9 , "9" , "9.001" or "DPT9.001")
-return msg;`, "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki"
+                ``, "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki"
         };
         res.json(jRet);
         return;
