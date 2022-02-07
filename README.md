@@ -32,6 +32,80 @@ Control your KNX intallation via Node.js!
 const knx = require("./index.js");
 const dptlib = require('./src/dptlib');
 
+// Get a list of supported datapoints
+// With this function, you can see what datapoints are supported and a sample on how you need to format the payload to be sent.
+// ######################################
+// Helpers
+sortBy = (field) => (a, b) => {
+    if (a[field] > b[field]) { return 1 } else { return -1 }
+};
+onlyDptKeys = (kv) => {
+    return kv[0].startsWith("DPT")
+};
+extractBaseNo = (kv) => {
+    return {
+        subtypes: kv[1].subtypes,
+        base: parseInt(kv[1].id.replace("DPT", ""))
+    }
+};
+convertSubtype = (baseType) => (kv) => {
+    let value = `${baseType.base}.${kv[0]}`;
+    //let sRet = value + " " + kv[1].name + (kv[1].unit === undefined ? "" : " (" + kv[1].unit + ")");
+    let sRet = value + " " + kv[1].name;
+    return {
+        value: value
+        , text: sRet
+    }
+}
+toConcattedSubtypes = (acc, baseType) => {
+    let subtypes =
+        Object.entries(baseType.subtypes)
+            .sort(sortBy(0))
+            .map(convertSubtype(baseType))
+
+    return acc.concat(subtypes)
+};
+dptGetHelp = dpt => {
+    var sDPT = dpt.split(".")[0]; // Takes only the main type
+    var jRet;
+    if (sDPT == "0") { // Special fake datapoint, meaning "Universal Mode"
+        jRet = {
+            "help":
+                ``, "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki"
+        };
+        return(jRet);
+    }
+    jRet = { "help": "No sample currently avaiable", "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome" };
+    const dpts =
+        Object.entries(dptlib)
+            .filter(onlyDptKeys)
+    for (let index = 0; index < dpts.length; index++) {
+        if (dpts[index][0].toUpperCase() === "DPT" + sDPT) {
+            jRet = { "help": (dpts[index][1].basetype.hasOwnProperty("help") ? dpts[index][1].basetype.help : "No sample currently avaiable, just pass the payload as is it"), "helplink": (dpts[index][1].basetype.hasOwnProperty("helplink") ? dpts[index][1].basetype.helplink : "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome") };
+            break;
+        }
+    }
+    return (jRet);
+}
+const dpts =
+    Object.entries(dptlib)
+        .filter(onlyDptKeys)
+        .map(extractBaseNo)
+        .sort(sortBy("base"))
+        .reduce(toConcattedSubtypes, [])
+dpts.forEach(element => {
+    console.log(element.text + " USAGE: " + dptGetHelp(element.value).help);
+    console.log(" ");
+});
+// ######################################
+
+
+
+
+// Let's connect and turn on your appliance.
+
+
+
 // Set the properties
 let knxUltimateClientProperties = {
     ipAddr: "224.0.23.12",
@@ -93,80 +167,6 @@ function handleBusEvents(_datagram, _echoed) {
 
 }
 
-// Get a list of supported datapoints
-// ######################################
-// Helpers
-sortBy = (field) => (a, b) => {
-    if (a[field] > b[field]) { return 1 } else { return -1 }
-};
-
-
-onlyDptKeys = (kv) => {
-    return kv[0].startsWith("DPT")
-};
-
-extractBaseNo = (kv) => {
-    return {
-        subtypes: kv[1].subtypes,
-        base: parseInt(kv[1].id.replace("DPT", ""))
-    }
-};
-
-convertSubtype = (baseType) => (kv) => {
-    let value = `${baseType.base}.${kv[0]}`;
-    //let sRet = value + " " + kv[1].name + (kv[1].unit === undefined ? "" : " (" + kv[1].unit + ")");
-    let sRet = value + " " + kv[1].name;
-    return {
-        value: value
-        , text: sRet
-    }
-}
-
-toConcattedSubtypes = (acc, baseType) => {
-    let subtypes =
-        Object.entries(baseType.subtypes)
-            .sort(sortBy(0))
-            .map(convertSubtype(baseType))
-
-    return acc.concat(subtypes)
-};
-
-dptGetHelp = dpt => {
-    var sDPT = dpt.split(".")[0]; // Takes only the main type
-    var jRet;
-    if (sDPT == "0") { // Special fake datapoint, meaning "Universal Mode"
-        jRet = {
-            "help":
-                ``, "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki"
-        };
-        res.json(jRet);
-        return;
-    }
-    jRet = { "help": "NO", "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome" };
-    const dpts =
-        Object.entries(dptlib)
-            .filter(onlyDptKeys)
-    for (let index = 0; index < dpts.length; index++) {
-        if (dpts[index][0].toUpperCase() === "DPT" + sDPT) {
-            jRet = { "help": (dpts[index][1].basetype.hasOwnProperty("help") ? dpts[index][1].basetype.help : "NO"), "helplink": (dpts[index][1].basetype.hasOwnProperty("helplink") ? dpts[index][1].basetype.helplink : "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome") };
-            break;
-        }
-    }
-    return (jRet);
-}
-
-const dpts =
-    Object.entries(dptlib)
-        .filter(onlyDptKeys)
-        .map(extractBaseNo)
-        .sort(sortBy("base"))
-        .reduce(toConcattedSubtypes, [])
-dpts.forEach(element => {
-    console.log(element.text + " USAGE: " + dptGetHelp(element.value).help);
-    console.log(" ");
-});
-
-// ######################################
 
 console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
 console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
@@ -177,6 +177,11 @@ console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Contro
 // WRITE SOMETHING 
 // WARNING, THIS WILL WRITE TO YOUR BUS !!!!
 setTimeout(() => {
+
+    // Check wether knxUltimateClient is clear to send the next telegram.
+    // This should be called bevore any .write, .response, and .read request.
+    // If not clear to send, retry later because the knxUltimateClient is busy in sending another telegram.
+    console.log("Clear to send: " + knxUltimateClient._getClearToSend())
 
     // // Send a WRITE telegram to the KNX BUS
     // // You need: group address, payload (true/false/or any message), datapoint as string
@@ -200,7 +205,6 @@ setTimeout(() => {
 
 
 }, 10000);
-
 ```
 
 Why not to try Node-Red https://nodered.org and the awesome KNX-Ultimate node https://github.com/Supergiovane/KNXUltimate ?
