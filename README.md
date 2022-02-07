@@ -11,8 +11,6 @@
 [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square)](https://www.paypal.me/techtoday) 
 
 
-![Sample Node](img/readmemain.png)
-
 Control your KNX intallation via Node.js!
 
 
