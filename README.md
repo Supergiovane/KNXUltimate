@@ -308,9 +308,12 @@ setTimeout(() => {
 <br/>
 <br/>
 
+## SUGGESTION
 > Why not to try Node-Red https://nodered.org and the awesome KNX-Ultimate node https://flows.nodered.org/node/node-red-contrib-knx-ultimate ?
 
-<img src='https://raw.githubusercontent.com/Supergiovane/knxultimate/master/img/nodered.png' width='60%'>
+<br/>
+
+<img src='https://raw.githubusercontent.com/Supergiovane/knxultimate/master/img/nodered.png' width='80%'>
 
 <br/>
 <br/>
