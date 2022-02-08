@@ -50,7 +50,7 @@ Control your KNX intallation via Node.js!
 
 **Supported Datapoints**
 
-Datapoints supporter are huge. Please run the **sample.js** file to view all datapoints in the console window.<br/>
+It support a massive number of Datapoints. Please run the **sample.js** file to view all datapoints in the console window.<br/>
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
 For example, pass a *true* for datapoint 1.001, or *{ red: 125, green: 0, blue: 0 }* for datapoijnt 232.600.<br/>
 
