@@ -7,7 +7,7 @@
 # CHANGELOG
 
 <p>
-<b>Version 1.0.7</b> - February 2022<br/>
+<b>Version 1.0.8</b> - February 2022<br/>
 - Fixed a file not found issue.<br/>
 </p>
 <p>
