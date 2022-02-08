@@ -28,7 +28,7 @@ Control your KNX intallation via Node.js!
 <br/>
 <br/>
 
-**Properties to be passed to the connection(see the knxUltimateClientProperties cariable below)**
+**Properties to be passed to the connection(see the knxUltimateClientProperties variable below)**
 
 |Property|Description|
 |--|--|
