@@ -99,7 +99,7 @@ async function go() {
 
     knxUltimateClient.Connect();
 
-    // Wait some second, just for fun
+    // Wait some seconds, just for fun
     await new Promise((resolve, reject) => setTimeout(resolve, 6000));
 
 
