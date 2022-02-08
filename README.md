@@ -10,22 +10,94 @@
 [![Youtube][youtube-image]][youtube-url]
 [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square)](https://www.paypal.me/techtoday) 
 
+<br/>
 
 Control your KNX intallation via Node.js!
 
+> This is the official engine of Node-Red node KNX-Ultimate (https://flows.nodered.org/node/KNXUltimate)
+> I had many users asking for a node.js release of that engine, so here is it.
+> The node will be KNX Secure compatible. I'm already working on that.
 
- KNX IP protocol implementation in pure Node.js
-
- This is the official engine of Node-Red node KNX-Ultimate (https://flows.nodered.org/node/KNXUltimate)
- I had many users asking for a node.js release of that engine, so here is it.
- The node will be KNX Secure compatible. I'm already working on that.
+<br/>
+<br/>
 
 ## CHANGELOG
 
 * See <a href="https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOG.md">here the changelog</a>
 
+<br/>
+<br/>
 
- Here the usage sample (you can find this sample in the "sample.js" file):
+**Properties to be passed to the connection(see the knxUltimateClientProperties cariable below)**
+
+|Property|Description|
+|--|--|
+| ipAddr (string) | The IP of your KNX router/interface (for Routers, use "224.0.23.12") |
+| ipPort (string) | The port, default is "3671" |
+| physAddr (string) | The physical address to be identified in the KNX bus |
+| suppress_ack_ldatareq (bool) | Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true |
+| loglevel (string) | The log level. "info", "error", "debug" or "trace" |
+| localEchoInTunneling (bool) | Leave true forever. This is used only in Node-Red KNX-Ultimate node |
+| hostProtocol (string) | "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces, or "TunnelTCP" for secure KNX Interfaces (not yet implemented)|
+| isSecureKNXEnabled (bool) | True: Enables the secure connection. Leave false until KNX-Secure has been released. |
+| jKNXSecureKeyring (string) | ETS Keyring JSON file content (leave blank until KNX-Secure has been released) |
+| localIPAddress (string) | The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate |
+| KNXEthInterface (string) | "Auto": Bind to the first avaiable local interfavce. "Manual": if you wish to specify the interface (for example eth1); in this case, set the property **interface** to the interface name (interface:"eth1") |
+| interface (string) | Specifies the local eth interface to be used to connect to the KNX Bus. **Do not add** this parameter if you've set **KNXEthInterface** to "Auto"|
+
+
+<br/>
+<br/>
+
+
+## Simple sample (you can find this sample in the "simpleSample.js" file):
+
+```javascript
+const knx = require("./index.js");
+
+// Set the properties
+let knxUltimateClientProperties = {
+    ipAddr: "224.0.23.12",
+    ipPort: "3671",
+    physAddr: "1.1.100",
+    suppress_ack_ldatareq: false,
+    loglevel: "error", // or "debug" is the default
+    localEchoInTunneling: true, // Leave true, forever.
+    hostProtocol: "Multicast", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
+    isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
+    jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
+    localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
+    KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
+};
+
+
+// Instantiate the client
+const knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
+
+// Setting handlers
+knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, function (_datagram, _echoed) {
+
+    // Traffic
+    let _evt = "";
+    if (_datagram.cEMIMessage.npdu.isGroupRead) _evt = "GroupValue_Read";
+    if (_datagram.cEMIMessage.npdu.isGroupResponse) _evt = "GroupValue_Response";
+    if (_datagram.cEMIMessage.npdu.isGroupWrite) _evt = "GroupValue_Write";
+    console.log("src: " + _datagram.cEMIMessage.srcAddress.toString() + " dest: " + _datagram.cEMIMessage.dstAddress.toString(), " event: " + _evt);
+
+});
+
+// Connect
+knxUltimateClient.Connect();
+
+// WARNING, THIS WILL WRITE ON YOUR KNX BUS!
+knxUltimateClient.write("0/1/1", false, "1.001");
+```
+
+
+<br/>
+<br/>
+
+## Full featured sample (you can find this sample in the "sample.js" file):
 
 ```javascript
 

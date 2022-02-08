@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.4</b> - February 2022<br/>
+- More samples and property specification in the README.<br/>
+</p>
+<p>
 <b>Version 1.0.3</b> - February 2022<br/>
 - Added sample in the readme.<br/>
 </p>
