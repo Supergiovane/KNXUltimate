@@ -7,7 +7,7 @@
 # CHANGELOG
 
 <p>
-<b>Version 1.0.4</b> - February 2022<br/>
+<b>Version 1.0.5</b> - February 2022<br/>
 - More samples and property specification in the README.<br/>
 </p>
 <p>
