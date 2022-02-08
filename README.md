@@ -56,7 +56,7 @@ It support a massive number of Datapoints. Please run the **sample.js** file to 
 Be aware, that these descriptions are taken from Node-Red KNX-Ultimate node, so there is more code than you need here. Please take only the *msg.payload* part in consideration.<br/>
 You should see something like this (the **msg.payload** is what you need to pass as payload), in the console window:
 
-<img src='https://raw.githubusercontent.com/Supergiovane/knxultimate/master/img/dpt.png' width='40%'>
+<img src='https://raw.githubusercontent.com/Supergiovane/knxultimate/master/img/dpt.png' width='60%'>
 
 <br/>
 <br/>
