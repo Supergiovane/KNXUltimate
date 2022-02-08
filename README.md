@@ -50,11 +50,13 @@ Control your KNX intallation via Node.js!
 
 **Supported Datapoints**
 
-It support a massive number of Datapoints. Please run the **sample.js** file to view all datapoints in the console window.<br/>
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
 For example, pass a *true* for datapoint "1.001", or *{ red: 125, green: 0, blue: 0 }* for datapoint "232.600".<br/>
-You should see something like this, in the console window:
-![dpe](img/dpt.png)
+It support a massive number of Datapoints. Please run the **sample.js** file to view all datapoints in the console window.<br/>
+Be aware, that these descriptions are taken from Node-Red KNX-Ultimate node, so there is more code than you need here. Please take only the *msg.payload* part in consideration.<br/>
+You should see something like this (the **msg.payload** is what you need to pass as payload), in the console window:
+
+<img src='https://raw.githubusercontent.com/Supergiovane/knxultimate/master/img/dpt.png' width='40%'>
 
 <br/>
 <br/>
