@@ -45,6 +45,29 @@ Control your KNX intallation via Node.js!
 | KNXEthInterface (string) | "Auto": Bind to the first avaiable local interfavce. "Manual": if you wish to specify the interface (for example eth1); in this case, set the property **interface** to the interface name (interface:"eth1") |
 | interface (string) | Specifies the local eth interface to be used to connect to the KNX Bus. **Do not add** this parameter if you've set **KNXEthInterface** to "Auto"|
 
+<br/>
+<br/>
+
+**Supported Datapoints**
+
+Datapoints supporter are huge. Please run the **sample.js** file to view all datapoints in the console window.<br/>
+For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
+For example, pass a *true* for datapoint 1.001, or *{ red: 125, green: 0, blue: 0 }* for datapoijnt 232.600.<br/>
+
+<br/>
+<br/>
+
+**Commands to be used to write to the KNX BUS**
+
+See the examples also.
+
+|Property|Description|
+|--|--|
+| .write (GA, payload, datapoint) | Sends a WRITE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
+| .respond (GA, payload, datapoint) | Sends a RESPONSE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
+| .read (GA) | Sends a READ telegram to the BUS. **GA** is the group address (for example "0/0/1").|
+
+
 
 <br/>
 <br/>
