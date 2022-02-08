@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.7</b> - February 2022<br/>
+- Fixed a file not found issue.<br/>
+</p>
+<p>
 <b>Version 1.0.6</b> - February 2022<br/>
 - More samples and property specification in the README.<br/>
 </p>
