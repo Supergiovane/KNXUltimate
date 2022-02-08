@@ -313,7 +313,7 @@ setTimeout(() => {
 
 <br/>
 
-<img src='https://raw.githubusercontent.com/Supergiovane/knxultimate/master/img/nodered.png' width='80%'>
+<img src='https://raw.githubusercontent.com/Supergiovane/knxultimate/master/img/nodered.png' width='90%'>
 
 <br/>
 <br/>
