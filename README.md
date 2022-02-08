@@ -306,7 +306,7 @@ setTimeout(() => {
 }, 10000);
 ```
 
-Why not to try Node-Red https://nodered.org and the awesome KNX-Ultimate node https://github.com/Supergiovane/KNXUltimate ?
+Why not to try Node-Red https://nodered.org and the awesome KNX-Ultimate node https://flows.nodered.org/node/node-red-contrib-knx-ultimate ?
 
 <br/>
 <br/>
