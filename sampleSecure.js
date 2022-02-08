@@ -1,5 +1,4 @@
 
-const { Console } = require("console");
 const knx = require("./index.js");
 
 // This is the content of the ETS Keyring file obtained doing this: https://www.youtube.com/watch?v=OpR7ZQTlMRU
