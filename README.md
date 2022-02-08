@@ -321,10 +321,10 @@ setTimeout(() => {
 ![Logo](https://raw.githubusercontent.com/Supergiovane/node-red-contrib-knx-ultimate/master/img/wiki/flags/madeinitaly.png)
 
 [license-image]: https://img.shields.io/badge/license-MIT-blue.svg
-[license-url]: https://github.com/Supergiovane/KNXUltimate/master/LICENSE
-[npm-url]: https://npmjs.org/package/KNXUltimate
-[npm-version-image]: https://img.shields.io/npm/v/KNXUltimate.svg
-[npm-downloads-month-image]: https://img.shields.io/npm/dm/KNXUltimate.svg
-[npm-downloads-total-image]: https://img.shields.io/npm/dt/KNXUltimate.svg
+[license-url]: https://github.com/Supergiovane/knxultimate/master/LICENSE
+[npm-url]: https://npmjs.org/package/knxultimate
+[npm-version-image]: https://img.shields.io/npm/v/knxultimate.svg
+[npm-downloads-month-image]: https://img.shields.io/npm/dm/knxultimate.svg
+[npm-downloads-total-image]: https://img.shields.io/npm/dt/knxultimate.svg
 [youtube-image]: https://img.shields.io/badge/Visit%20me-Youtube-red
 [youtube-url]: https://www.youtube.com/channel/UCA9RsLps1IthT7fDSeUbRZw/playlists
