@@ -19,7 +19,7 @@ const ipAddressHelper = require("./util/ipAddressHelper");
 const KNXAddress = require("./protocol/KNXAddress").KNXAddress;
 const KNXDataBuffer = require("./protocol/KNXDataBuffer").KNXDataBuffer;
 const DPTLib = require('./dptlib');
-const KNXsecureKeyring = require("./KNXsecureKeyring.js");
+//const KNXsecureKeyring = require("./KNXsecureKeyring.js");
 //const lodash = require("lodash");
 
 var STATE;
@@ -64,6 +64,9 @@ var KNXClientEvents;
 //     connecting: "connecting"
 // };
 
+// Contains the decrypted keyring file
+var jKNXSecureKeyring = "";
+
 // options:
 const optionsDefaults = {
     physAddr: '15.15.200',
@@ -104,7 +107,7 @@ class KNXClient extends EventEmitter {
         this._processInboundMessage = this._processInboundMessage.bind(this);
         this._clientSocket = null;
         this.sysLogger = null;
-        this.jKNXSecureKeyring = this._options.jKNXSecureKeyring; // 28/12/2021 Contains the Keyring JSON object
+        jKNXSecureKeyring = this._options.jKNXSecureKeyring; // 28/12/2021 Contains the Keyring JSON object
         try {
             this.sysLogger = require("./KnxLog.js").get({ loglevel: this._options.loglevel }); // 08/04/2021 new logger to adhere to the loglevel selected in the config-window            
         } catch (error) {
@@ -119,6 +122,7 @@ class KNXClient extends EventEmitter {
             if (this.sysLogger !== undefined && this.sysLogger !== null) this.sysLogger.error("ipAddressHelper.getLocalAddress:" + error.message);
             throw (error);
         }
+
 
         let conn = this;
         // 07/12/2021 Based on protocol instantiate the right socket
@@ -651,7 +655,7 @@ class KNXClient extends EventEmitter {
                 // }, 1000 * KNXConstants.KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT);
                 conn._awaitingResponseType = KNXConstants.KNX_CONSTANTS.CONNECT_RESPONSE;
                 conn._clientTunnelSeqNumber = 0;
-                if (conn._options.isSecureKNXEnabled) conn._sendSecureSessionRequestMessage(new TunnelCRI.TunnelCRI(knxLayer), conn.jKNXSecureKeyring);
+                if (conn._options.isSecureKNXEnabled) conn._sendSecureSessionRequestMessage(new TunnelCRI.TunnelCRI(knxLayer));
             });
 
         } else {
@@ -1046,18 +1050,22 @@ class KNXClient extends EventEmitter {
     _sendDisconnectResponseMessage(channelID, status = KNXConstants.ConnectionStatus.E_NO_ERROR) {
         this.send(KNXProtocol.KNXProtocol.newKNXDisconnectResponse(channelID, status));
     }
-    _sendSecureSessionRequestMessage(cri, jKNXSecureKeyring) {
+    _sendSecureSessionRequestMessage(cri) {
         let oHPAI = new HPAI.HPAI("0.0.0.0", 0, this._options.hostProtocol === "TunnelTCP" ? KNXConstants.KNX_CONSTANTS.IPV4_TCP : KNXConstants.KNX_CONSTANTS.IPV4_UDP);
-        this.send(KNXProtocol.KNXProtocol.newKNXSecureSessionRequest(cri, oHPAI, jKNXSecureKeyring));
+        this.send(KNXProtocol.KNXProtocol.newKNXSecureSessionRequest(cri, oHPAI));
     }
 }
+
 
 // module.exports = function KNXClientEvents() {
 //     return KNXClientEvents;
 // }
 module.exports = {
     KNXClient: KNXClient,
-    KNXClientEvents: KNXClientEvents
+    KNXClientEvents: KNXClientEvents,
+    getDecodedKeyring: function () {
+        return jKNXSecureKeyring;
+    } // Contains the decoded keyring file
 };
 //exports.KNXClient = KNXClient;
 //exports.KNXClientEvents = KNXClientEvents;

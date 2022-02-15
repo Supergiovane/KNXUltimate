@@ -99,8 +99,8 @@ class KNXProtocol {
     static newKNXRoutingIndication(cEMIMessage) { // 18/12/2021
         return new KNXRoutingIndication.KNXRoutingIndication(cEMIMessage);
     }
-    static newKNXSecureSessionRequest(cri, hpaiData = HPAI.HPAI.NULLHPAI, jKNXSecureKeyring) {
-        return new KNXSecureSessionRequest.KNXSecureSessionRequest(cri, hpaiData, jKNXSecureKeyring);
+    static newKNXSecureSessionRequest(cri, hpaiData = HPAI.HPAI.NULLHPAI) {
+        return new KNXSecureSessionRequest.KNXSecureSessionRequest(cri, hpaiData);
     }
 }
 exports.KNXProtocol = KNXProtocol;

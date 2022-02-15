@@ -1,5 +1,6 @@
 
 const knx = require("./index.js");
+const KNXsecureKeyring = require("./src/KNXsecureKeyring.js");
 
 // This is the content of the ETS Keyring file obtained doing this: https://www.youtube.com/watch?v=OpR7ZQTlMRU
 let rawjKNXSecureKeyring = `<?xml version="1.0" encoding="utf-8"?>
@@ -37,11 +38,11 @@ let knxUltimateClientProperties = {
     isSecureKNXEnabled: true, // Leave "false" until KNX-Secure has been released
     KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
-    jKNXSecureKeyring:"", // This is the unencrypted Keyring file content (see below)
+    jKNXSecureKeyring: "", // This is the unencrypted Keyring file content (see below)
 };
 
 async function LoadKeyringFile(_keyring, _password) {
-    return knx.KNXSecureKeyring.keyring.load(_keyring, _password);
+    return KNXsecureKeyring.keyring.load(_keyring, _password);
 }
 
 async function go() {
@@ -51,11 +52,15 @@ async function go() {
     // Again, see this https://www.youtube.com/watch?v=OpR7ZQTlMRU
     knxUltimateClientProperties.jKNXSecureKeyring = await LoadKeyringFile(rawjKNXSecureKeyring, "banana");
 
+
     // Log some infos
     console.log("KNX-Secure: Keyring for ETS proj " + knxUltimateClientProperties.jKNXSecureKeyring.ETSProjectName + ", created by " + knxUltimateClientProperties.jKNXSecureKeyring.ETSCreatedBy + " on " + knxUltimateClientProperties.jKNXSecureKeyring.ETSCreated + " succesfully validated with provided password");
 
     // Instantiate the client
     const knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
+    
+    // This contains the decrypted keyring file, accessible to all .js files referencing the "index.js" module.
+    console.log(knx.getDecodedKeyring());
 
     // Setting handlers
     // ######################################

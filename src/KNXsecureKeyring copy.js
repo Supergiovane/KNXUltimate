@@ -401,6 +401,10 @@ var keyring = (function () {
         return ret;
     }
 
+    // Return the already valorized _retJson
+    function get() {
+        return _retJson;
+    }
     // Read the XML text
     // Returns an object with all necessary info, or error if the keyring password is wrong or something is going bad
     async function load(_sXML, _keyringPassword) {
@@ -558,7 +562,8 @@ var keyring = (function () {
 
     }
     return {
-        load: load
+        load: load,
+        get: get
     };
 
 
