@@ -8,18 +8,21 @@ const KNXConstants = require("./KNXConstants");
 const KNXPacket = require("./KNXPacket");
 const HPAI = require("./HPAI");
 const CRIFactory = __importDefault(require("./CRIFactory"));
+const knx = require("../../index.js");
 
 class KNXSecureSessionRequest extends KNXPacket.KNXPacket {
-    constructor(cri, hpaiData = HPAI.HPAI.NULLHPAI, _jKNXSecureKeyring = {}) {
+    constructor(cri, hpaiData = HPAI.HPAI.NULLHPAI) {
         //super(KNXConstants.KNX_CONSTANTS.SECURE_SESSION_REQUEST, hpaiControl.length + hpaiData.length + cri.length + 32);
         super(KNXConstants.KNX_CONSTANTS.SECURE_SESSION_REQUEST, hpaiData.length + 32);
         this.cri = cri;
         this.hpaiData = hpaiData;
+        // Get the Keyring
+        this.keyring = knx.getDecodedKeyring();
         this.diffieHellmanClientPublicValue = new Buffer.alloc(32);
 
         // Send the DH curve as well
         // 02/01/2022 SONO ARRIVATO QUI get the authentication password from the first tunnel of the interface
-        let authenticationPassword = _jKNXSecureKeyring.Devices[0].authenticationPassword;
+        let authenticationPassword = this.keyring.Devices[0].authenticationPassword;
         //authenticationPassword = authenticationPassword.length === 0 ? new byte[16] : authenticationPassword;
         authenticationPassword = authenticationPassword.length === 0 ? "00000000000000000000000000000000" : authenticationPassword;
         let _key = authenticationPassword;

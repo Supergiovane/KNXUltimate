@@ -7,6 +7,11 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.11</b> - February 2022<br/>
+- Added the property containing the decoded Keyring file, accessible by all modules referencing the "index.js".<br/>
+- Updated the secure sample code.<br/>
+</p>
+<p>
 <b>Version 1.0.10</b> - February 2022<br/>
 - Added secure connection sample code.<br/>
 </p>
