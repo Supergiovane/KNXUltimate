@@ -35,9 +35,6 @@ Control your KNX intallation via Node.js!
 
 KNX-Secure is under development and **should** be ready by mid 2022.<br/>
 Many users requested me to "extract" the baseline KNX API and make it accessible via npmjs. Here is it.<br/>
-The API is named **KNXUltimate**. In the README page is well documented and there are also samples for unsecure and secure KNX connections.
-* <a href="https://github.com/Supergiovane/KNXUltimate#readme">KNXUltimate API</a>
-
 I need volunteer helping in development of KNX Secure.<br/>
 High knowledge of cryptography and KNX is needed.
 **************************************************
