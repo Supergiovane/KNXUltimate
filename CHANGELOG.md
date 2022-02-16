@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.12</b> - February 2022<br/>
+- FIX Datapoint 16.001: fixed an issue with the ISO8859-1 encoding.<br/>
+</p>
+<p>
 <b>Version 1.0.11</b> - February 2022<br/>
 - Added the property containing the decoded Keyring file, accessible by all modules referencing the "index.js".<br/>
 - Updated the secure sample code.<br/>
