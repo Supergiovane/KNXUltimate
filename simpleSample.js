@@ -1,4 +1,3 @@
-
 const knx = require("./index.js");
 
 // Set the properties
@@ -15,7 +14,6 @@ let knxUltimateClientProperties = {
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
     KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
 };
-
 
 // Instantiate the client
 const knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
@@ -37,5 +35,3 @@ knxUltimateClient.Connect();
 
 // WARNING, THIS WILL WRITE ON YOUR KNX BUS!
 knxUltimateClient.write("0/1/1", false, "1.001");
-
-

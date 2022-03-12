@@ -112,7 +112,6 @@ let knxUltimateClientProperties = {
     KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
 };
 
-
 // Instantiate the client
 const knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
 
@@ -142,7 +141,6 @@ knxUltimateClient.write("0/1/1", false, "1.001");
 ## Full featured sample (you can find this sample in the "sample.js" file):
 
 ```javascript
-
 const knx = require("./index.js");
 const dptlib = require('./src/dptlib');
 
@@ -187,7 +185,7 @@ dptGetHelp = dpt => {
             "help":
                 ``, "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki"
         };
-        return(jRet);
+        return (jRet);
     }
     jRet = { "help": "No sample currently avaiable", "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome" };
     const dpts =
@@ -213,13 +211,7 @@ dpts.forEach(element => {
 });
 // ######################################
 
-
-
-
 // Let's connect and turn on your appliance.
-
-
-
 // Set the properties
 let knxUltimateClientProperties = {
     ipAddr: "224.0.23.12",
@@ -235,9 +227,8 @@ let knxUltimateClientProperties = {
     KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
 };
 
-
 // Let's go
-const knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
+var knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
 
 // Setting handlers
 // ######################################
@@ -247,18 +238,17 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.error, err => {
     console.log("Error", err)
 });
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.disconnected, info => {
-    // The client is cisconnected
+    // The client is disconnected. Here you can handle the reconnection
     console.log("Disconnected", info)
 });
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.close, info => {
-    // The client connection has been closed
+    // The client physical net socket has been closed
     console.log("Closed", info)
 
 });
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
     // The client is connected
     console.log("Connected. On Duty", info)
-
 });
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connecting, info => {
     // The client is setting up the connection
@@ -281,16 +271,18 @@ function handleBusEvents(_datagram, _echoed) {
 
 }
 
-
-console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
-console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
-console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
-console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
 console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
 
 // WRITE SOMETHING 
 // WARNING, THIS WILL WRITE TO YOUR BUS !!!!
 setTimeout(() => {
+
+    // WARNING, THIS WILL WRITE ON YOUR KNX BUS!
+
+    if (!knxUltimateClient.isConnected()) {
+        console.log("I'm not connected");
+        return;
+    } 
 
     // Check wether knxUltimateClient is clear to send the next telegram.
     // This should be called bevore any .write, .response, and .read request.
@@ -314,7 +306,13 @@ setTimeout(() => {
     payload = false;
     knxUltimateClient.respond("0/0/1", payload, "1.001");
 
-}, 10000);
+}, 5000);
+
+// Disconnect after 20 secs.
+setTimeout(() => {
+    knxUltimateClient.Disconnect();
+}, 20000);
+
 ```
 <br/>
 <br/>
@@ -327,7 +325,6 @@ Loading, decrypting and validating Keyring file has been done.<br/>
 I'm working on the first secure handshake now.<br/>
 
 ```javascript
-
 const knx = require("./index.js");
 const KNXsecureKeyring = require("./src/KNXsecureKeyring.js");
 
@@ -386,8 +383,8 @@ async function go() {
     console.log("KNX-Secure: Keyring for ETS proj " + knxUltimateClientProperties.jKNXSecureKeyring.ETSProjectName + ", created by " + knxUltimateClientProperties.jKNXSecureKeyring.ETSCreatedBy + " on " + knxUltimateClientProperties.jKNXSecureKeyring.ETSCreated + " succesfully validated with provided password");
 
     // Instantiate the client
-    const knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
-    
+    var knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
+
     // This contains the decrypted keyring file, accessible to all .js files referencing the "index.js" module.
     console.log(knx.getDecodedKeyring());
 
@@ -403,9 +400,8 @@ async function go() {
         console.log("Disconnected", info)
     });
     knxUltimateClient.on(knx.KNXClient.KNXClientEvents.close, info => {
-        // The client connection has been closed
+         // The client physical net socket has been closed
         console.log("Closed", info)
-
     });
     knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
         // The client is connected
@@ -436,12 +432,11 @@ async function go() {
     // Wait some seconds, just for fun
     await new Promise((resolve, reject) => setTimeout(resolve, 6000));
 
-
     // WARNING, THIS WILL WRITE ON YOUR KNX BUS!
-    knxUltimateClient.write("0/1/1", false, "1.001");
+    if (knxUltimateClient.isConnected()) knxUltimateClient.write("0/1/1", false, "1.001");
+
 }
 
-// Gona fishing.
 go();
 
 ```

@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.13</b> - March 2022<br/>
+- Updated samples and fixed disconnection issues is some circumstaces, where the KNX IP Interface doesn't send the DISCONNECT_RESPONSE datagram to confirm the disconnection.<br/>
+</p>
+<p>
 <b>Version 1.0.12</b> - February 2022<br/>
 - FIX Datapoint 16.001: fixed an issue with the ISO8859-1 encoding.<br/>
 </p>
