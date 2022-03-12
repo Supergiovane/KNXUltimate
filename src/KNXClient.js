@@ -123,11 +123,14 @@ class KNXClient extends EventEmitter {
             throw (error);
         }
 
+        // 12/03/2022 Remove all listeners
+        this.removeAllListeners();
 
         let conn = this;
         // 07/12/2021 Based on protocol instantiate the right socket
         if (this._options.hostProtocol === "TunnelUDP") {
             this._clientSocket = dgram.createSocket({ type: 'udp4', reuseAddr: false });
+            this._clientSocket.removeAllListeners();  // 12/03/2022 Remove all listeners
             this._clientSocket.on(SocketEvents.message, this._processInboundMessage);
             this._clientSocket.on(SocketEvents.error, error => this.emit(KNXClientEvents.error, error));
             this._clientSocket.on(SocketEvents.close, info => this.emit(KNXClientEvents.close, info));
@@ -142,6 +145,7 @@ class KNXClient extends EventEmitter {
         } else if (this._options.hostProtocol === "TunnelTCP") {
             // TCP
             this._clientSocket = new net.Socket();
+            this._clientSocket.removeAllListeners();  // 12/03/2022 Remove all listeners
             //this._clientSocket.on(SocketEvents.data, this._processInboundMessage);
             this._clientSocket.on(SocketEvents.data, function (msg, rinfo, callback) {
                 console.log(msg, rinfo, callback);
@@ -152,6 +156,7 @@ class KNXClient extends EventEmitter {
         } else if (this._options.hostProtocol === "Multicast") {
             let conn = this;
             this._clientSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+            this._clientSocket.removeAllListeners();  // 12/03/2022 Remove all listeners
             this._clientSocket.on(SocketEvents.listening, function () {
                 try {
                     conn._clientSocket.addMembership(conn._peerHost, conn._options.localIPAddress);
@@ -348,8 +353,7 @@ class KNXClient extends EventEmitter {
             cEMIMessage.control.priority = 3;
             cEMIMessage.control.addressType = 1;
             cEMIMessage.control.hopCount = 6;
-            this._incSeqNumber(); // 26/12/2021
-            const seqNum = this._getSeqNumber();
+            const seqNum = this._incSeqNumber(); // 26/12/2021
             const knxPacketRequest = KNXProtocol.KNXProtocol.newKNXTunnelingRequest(this._channelID, seqNum, cEMIMessage);
             if (!this._options.suppress_ack_ldatareq) this._setTimerWaitingForACK(knxPacketRequest);
             //if (this.sysLogger !== undefined && this.sysLogger !== null) this.sysLogger.error("this._tunnelReqTimer "+ this._tunnelReqTimer.size);
@@ -394,8 +398,7 @@ class KNXClient extends EventEmitter {
             cEMIMessage.control.priority = 3;
             cEMIMessage.control.addressType = 1;
             cEMIMessage.control.hopCount = 6;
-            this._incSeqNumber(); // 26/12/2021
-            const seqNum = this._getSeqNumber();
+            const seqNum = this._incSeqNumber(); // 26/12/2021
             const knxPacketRequest = KNXProtocol.KNXProtocol.newKNXTunnelingRequest(this._channelID, seqNum, cEMIMessage);
             if (!this._options.suppress_ack_ldatareq) this._setTimerWaitingForACK(knxPacketRequest);
             this.send(knxPacketRequest);
@@ -436,8 +439,7 @@ class KNXClient extends EventEmitter {
             cEMIMessage.control.priority = 3;
             cEMIMessage.control.addressType = 1;
             cEMIMessage.control.hopCount = 6;
-            this._incSeqNumber(); // 26/12/2021
-            const seqNum = this._getSeqNumber();
+            const seqNum = this._incSeqNumber(); // 26/12/2021
             const knxPacketRequest = KNXProtocol.KNXProtocol.newKNXTunnelingRequest(this._channelID, seqNum, cEMIMessage);
             if (!this._options.suppress_ack_ldatareq) this._setTimerWaitingForACK(knxPacketRequest);
             this.send(knxPacketRequest);
@@ -450,55 +452,6 @@ class KNXClient extends EventEmitter {
         }
 
     }
-    // writeRaw(dstAddress, _rawDataBuffer, bitlength) {
-    //     // bitlength is unused and only for backward compatibility
-
-    //     if (this._connectionState !== STATE.CONNECTED) throw new Error("The socket is not connected. Unable to access the KNX BUS");
-
-    //     if (!Buffer.isBuffer(_rawDataBuffer)) {
-    //         if (this.sysLogger !== undefined && this.sysLogger !== null) this.sysLogger.error('KNXClient: writeRaw: Value must be a buffer! ');
-    //         return
-    //     }
-
-    //     // Transform the  "data" into a KNDDataBuffer
-    //     let data = new KNXDataBuffer(_rawDataBuffer);
-
-    //     if (typeof dstAddress === "string") dstAddress = KNXAddress.createFromString(dstAddress, KNXAddress.TYPE_GROUP);
-    //     let srcAddress = this._options.physAddr;
-    //     if (this._options.hostProtocol === "Multicast") {
-    //         // Multicast
-    //         const cEMIMessage = CEMIFactory.CEMIFactory.newLDataIndicationMessage("write", srcAddress, dstAddress, data);
-    //         cEMIMessage.control.ack = 0;
-    //         cEMIMessage.control.broadcast = 1;
-    //         cEMIMessage.control.priority = 3;
-    //         cEMIMessage.control.addressType = 1;
-    //         cEMIMessage.control.hopCount = 6;
-    //         const knxPacketRequest = KNXProtocol.KNXProtocol.newKNXRoutingIndication(cEMIMessage);
-    //         this.send(knxPacketRequest);
-    //         // 06/12/2021 Multivast automaticalli echoes telegrams
-
-    //     } else {
-    //         // Tunneling
-    //         const cEMIMessage = CEMIFactory.CEMIFactory.newLDataRequestMessage("write", srcAddress, dstAddress, data);
-    //         cEMIMessage.control.ack = this._options.suppress_ack_ldatareq ? 0 : 1;
-    //         cEMIMessage.control.broadcast = 1;
-    //         cEMIMessage.control.priority = 3;
-    //         cEMIMessage.control.addressType = 1;
-    //         cEMIMessage.control.hopCount = 6;
-    //         this._incSeqNumber(); // 26/12/2021
-    //         const seqNum = this._getSeqNumber();
-    //         const knxPacketRequest = KNXProtocol.KNXProtocol.newKNXTunnelingRequest(this._channelID, seqNum, cEMIMessage);
-    //         if (!this._options.suppress_ack_ldatareq) this._setTimerWaitingForACK(knxPacketRequest);
-    //         this.send(knxPacketRequest);
-    //         // 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-    //         try {
-    //             if (this._options.localEchoInTunneling) this.emit(KNXClientEvents.indication, knxPacketRequest, true);
-    //         } catch (error) {
-    //         }
-
-    //     }
-
-    // }
 
     writeRaw(dstAddress, _rawDataBuffer, bitlength) {
         // bitlength is unused and only for backward compatibility
@@ -547,8 +500,7 @@ class KNXClient extends EventEmitter {
             cEMIMessage.control.priority = 3;
             cEMIMessage.control.addressType = 1;
             cEMIMessage.control.hopCount = 6;
-            this._incSeqNumber(); // 26/12/2021
-            const seqNum = this._getSeqNumber();
+            const seqNum = this._incSeqNumber(); // 26/12/2021
             const knxPacketRequest = KNXProtocol.KNXProtocol.newKNXTunnelingRequest(this._channelID, seqNum, cEMIMessage);
             if (!this._options.suppress_ack_ldatareq) this._setTimerWaitingForACK(knxPacketRequest);
             this.send(knxPacketRequest);
@@ -706,33 +658,38 @@ class KNXClient extends EventEmitter {
         this._connectionState = STATE.DISCONNECTING;
         this._awaitingResponseType = KNXConstants.KNX_CONSTANTS.DISCONNECT_RESPONSE;
         this._sendDisconnectRequestMessage(this._channelID);
-        //this._timerTimeoutSendDisconnectRequestMessage = setTimeout(() => {
-        this._setDisconnected("Called from KNXClient Disconnected");
-        //}, 1000 * KNXConstants.KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT);
+        // 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
+        setTimeout(() => {
+            if (this._connectionState !== STATE.DISCONNECTED) this._setDisconnected("Forced call from KNXClient Disconnect() function, because the KNX Interface hasn't sent the DISCONNECT_RESPONSE in time.");
+        }, 2000);
     }
     isConnected() {
         return this._connectionState === STATE.CONNECTED;
     }
     _setDisconnected(_sReason = "") {
+        try {
+            if (this.sysLogger !== undefined && this.sysLogger !== null) this.sysLogger.debug("KNXClient: called _setDisconnected " + this._options.ipAddr + ":" + this._options.ipPort + " " + _sReason);
+        } catch (error) {
+        }
+        this._connectionState = STATE.DISCONNECTED;
+        this.stopHeartBeat();
         if (this._timerTimeoutSendDisconnectRequestMessagetimer !== null) clearTimeout(this._timerTimeoutSendDisconnectRequestMessagetimer);
         this._timerTimeoutSendDisconnectRequestMessage = null;
         if (this._connectionTimeoutTimer !== null) clearTimeout(this._connectionTimeoutTimer);
         if (this._tunnelReqTimer !== null) clearTimeout(this._tunnelReqTimer);
-        this.stopHeartBeat();
-        this._connectionState = STATE.DISCONNECTED;
-        try {
-            this.emit(KNXClientEvents.disconnected, this._options.ipAddr + ":" + this._options.ipPort + " " + _sReason);
-        } catch (error) {
-        }
-
         this._clientTunnelSeqNumber = -1;
-        this._clearToSend = true; // 26/12/2021 allow to send
         this._channelID = null;
 
         // 08/12/2021
         try {
             this._clientSocket.close();
         } catch (error) { }
+
+        try {
+            this.emit(KNXClientEvents.disconnected, this._options.ipAddr + ":" + this._options.ipPort + " " + _sReason);
+        } catch (error) {
+        }
+        this._clearToSend = true; // 26/12/2021 allow to send
 
     }
     _runHeartbeat() {
@@ -751,7 +708,7 @@ class KNXClient extends EventEmitter {
         return (this._clearToSend !== undefined ? this._clearToSend : true);
     }
 
-    _incSeqNumber(seq) {
+    _incSeqNumber() {
         this._clientTunnelSeqNumber++;
         if (this._clientTunnelSeqNumber > 255) {
             this._clientTunnelSeqNumber = 0;
@@ -864,7 +821,7 @@ class KNXClient extends EventEmitter {
                     } catch (error) {
                     }
                 }
-                this._setDisconnected("Received Disconnect Response");
+                this._setDisconnected("Received DISCONNECT_RESPONSE from the KNX interface.");
             }
             else if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.DISCONNECT_REQUEST) {
 
@@ -879,7 +836,10 @@ class KNXClient extends EventEmitter {
 
                 this._connectionState = STATE.DISCONNECTING;
                 this._sendDisconnectResponseMessage(knxDisconnectRequest.channelID);
-                this._setDisconnected("Received Disconnect Request");
+                // 12/03/2021 Added 1 sec delay.
+                setTimeout(() => {
+                    this._setDisconnected("Received KNX packet: DISCONNECT_REQUEST, ChannelID:" + this._channelID + " Host:" + this._options.ipAddr + ":" + this._options.ipPort);
+                }, 1000);
             }
             else if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.TUNNELING_REQUEST) {
 

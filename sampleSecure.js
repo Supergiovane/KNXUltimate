@@ -57,8 +57,8 @@ async function go() {
     console.log("KNX-Secure: Keyring for ETS proj " + knxUltimateClientProperties.jKNXSecureKeyring.ETSProjectName + ", created by " + knxUltimateClientProperties.jKNXSecureKeyring.ETSCreatedBy + " on " + knxUltimateClientProperties.jKNXSecureKeyring.ETSCreated + " succesfully validated with provided password");
 
     // Instantiate the client
-    const knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
-    
+    var knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
+
     // This contains the decrypted keyring file, accessible to all .js files referencing the "index.js" module.
     console.log(knx.getDecodedKeyring());
 
@@ -74,9 +74,8 @@ async function go() {
         console.log("Disconnected", info)
     });
     knxUltimateClient.on(knx.KNXClient.KNXClientEvents.close, info => {
-        // The client connection has been closed
+         // The client physical net socket has been closed
         console.log("Closed", info)
-
     });
     knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
         // The client is connected
@@ -107,11 +106,10 @@ async function go() {
     // Wait some seconds, just for fun
     await new Promise((resolve, reject) => setTimeout(resolve, 6000));
 
-
     // WARNING, THIS WILL WRITE ON YOUR KNX BUS!
-    knxUltimateClient.write("0/1/1", false, "1.001");
-}
+    if (knxUltimateClient.isConnected()) knxUltimateClient.write("0/1/1", false, "1.001");
 
+}
 
 go();
 
