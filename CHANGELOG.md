@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.14</b> - March 2022<br/>
+- Optimized memory allocation to allow the garbage collector to get rid of unref variables.<br/>
+</p>
+<p>
 <b>Version 1.0.13</b> - March 2022<br/>
 - Updated samples and fixed disconnection issues is some circumstaces, where the KNX IP Interface doesn't send the DISCONNECT_RESPONSE datagram to confirm the disconnection.<br/>
 </p>
