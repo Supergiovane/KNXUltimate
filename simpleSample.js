@@ -29,9 +29,14 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, function (_datagr
     console.log("src: " + _datagram.cEMIMessage.srcAddress.toString() + " dest: " + _datagram.cEMIMessage.dstAddress.toString(), " event: " + _evt);
 
 });
+knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
+    // The client is connected
+    console.log("Connected. On Duty", info);
+
+    // WARNING, THIS WILL WRITE ON YOUR KNX BUS!
+    knxUltimateClient.write("0/1/1", false, "1.001");
+});
 
 // Connect
 knxUltimateClient.Connect();
 
-// WARNING, THIS WILL WRITE ON YOUR KNX BUS!
-knxUltimateClient.write("0/1/1", false, "1.001");
