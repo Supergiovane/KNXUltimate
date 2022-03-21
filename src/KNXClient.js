@@ -523,35 +523,35 @@ class KNXClient extends EventEmitter {
             clearTimeout(this._heartbeatTimer);
         }
     }
-    isDiscoveryRunning() {
-        return this._discovery_timer != null;
-    }
-    startDiscovery() {
-        if (this.isDiscoveryRunning()) {
-            throw new Error('Discovery already running');
-        }
-        this._discovery_timer = setTimeout(() => {
-            this._discovery_timer = null;
-        }, 1000 * KNXConstants.KNX_CONSTANTS.SEARCH_TIMEOUT);
-        this._sendSearchRequestMessage();
-    }
-    stopDiscovery() {
-        if (!this.isDiscoveryRunning()) {
-            return;
-        }
-        if (this._discovery_timer !== null) clearTimeout(this._discovery_timer);
-        this._discovery_timer = null;
-    }
-    getDescription(host, port) {
-        if (this._clientSocket == null) {
-            throw new Error('No client socket defined');
-        }
-        this._connectionTimeoutTimer = setTimeout(() => {
-            this._connectionTimeoutTimer = null;
-        }, 1000 * KNXConstants.KNX_CONSTANTS.DEVICE_CONFIGURATION_REQUEST_TIMEOUT);
-        this._awaitingResponseType = KNXConstants.KNX_CONSTANTS.DESCRIPTION_RESPONSE;
-        this._sendDescriptionRequestMessage(host, port);
-    }
+    // isDiscoveryRunning() {
+    //     return this._discovery_timer != null;
+    // }
+    // startDiscovery() {
+    //     if (this.isDiscoveryRunning()) {
+    //         throw new Error('Discovery already running');
+    //     }
+    //     this._discovery_timer = setTimeout(() => {
+    //         this._discovery_timer = null;
+    //     }, 1000 * KNXConstants.KNX_CONSTANTS.SEARCH_TIMEOUT);
+    //     this._sendSearchRequestMessage();
+    // }
+    // stopDiscovery() {
+    //     if (!this.isDiscoveryRunning()) {
+    //         return;
+    //     }
+    //     if (this._discovery_timer !== null) clearTimeout(this._discovery_timer);
+    //     this._discovery_timer = null;
+    // }
+    // getDescription(host, port) {
+    //     if (this._clientSocket == null) {
+    //         throw new Error('No client socket defined');
+    //     }
+    //     this._connectionTimeoutTimer = setTimeout(() => {
+    //         this._connectionTimeoutTimer = null;
+    //     }, 1000 * KNXConstants.KNX_CONSTANTS.DEVICE_CONFIGURATION_REQUEST_TIMEOUT);
+    //     this._awaitingResponseType = KNXConstants.KNX_CONSTANTS.DESCRIPTION_RESPONSE;
+    //     this._sendDescriptionRequestMessage(host, port);
+    // }
     Connect(knxLayer = TunnelCRI.TunnelTypes.TUNNEL_LINKLAYER) {
 
         if (this._clientSocket == null) {
@@ -662,7 +662,7 @@ class KNXClient extends EventEmitter {
         this._awaitingResponseType = KNXConstants.KNX_CONSTANTS.DISCONNECT_RESPONSE;
         this._sendDisconnectRequestMessage(this._channelID);
         // 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
-        setTimeout(() => {
+        let t = setTimeout(() => { // 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
             if (this._connectionState !== STATE.DISCONNECTED) this._setDisconnected("Forced call from KNXClient Disconnect() function, because the KNX Interface hasn't sent the DISCONNECT_RESPONSE in time.");
         }, 2000);
     }
@@ -696,7 +696,7 @@ class KNXClient extends EventEmitter {
     _runHeartbeat() {
         if (this._heartbeatRunning) {
             this.getConnectionStatus();
-            setTimeout(() => {
+            let t = setTimeout(() => { // 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
                 this._runHeartbeat();
             }, 1000 * this._options.connectionKeepAliveTimeout);
         }
@@ -844,7 +844,7 @@ class KNXClient extends EventEmitter {
                 this._connectionState = STATE.DISCONNECTING;
                 this._sendDisconnectResponseMessage(knxDisconnectRequest.channelID);
                 // 12/03/2021 Added 1 sec delay.
-                setTimeout(() => {
+                let t = setTimeout(() => { // 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
                     this._setDisconnected("Received KNX packet: DISCONNECT_REQUEST, ChannelID:" + this._channelID + " Host:" + this._options.ipAddr + ":" + this._options.ipPort);
                 }, 1000);
             }

@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.15</b> - March 2022<br/>
+- Further optimization for the garbage collector.<br/>
+</p>
+<p>
 <b>Version 1.0.14</b> - March 2022<br/>
 - Optimized memory allocation to allow the garbage collector to get rid of unref variables.<br/>
 </p>
