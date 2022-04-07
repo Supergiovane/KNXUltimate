@@ -1,4 +1,5 @@
 const knx = require("./index.js");
+const dptlib = require('./src/dptlib');
 
 // Set the properties
 let knxUltimateClientProperties = {
@@ -21,18 +22,39 @@ const knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
 // Setting handlers
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, function (_datagram, _echoed) {
 
-    // Traffic
+    // This function is called whenever a KNX telegram arrives from BUS
+
+    // Get the event
     let _evt = "";
+    let dpt = "";
+    let jsValue;
     if (_datagram.cEMIMessage.npdu.isGroupRead) _evt = "GroupValue_Read";
     if (_datagram.cEMIMessage.npdu.isGroupResponse) _evt = "GroupValue_Response";
     if (_datagram.cEMIMessage.npdu.isGroupWrite) _evt = "GroupValue_Write";
-    console.log("src: " + _datagram.cEMIMessage.srcAddress.toString() + " dest: " + _datagram.cEMIMessage.dstAddress.toString(), " event: " + _evt);
+    // Get the source Address
+    let _src = _datagram.cEMIMessage.srcAddress.toString();
+    // Get the destination GA
+    let _dst = _datagram.cEMIMessage.dstAddress.toString()
+    // Get the RAW Value
+    let _Rawvalue = _datagram.cEMIMessage.npdu.dataValue;
+    
+    // Decode the telegram. 
+    if (_dst === "0/1/1") {
+        // We know that 0/1/1 is a boolean DPT 1.001
+        dpt = dptlib.resolve("1.001");
+        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+    } else if (_dst === "0/1/2") {
+        // We know that 0/1/2 is a boolean DPT 232.600 Color RGB
+        dpt = dptlib.resolve("232.600");
+        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+    }
+    console.log("src: " + _src + " dest: " + _dst, " event: " + _evt, " value: " + jsValue);
+
 
 });
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
     // The client is connected
     console.log("Connected. On Duty", info);
-
     // WARNING, THIS WILL WRITE ON YOUR KNX BUS!
     knxUltimateClient.write("0/1/1", false, "1.001");
 });

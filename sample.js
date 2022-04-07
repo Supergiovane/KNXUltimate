@@ -106,6 +106,29 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.close, info => {
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
     // The client is connected
     console.log("Connected. On Duty", info)
+
+    // Check wether knxUltimateClient is clear to send the next telegram.
+    // This should be called bevore any .write, .response, and .read request.
+    // If not clear to send, retry later because the knxUltimateClient is busy in sending another telegram.
+    console.log("Clear to send: " + knxUltimateClient._getClearToSend())
+
+    // // Send a WRITE telegram to the KNX BUS
+    // // You need: group address, payload (true/false/or any message), datapoint as string
+    let payload = true;
+    if (knxUltimateClient._getClearToSend()) knxUltimateClient.write("0/1/1", payload, "1.001");
+
+    // Send a color RED to an RGB datapoint
+    payload = { red: 125, green: 0, blue: 0 };
+    if (knxUltimateClient._getClearToSend()) knxUltimateClient.write("0/1/2", payload, "232.600");
+
+    // // Send a READ request to the KNX BUS
+    if (knxUltimateClient._getClearToSend()) knxUltimateClient.read("0/0/1");
+
+    // Send a RESPONSE telegram to the KNX BUS
+    // You need: group address, payload (true/false/or any message), datapoint as string
+    payload = false;
+    if (knxUltimateClient._getClearToSend()) knxUltimateClient.respond("0/0/1", payload, "1.001");
+
 });
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connecting, info => {
     // The client is setting up the connection
@@ -119,53 +142,37 @@ knxUltimateClient.Connect();
 // ---------------------------------------------------------------------------------------
 function handleBusEvents(_datagram, _echoed) {
 
-    // Traffic
+    // This function is called whenever a KNX telegram arrives from BUS
+
+    // Get the event
     let _evt = "";
+    let dpt = "";
+    let jsValue;
     if (_datagram.cEMIMessage.npdu.isGroupRead) _evt = "GroupValue_Read";
     if (_datagram.cEMIMessage.npdu.isGroupResponse) _evt = "GroupValue_Response";
     if (_datagram.cEMIMessage.npdu.isGroupWrite) _evt = "GroupValue_Write";
-    console.log("src: " + _datagram.cEMIMessage.srcAddress.toString() + " dest: " + _datagram.cEMIMessage.dstAddress.toString(), " event: " + _evt);
+    // Get the source Address
+    let _src = _datagram.cEMIMessage.srcAddress.toString();
+    // Get the destination GA
+    let _dst = _datagram.cEMIMessage.dstAddress.toString()
+    // Get the RAW Value
+    let _Rawvalue = _datagram.cEMIMessage.npdu.dataValue;
+    
+    // Decode the telegram. 
+    if (_dst === "0/1/1") {
+        // We know that 0/1/1 is a boolean DPT 1.001
+        dpt = dptlib.resolve("1.001");
+        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+    } else if (_dst === "0/1/2") {
+        // We know that 0/1/2 is a boolean DPT 232.600 Color RGB
+        dpt = dptlib.resolve("232.600");
+        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+    }
+    console.log("src: " + _src + " dest: " + _dst, " event: " + _evt, " value: " + jsValue);
 
 }
 
-console.log("WARNING: I'm about to write to your BUS in 10 seconds! Press Control+C to abort!")
-
-// WRITE SOMETHING 
-// WARNING, THIS WILL WRITE TO YOUR BUS !!!!
-setTimeout(() => {
-
-    // WARNING, THIS WILL WRITE ON YOUR KNX BUS!
-
-    if (!knxUltimateClient.isConnected()) {
-        console.log("I'm not connected");
-        return;
-    } 
-
-    // Check wether knxUltimateClient is clear to send the next telegram.
-    // This should be called bevore any .write, .response, and .read request.
-    // If not clear to send, retry later because the knxUltimateClient is busy in sending another telegram.
-    console.log("Clear to send: " + knxUltimateClient._getClearToSend())
-
-    // // Send a WRITE telegram to the KNX BUS
-    // // You need: group address, payload (true/false/or any message), datapoint as string
-    let payload = true;
-    knxUltimateClient.write("0/1/1", payload, "1.001");
-
-    // Send a color RED to an RGB datapoint
-    payload = { red: 125, green: 0, blue: 0 };
-    knxUltimateClient.write("0/1/2", payload, "232.600");
-
-    // // Send a READ request to the KNX BUS
-    knxUltimateClient.read("0/0/1");
-
-    // Send a RESPONSE telegram to the KNX BUS
-    // You need: group address, payload (true/false/or any message), datapoint as string
-    payload = false;
-    knxUltimateClient.respond("0/0/1", payload, "1.001");
-
-}, 5000);
-
 // Disconnect after 20 secs.
 setTimeout(() => {
-    knxUltimateClient.Disconnect();
+    if (knxUltimateClient.isConnected()) knxUltimateClient.Disconnect();
 }, 20000);
