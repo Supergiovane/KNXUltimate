@@ -101,7 +101,12 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.disconnected, info => {
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.close, info => {
     // The client physical net socket has been closed
     console.log("Closed", info)
-
+});
+knxUltimateClient.on(knx.KNXClient.KNXClientEvents.ackReceived, (knxMessage, info) => {
+    // In -->tunneling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
+    // knxMessage: contains the telegram sent.
+    // info is true it the last telegram has been acknowledge, otherwise false.
+    console.log("Last telegram acknowledge", knxMessage, info)
 });
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
     // The client is connected
@@ -114,7 +119,7 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
 
     // // Send a WRITE telegram to the KNX BUS
     // // You need: group address, payload (true/false/or any message), datapoint as string
-    let payload = true;
+    let payload = false;
     if (knxUltimateClient._getClearToSend()) knxUltimateClient.write("0/1/1", payload, "1.001");
 
     // Send a color RED to an RGB datapoint
@@ -157,7 +162,7 @@ function handleBusEvents(_datagram, _echoed) {
     let _dst = _datagram.cEMIMessage.dstAddress.toString()
     // Get the RAW Value
     let _Rawvalue = _datagram.cEMIMessage.npdu.dataValue;
-    
+
     // Decode the telegram. 
     if (_dst === "0/1/1") {
         // We know that 0/1/1 is a boolean DPT 1.001

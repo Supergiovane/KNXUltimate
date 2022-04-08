@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.18</b> - April 2022<br/>
+- NEW: new event has been added. The ackReceived event is triggered every time a telegram is sent over TunnelUDP ot TunnelTCP, after it has been acknowledge or not acknowledge<br/>
+</p>
+<p>
 <b>Version 1.0.16</b> - April 2022<br/>
 - Changed: the KNX Gateway don't care anymore for ROUTING_LOST_MESSAGE and ROUTING_BUSY. Previously, it was disconnecting. Now it only advises in LOG.<br/>
 - Added sample on how to decode incoming datagram's values<br/>

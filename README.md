@@ -86,15 +86,21 @@ You should see something like this in the console window (the **msg.payload** is
 | .respond (GA, payload, datapoint) | Sends a RESPONSE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
 | .read (GA) | Sends a READ telegram to the BUS. **GA** is the group address (for example "0/0/1").|
 
-
 <br/>
 <br/>
-
 
 |Properties|Description|
 |--|--|
 | .isConnected() | Returns **true** if you the client is connected to the KNX Gateway Router/Interface, **false** if not connected. |
-| ._getClearToSend() | Returns **true** if you can send a telegram, **false** if the client is still waiting for the last telegram's ACK or whenever the client cannot temporary send the telegram. |
+| ._getClearToSend() | Returns **true** if you can send a telegram, **false** if the client is still waiting for the last telegram's ACK or whenever the client cannot temporary send the telegram. In tunneling mode, you could also refer to the event **KNXClientEvents.ackReceived**, that is fired everytime a telegram has been succesfully acknowledge or not acknowledge. See the sample.js file. |
+
+<br/>
+<br/>
+
+## EVENTS
+
+Please see the sample.js file. This sample contains all events triggered by KNXUltimate.
+
 
 
 <br/>
@@ -291,7 +297,12 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.disconnected, info => {
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.close, info => {
     // The client physical net socket has been closed
     console.log("Closed", info)
-
+});
+knxUltimateClient.on(knx.KNXClient.KNXClientEvents.ackReceived, (knxMessage, info) => {
+    // In -->tunneling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
+    // knxMessage: contains the telegram sent.
+    // info is true it the last telegram has been acknowledge, otherwise false.
+    console.log("Last telegram acknowledge", knxMessage, info)
 });
 knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
     // The client is connected
@@ -304,7 +315,7 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
 
     // // Send a WRITE telegram to the KNX BUS
     // // You need: group address, payload (true/false/or any message), datapoint as string
-    let payload = true;
+    let payload = false;
     if (knxUltimateClient._getClearToSend()) knxUltimateClient.write("0/1/1", payload, "1.001");
 
     // Send a color RED to an RGB datapoint
@@ -347,7 +358,7 @@ function handleBusEvents(_datagram, _echoed) {
     let _dst = _datagram.cEMIMessage.dstAddress.toString()
     // Get the RAW Value
     let _Rawvalue = _datagram.cEMIMessage.npdu.dataValue;
-    
+
     // Decode the telegram. 
     if (_dst === "0/1/1") {
         // We know that 0/1/1 is a boolean DPT 1.001
