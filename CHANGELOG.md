@@ -8,7 +8,7 @@
 
 <p>
 <b>Version 1.0.18</b> - April 2022<br/>
-- NEW: new event has been added. The ackReceived event is triggered every time a telegram is sent over TunnelUDP ot TunnelTCP, after it has been acknowledge or not acknowledge<br/>
+- NEW: new event has been added. The ackReceived event is triggered every time a telegram is sent over TunnelUDP or TunnelTCP, after it has been acknowledged or not acknowledged. Please see the full featured sample.js file.<br/>
 </p>
 <p>
 <b>Version 1.0.16</b> - April 2022<br/>
