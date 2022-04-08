@@ -70,6 +70,12 @@ async function go() {
         // Error event
         console.log("Error", err)
     });
+    knxUltimateClient.on(knx.KNXClient.KNXClientEvents.ackReceived, (knxMessage, info) => {
+        // In -->tunneling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
+        // knxMessage: contains the telegram sent.
+        // info is true it the last telegram has been acknowledge, otherwise false.
+        console.log("Last telegram acknowledge", knxMessage, info)
+    });
     knxUltimateClient.on(knx.KNXClient.KNXClientEvents.disconnected, info => {
         // The client is cisconnected
         console.log("Disconnected", info)
