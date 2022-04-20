@@ -56,7 +56,7 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
     // The client is connected
     console.log("Connected. On Duty", info);
     // WARNING, THIS WILL WRITE ON YOUR KNX BUS!
-    knxUltimateClient.write("0/1/1", false, "1.001");
+    knxUltimateClient.write("0/1/1", false, "1.001");    
 });
 
 // Connect
