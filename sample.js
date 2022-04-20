@@ -84,6 +84,7 @@ let knxUltimateClientProperties = {
     KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
 };
 
+
 // Let's go
 var knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
 
