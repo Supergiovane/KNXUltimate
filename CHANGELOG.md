@@ -7,6 +7,12 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.19</b> - April 2022<br/>
+- Protected some functions to avoid issues in case of misuse.<br/>
+- The ACK of received telegrams is now called befor the "indication" event is emitted to the client.<br/>
+- Fixed some issues in the disconnection mechanism.<br/>
+</p>
+<p>
 <b>Version 1.0.18</b> - April 2022<br/>
 - NEW: new event has been added. The ackReceived event is triggered every time a telegram is sent over TunnelUDP or TunnelTCP, after it has been acknowledged or not acknowledged. Please see the full featured sample.js file.<br/>
 </p>
