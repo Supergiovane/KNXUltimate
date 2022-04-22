@@ -595,7 +595,10 @@ class KNXClient extends EventEmitter {
             }, 1000 * KNXConstants.KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT);
             this._awaitingResponseType = KNXConstants.KNX_CONSTANTS.CONNECT_RESPONSE;
             this._clientTunnelSeqNumber = -1;
-            this._sendConnectRequestMessage(new TunnelCRI.TunnelCRI(knxLayer));
+            try {
+                this._sendConnectRequestMessage(new TunnelCRI.TunnelCRI(knxLayer));
+            } catch (error) { }
+
 
         } else if (this._options.hostProtocol === "TunnelTCP") {
 
@@ -656,16 +659,26 @@ class KNXClient extends EventEmitter {
             }
         }, 1000 * KNXConstants.KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT);
         this._awaitingResponseType = KNXConstants.KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE;
-        this._sendConnectionStateRequestMessage(this._channelID);
+        try {
+            this._sendConnectionStateRequestMessage(this._channelID);
+        } catch (error) { }
     }
     Disconnect() {
-        if (this._clientSocket == null) {
+        if (this._clientSocket === null) {
             throw new Error('No client socket defined');
+        }
+        // 20/04/2022 this._channelID === null can happen when the KNX Gateway is already disconnected
+        if (this._channelID === null) {
+            throw new Error('KNX Socket is already disconnected');
         }
         this.stopHeartBeat();
         this._connectionState = STATE.DISCONNECTING;
         this._awaitingResponseType = KNXConstants.KNX_CONSTANTS.DISCONNECT_RESPONSE;
-        this._sendDisconnectRequestMessage(this._channelID);
+        try {
+            this._sendDisconnectRequestMessage(this._channelID);
+        } catch (error) {
+        }
+
         // 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
         let t = setTimeout(() => { // 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
             if (this._connectionState !== STATE.DISCONNECTED) this._setDisconnected("Forced call from KNXClient Disconnect() function, because the KNX Interface hasn't sent the DISCONNECT_RESPONSE in time.");
@@ -776,14 +789,14 @@ class KNXClient extends EventEmitter {
                 try {
                     this.emit(KNXClientEvents.error, new Error('ROUTING_LOST_MESSAGE'));
                     //this._setDisconnected("Routing Lost Message"); // 31/03/2022 Commented, because it doesn't matter. Non need to disconnect.
-                    return;
                 } catch (error) { }
+                return;
             } else if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.ROUTING_BUSY) {
                 try {
                     this.emit(KNXClientEvents.error, new Error('ROUTING_BUSY'));
                     //this._setDisconnected("Routing Busy"); // 31/03/2022 Commented, because it doesn't matter. Non need to disconnect.
-                    return;
                 } catch (error) { }
+                return;
             }
 
             if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.SEARCH_RESPONSE) {
@@ -853,7 +866,10 @@ class KNXClient extends EventEmitter {
                 } catch (error) { }
 
                 this._connectionState = STATE.DISCONNECTING;
-                this._sendDisconnectResponseMessage(knxDisconnectRequest.channelID);
+                try {
+                    this._sendDisconnectResponseMessage(knxDisconnectRequest.channelID);
+                } catch (error) { }
+
                 // 12/03/2021 Added 1 sec delay.
                 let t = setTimeout(() => { // 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
                     this._setDisconnected("Received KNX packet: DISCONNECT_REQUEST, ChannelID:" + this._channelID + " Host:" + this._options.ipAddr + ":" + this._options.ipPort);
@@ -865,6 +881,12 @@ class KNXClient extends EventEmitter {
                 if (knxTunnelingRequest.channelID !== this._channelID) {
                     return;
                 }
+                // 26/12/2021 send the ACK if the server requestet that
+                // Then REMOVED, because some interfaces sets the "ack request" always to 0 even if it needs ack.
+                //if (knxMessage.cEMIMessage.control.ack){
+                let knxTunnelAck = KNXProtocol.KNXProtocol.newKNXTunnelingACK(knxTunnelingRequest.channelID, knxTunnelingRequest.seqCounter, KNXConstants.KNX_CONSTANTS.E_NO_ERROR);
+                this.send(knxTunnelAck);
+                //}      
 
                 if (knxTunnelingRequest.cEMIMessage.msgCode === CEMIConstants.CEMIConstants.L_DATA_IND) {
 
@@ -893,15 +915,8 @@ class KNXClient extends EventEmitter {
 
                 }
 
-                // 26/12/2021 send the ACK if the server requestet that
-                // Then REMOVED, because some interfaces sets the "ack request" always to 0 even if it needs ack.
-                //if (knxMessage.cEMIMessage.control.ack){
-                const knxTunnelAck = KNXProtocol.KNXProtocol.newKNXTunnelingACK(knxTunnelingRequest.channelID, knxTunnelingRequest.seqCounter, KNXConstants.KNX_CONSTANTS.E_NO_ERROR);
-                this.send(knxTunnelAck);
-                //}               
-
             } else if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.TUNNELING_ACK) {
-                //const knxTunnelingAck =  lodash.cloneDeep(knxMessage);
+
                 const knxTunnelingAck = knxMessage;
                 if (knxTunnelingAck.channelID !== this._channelID) {
                     return;
@@ -913,6 +928,7 @@ class KNXClient extends EventEmitter {
 
                 // Check the received ACK sequence number
                 if (!this._options.suppress_ack_ldatareq) {
+
                     if (knxTunnelingAck.seqCounter === this._getSeqNumber()) {
                         if (this._timerWaitingForACK !== null) clearTimeout(this._timerWaitingForACK);
                         this._numFailedTelegramACK = 0; // 25/12/2021 clear the current ACK failed telegram number
@@ -965,9 +981,6 @@ class KNXClient extends EventEmitter {
                     } catch (error) { }
 
                 }
-
-            } else if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.ROUTING_LOST_MESSAGE) {
-                // Multicast, ho perso il mondo dei messaggi
 
             } else {
                 if (knxHeader.service_type === this._awaitingResponseType) {
