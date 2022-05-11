@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.20</b> - Mai 2022<br/>
+- Fixed a compatibility issue introducted in Node 18.<br/>
+</p>
+<p>
 <b>Version 1.0.19</b> - April 2022<br/>
 - Protected some functions to avoid issues in case of misuse.<br/>
 - The ACK of received telegrams is now called befor the "indication" event is emitted to the client.<br/>
