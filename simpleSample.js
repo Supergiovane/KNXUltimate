@@ -37,7 +37,7 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, function (_datagr
     let _dst = _datagram.cEMIMessage.dstAddress.toString()
     // Get the RAW Value
     let _Rawvalue = _datagram.cEMIMessage.npdu.dataValue;
-    
+
     // Decode the telegram. 
     if (_dst === "0/1/1") {
         // We know that 0/1/1 is a boolean DPT 1.001
@@ -47,6 +47,15 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, function (_datagr
         // We know that 0/1/2 is a boolean DPT 232.600 Color RGB
         dpt = dptlib.resolve("232.600");
         jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+    } else {
+        // All others... assume they are boolean
+        dpt = dptlib.resolve("1.001");
+        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+        if (jsValue === null) {
+            // Is null, try if it's a numerical value
+            dpt = dptlib.resolve("5.001");
+            jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+        }
     }
     console.log("src: " + _src + " dest: " + _dst, " event: " + _evt, " value: " + jsValue);
 
@@ -56,7 +65,7 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
     // The client is connected
     console.log("Connected. On Duty", info);
     // WARNING, THIS WILL WRITE ON YOUR KNX BUS!
-    knxUltimateClient.write("0/1/1", false, "1.001");    
+    knxUltimateClient.write("0/1/1", false, "1.001");
 });
 
 // Connect
