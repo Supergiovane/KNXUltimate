@@ -1004,8 +1004,9 @@ class KNXClient extends EventEmitter {
                     } else if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.SECURE_SESSION_RESPONSE) {
                         
                         // 23/06/2022 Secure session response after i sent the secure_session_request
+                        // 23/06/2022 SONO ARRIVATO QUI
                         const knxConnectionStateResponse = knxMessage;
-                        console.log("banana",  knxMessage);
+                        console.log("banana",  knxConnectionStateResponse);
 
                     } else {
                         if (this._connectionTimeoutTimer !== null) clearTimeout(this._connectionTimeoutTimer);
