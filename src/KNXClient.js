@@ -1004,7 +1004,7 @@ class KNXClient extends EventEmitter {
                     } else if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.SECURE_SESSION_RESPONSE) {
                         
                         // 23/06/2022 Secure session response after i sent the secure_session_request
-                        // 23/06/2022 SONO ARRIVATO QUI
+                        // 23/06/2022 SONO ARRIVATO QUI. Occorre estrarre la chiave usata da client e server in base alle chiavi pubbliche
                         const knxConnectionStateResponse = knxMessage;
                         console.log("banana",  knxConnectionStateResponse);
 

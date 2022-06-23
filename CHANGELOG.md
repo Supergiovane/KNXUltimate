@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.22</b> - June 2022<br/>
+- KNX-Secure: completed the Secure_Session_Request and working on Secure_Session_Response.<br/>
+</p>
+<p>
 <b>Version 1.0.21</b> - Mai 2022<br/>
 - Fixed an issue in retrieving the local IP, in case of ETH interface not having the "family" property set.<br/>
 </p>
