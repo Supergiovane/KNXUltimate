@@ -17,6 +17,7 @@ const KNXTunnelingRequest = require("./KNXTunnelingRequest");
 const KNXTunnelingAck = require("./KNXTunnelingAck");
 const KNXRoutingIndication = require("./KNXRoutingIndication"); // 07/12/2021
 const KNXSecureSessionRequest = require("./KNXSecureSessionRequest"); // 07/12/2021
+const KNXSecureSessionResponse = require("./KNXSecureSessionResponse"); // 23/06/2022
 const sysLogger = require("./../KnxLog.js").get(); // 08/04/2021 new logger to adhere to the loglevel selected in the config-window            
 
 const HPAI = require("./HPAI");
@@ -68,6 +69,10 @@ class KNXProtocol {
                 knxMessage = KNXRoutingIndication.KNXRoutingIndication.createFromBuffer(knxData);
                 break;
             case KNXConstants.KNX_CONSTANTS.ROUTING_LOST_MESSAGE:
+                break;
+            case KNXConstants.KNX_CONSTANTS.SECURE_SESSION_RESPONSE:
+                // 23/06/2022 Secure Response
+                knxMessage = KNXSecureSessionResponse.KNXSecureSessionResponse.createFromBuffer(knxData);
                 break;
         }
         return { knxHeader, knxMessage, knxData };

@@ -54,17 +54,17 @@ class KNXSecureSessionRequest extends KNXPacket.KNXPacket {
 
 
     }
-    static createFromBuffer(buffer, offset = 0) {
-        if (offset >= buffer.length) {
-            throw new Error('Buffer too short');
-        }
-        const hpaiControl = HPAI.HPAI.createFromBuffer(buffer, offset);
-        offset += hpaiControl.length;
-        const hpaiData = HPAI.HPAI.createFromBuffer(buffer, offset);
-        offset += hpaiData.length;
-        const cri = CRIFactory.default.createFromBuffer(buffer, offset);
-        return new KNXSecureSessionRequest(cri, hpaiControl, hpaiData);
-    }
+    // static createFromBuffer(buffer, offset = 0) {
+    //     if (offset >= buffer.length) {
+    //         throw new Error('Buffer too short');
+    //     }
+    //     const hpaiControl = HPAI.HPAI.createFromBuffer(buffer, offset);
+    //     offset += hpaiControl.length;
+    //     const hpaiData = HPAI.HPAI.createFromBuffer(buffer, offset);
+    //     offset += hpaiData.length;
+    //     const cri = CRIFactory.default.createFromBuffer(buffer, offset);
+    //     return new KNXSecureSessionRequest(cri, hpaiControl, hpaiData);
+    // }
     toBuffer() {
         return Buffer.concat([
             this.header.toBuffer(),
