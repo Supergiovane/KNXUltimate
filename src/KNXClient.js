@@ -140,17 +140,16 @@ class KNXClient extends EventEmitter {
                 } catch (error) {
                     if (conn.sysLogger !== undefined && conn.sysLogger !== null) conn.sysLogger.error("UDP:  Error setting SetTTL " + error.message || "");
                 }
-                conn = null;
             });
 
         } else if (this._options.hostProtocol === "TunnelTCP") {
             // TCP
             this._clientSocket = new net.Socket();
             this._clientSocket.removeAllListeners();  // 12/03/2022 Remove all listeners
-            //this._clientSocket.on(SocketEvents.data, this._processInboundMessage);
-            this._clientSocket.on(SocketEvents.data, function (msg, rinfo, callback) {
-                console.log(msg, rinfo, callback);
-            });
+            this._clientSocket.on(SocketEvents.data, this._processInboundMessage);
+            // this._clientSocket.on(SocketEvents.data, function (msg, rinfo, callback) {
+            //     console.log(msg, rinfo, callback);
+            // });
             this._clientSocket.on(SocketEvents.error, error => this.emit(KNXClientEvents.error, error));
             this._clientSocket.on(SocketEvents.close, info => this.emit(KNXClientEvents.close, info));
 
@@ -178,7 +177,6 @@ class KNXClient extends EventEmitter {
                     try {
                         conn.emit(KNXClientEvents.error, err);
                     } catch (error) { }
-                    conn = null;
                     return;
                 }
                 conn = null;
@@ -610,10 +608,9 @@ class KNXClient extends EventEmitter {
                 //     conn._timer = null;
                 //     conn.emit(KNXClientEvents.error, timeoutError);
                 // }, 1000 * KNXConstants.KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT);
-                conn._awaitingResponseType = KNXConstants.KNX_CONSTANTS.CONNECT_RESPONSE;
+                conn._awaitingResponseType = KNXConstants.KNX_CONSTANTS.SECURE_SESSION_RESPONSE;
                 conn._clientTunnelSeqNumber = 0;
                 if (conn._options.isSecureKNXEnabled) conn._sendSecureSessionRequestMessage(new TunnelCRI.TunnelCRI(knxLayer));
-                conn = null;
             });
 
         } else {
@@ -983,8 +980,9 @@ class KNXClient extends EventEmitter {
                 }
 
             } else {
+
                 if (knxHeader.service_type === this._awaitingResponseType) {
-                    if (this._awaitingResponseType === KNXConstants.KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE) {
+                    if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE) {
 
                         try {
                             if (this.sysLogger !== undefined && this.sysLogger !== null) this.sysLogger.debug("Received KNX packet: CONNECTIONSTATE_RESPONSE, ChannelID:" + this._channelID + " Host:" + this._options.ipAddr + ":" + this._options.ipPort);
@@ -1002,8 +1000,14 @@ class KNXClient extends EventEmitter {
                             if (this._heartbeatTimer !== null) clearTimeout(this._heartbeatTimer);
                             this._heartbeatFailures = 0;
                         }
-                    }
-                    else {
+
+                    } else if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.SECURE_SESSION_RESPONSE) {
+                        
+                        // 23/06/2022 Secure session response after i sent the secure_session_request
+                        const knxConnectionStateResponse = knxMessage;
+                        console.log("banana",  knxMessage);
+
+                    } else {
                         if (this._connectionTimeoutTimer !== null) clearTimeout(this._connectionTimeoutTimer);
                     }
                 }
