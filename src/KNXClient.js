@@ -1060,6 +1060,10 @@ module.exports = {
     KNXClient: KNXClient,
     KNXClientEvents: KNXClientEvents,
     getDecodedKeyring: function () {
+        return jKNXSecureKeyring; // Contains the decoded keyring file
+    },
+    appendPropertyToDecodedKeyring: function (prop = "", val = "") {
+        jKNXSecureKeyring[prop] = val;
         return jKNXSecureKeyring;
     } // Contains the decoded keyring file
 };
