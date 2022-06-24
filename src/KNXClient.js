@@ -1007,6 +1007,7 @@ class KNXClient extends EventEmitter {
                         // 23/06/2022 SONO ARRIVATO QUI. Occorre estrarre la chiave usata da client e server in base alle chiavi pubbliche
                         const knxConnectionStateResponse = knxMessage;
                         console.log("banana",  knxConnectionStateResponse);
+                       
 
                     } else {
                         if (this._connectionTimeoutTimer !== null) clearTimeout(this._connectionTimeoutTimer);
@@ -1067,7 +1068,7 @@ module.exports = {
     getDecodedKeyring: function () {
         return jKNXSecureKeyring; // Contains the decoded keyring file
     },
-    appendPropertyToDecodedKeyring: function (prop = "", val = "") {
+    appendPropertyToDecodedKeyring: function (prop = "", val) {
         jKNXSecureKeyring[prop] = val;
         return jKNXSecureKeyring;
     } // Contains the decoded keyring file
