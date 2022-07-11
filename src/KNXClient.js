@@ -1002,12 +1002,44 @@ class KNXClient extends EventEmitter {
                         }
 
                     } else if (knxHeader.service_type === KNXConstants.KNX_CONSTANTS.SECURE_SESSION_RESPONSE) {
-                        
+
                         // 23/06/2022 Secure session response after i sent the secure_session_request
-                        // 23/06/2022 SONO ARRIVATO QUI. Occorre estrarre la chiave usata da client e server in base alle chiavi pubbliche
+                        // 25/06/2022 SONO ARRIVATO QUI. Occorre estrarre la chiave usata da client e server in base alle chiavi pubbliche
                         const knxConnectionStateResponse = knxMessage;
-                        console.log("banana",  knxConnectionStateResponse);
-                       
+
+                        // Validate the messageAuthenticationCode (optional) To Do
+                        // Xor the public keys. 
+                        let a = Buffer.from(knxConnectionStateResponse.keyring.diffieHellmanClientPublicValue);
+                        let b = Buffer.from(knxConnectionStateResponse.keyring.diffieHellmanServerPublicValue);
+                        let length = Math.max(a.length, b.length)
+                        let buffer = Buffer.allocUnsafe(length)
+                        for (var i = 0; i < length; ++i) {
+                            buffer[i] = a[i] ^ b[i]
+                        }
+
+                        console.log(buffer);
+
+                        const resMsg = knxHeader.headerLength.toString(16).padStart(2, '0').toString()
+                            + knxHeader.version.toString(16).padStart(2, '0').toString()
+                            + knxHeader.service_type.toString(16).padStart(4, '0').toString()
+                            + "00" + knxConnectionStateResponse.length.toString(16).padStart(2, '0').toString()
+                            + knxConnectionStateResponse.keyring.secureSessionID.toString(16).padStart(4, '0').toString()
+                            + buffer.toString("hex");   // symbol ^ means XOR bit operation 
+
+                        let _key = "autenticazione\0\0";
+                        //_key = _key + new Array((32 + 1) - _key.length).join("\0");
+                        const resKey = Buffer.from(_key);
+                        const hashLen = 16;
+                        const aesCbcMac = require("aes-cbc-mac");
+                        try {
+                            let mac = aesCbcMac.create(Buffer.from(resMsg, "hex"), resKey, hashLen);
+                        } catch (error) {
+                            console.log("ORRORE", error);
+                        }
+
+
+                        console.log("banana", knxConnectionStateResponse);
+
 
                     } else {
                         if (this._connectionTimeoutTimer !== null) clearTimeout(this._connectionTimeoutTimer);
