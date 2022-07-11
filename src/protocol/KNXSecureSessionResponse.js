@@ -37,17 +37,18 @@ class KNXSecureSessionResponse extends KNXPacket.KNXPacket {
 
         //super(KNXConstants.KNX_CONSTANTS.SECURE_SESSION_REQUEST, hpaiControl.length + hpaiData.length + cri.length + 32);
         super(KNXConstants.KNX_CONSTANTS.SECURE_SESSION_RESPONSE, 56);
-        this.secureSessionID = _secureSessionID;
-        this.messageAuthenticationCode = _messageAuthenticationCode;
+        //this.secureSessionID = _secureSessionID;
+        //this.messageAuthenticationCode = _messageAuthenticationCode;
         // Add the secure session ID to the keyring object
         this.keyring = knx.appendPropertyToDecodedKeyring("secureSessionID", _secureSessionID);// .getDecodedKeyring();
 
-        // Getting the user password. The user id 0 is reserved and the user id 1 is used for management tasks,
-        // thus you will need to specify a user id that is 2 or higher according to the tunneling channel you would like to use.
-        let user2AuthenticationPassword = this.keyring.interfaces.find(a => a.userID === "2").authenticationPassword;
-        let user2DeviceHost = this.keyring.interfaces.find(a => a.userID === "2").host;
-        // Get the device auth password
-        let deviceAuthenticationPassword = this.keyring.Devices.find(a => a.individualAddress === user2DeviceHost).authenticationPassword;
+        // // Getting the user password. The user id 0 is reserved and the user id 1 is used for management tasks,
+        // // thus you will need to specify a user id that is 2 or higher according to the tunneling channel you would like to use.
+        // let user2AuthenticationPassword = this.keyring.interfaces.find(a => a.userID === "2").authenticationPassword;
+        // let user2DeviceHost = this.keyring.interfaces.find(a => a.userID === "2").host;
+        // // Get the device auth password
+        // let deviceAuthenticationPassword = this.keyring.Devices.find(a => a.individualAddress === user2DeviceHost).authenticationPassword;
+
         // Calculating the session key:
         // The session key is calculated as follows (for both the KNXnet/IP secure client and KNXnet/IP secure server):
         // 1) sharedSecret_in_little_endian = Curve25519(myPrivateKey, peersPublicKey)
@@ -59,9 +60,10 @@ class KNXSecureSessionResponse extends KNXPacket.KNXPacket {
         let hash_in_big_endian = CryptoJS.SHA256(sharedSecret_in_little_endian.toString());
         let sessionKey = Buffer.from(hash_in_big_endian.toString()).slice(0, 16);
         knx.appendPropertyToDecodedKeyring("sessionKey", sessionKey);
-        // calculate Message Authentication Code (40 bytes)
-        // Secure Header | Secure session_identifier | (Client Public Key X ^ Server Public Key Y)
-        // encrypt with device authentication code
+        knx.appendPropertyToDecodedKeyring("diffieHellmanServerPublicValue", _diffieHellmanServerPublicValue);
+        
+        
+
 
         console.log("BABANAN")
         // KEYRING:
@@ -185,40 +187,6 @@ class KNXSecureSessionResponse extends KNXPacket.KNXPacket {
         //   }
 
 
-        // 8 octets for the UDP/TCP HPAI and 32 octets for the client’s ECDH public value
-        // LENGTH: Final = 56 bytes
-
-
-        // Get the Keyring
-        //this.keyring = knx.getDecodedKeyring();
-
-        // Add the Diffie-Hellman
-        // let Curve25519 = require('./../Curve25519');
-        // const crypto = require('crypto');
-        // let keyPair = Curve25519.generateKeyPair(crypto.randomBytes(32));
-        // // Get the Keyring
-
-
-        // // Send the DH curve as well
-        // // 02/01/2022 SONO ARRIVATO QUI get the authentication password from the first tunnel of the interface
-        // let authenticationPassword = this.keyring.Devices[0].authenticationPassword;
-        // //authenticationPassword = authenticationPassword.length === 0 ? new byte[16] : authenticationPassword;
-        // authenticationPassword = authenticationPassword.length === 0 ? "00000000000000000000000000000000" : authenticationPassword;
-        // let _key = authenticationPassword;
-        // _key = _key + new Array((32 + 1) - _key.length).join("\0");
-
-        // let authenticationPasswordHEX = Buffer.from(_key).toString("hex");
-        // let authenticationPasswordUint8Array = Uint8Array.from(Buffer.from(authenticationPasswordHEX, 'hex'));
-        // let Curve25519 = require('./../Curve25519');
-        // try {
-        //     let secret = Curve25519.generateKeyPair(authenticationPasswordUint8Array);
-        //     //let hexString = "f0c143e363147dc64913d736978042ef748ba448aa6ce2a1dab5ddecca919455";
-        //     //secret.public = Uint8Array.from(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-        //     this.diffieHellmanClientPublicValue = Buffer.from(secret.public).toString('hex');
-
-        // } catch (error) {
-        //     throw (error);
-        // }
 
 
     }
