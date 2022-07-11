@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.23</b> - Juli 2022<br/>
+-NEW: Added datapoint 1.024 for Day/Night<br/>
+</p>
+<p>
 <b>Version 1.0.22</b> - June 2022<br/>
 - KNX-Secure: completed the Secure_Session_Request and working on Secure_Session_Response.<br/>
 </p>
