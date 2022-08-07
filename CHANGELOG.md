@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.24</b> - August 2022<br/>
+- Fixed old "new Buffer" syntax, due to future unsupported call.<br/>
+</p>
+<p>
 <b>Version 1.0.23</b> - Juli 2022<br/>
 -NEW: Added datapoint 1.024 for Day/Night<br/>
 </p>
