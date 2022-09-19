@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.25</b> - September 2022<br/>
+- Standardized code.<br/>
+</p>
+<p>
 <b>Version 1.0.24</b> - August 2022<br/>
 - Fixed old "new Buffer" syntax, due to future unsupported call.<br/>
 </p>
