@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.26</b> - October 2022<br/>
+- NEW: added DPT 21.001.<br/>
+</p>
+<p>
 <b>Version 1.0.25</b> - September 2022<br/>
 - Standardized code.<br/>
 </p>
