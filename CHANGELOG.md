@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.28</b> - November 2022<br/>
+- NEW: added datapoint 9.009 Airflow.<br/>
+</p>
+<p>
 <b>Version 1.0.27</b> - October 2022<br/>
 - FIX: fixed an issue accurring when you put a wrong IP/hostname in the configuration of the gateway. Leaving node running with such wrong configuration, after a month or so, all UDP channels remain occupied until reboot. Thanks to @tarag for reporting that.<br/>
 </p>
