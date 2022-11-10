@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.29</b> - November 2022<br/>
+- NEW: added Griesser Datpoint Custom 6001.001.<br/>
+</p>
+<p>
 <b>Version 1.0.28</b> - November 2022<br/>
 - NEW: added datapoint 9.009 Airflow.<br/>
 </p>
