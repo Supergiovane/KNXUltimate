@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.30</b> - November 2022<br/>
+- NEW: added Datapoints 13.016, 13.1200, 13.1201.<br/>
+</p>
+<p>
 <b>Version 1.0.29</b> - November 2022<br/>
 - NEW: added Griesser Datpoint Custom 6001.001.<br/>
 </p>
