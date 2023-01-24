@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.31</b> - January 2023<br/>
+- NEW: added Datapoint 28.001: ASCII string (variable length) UTF-8<br/>
+</p>
+<p>
 <b>Version 1.0.30</b> - November 2022<br/>
 - NEW: added Datapoints 13.016, 13.1200, 13.1201.<br/>
 </p>
