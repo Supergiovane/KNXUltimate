@@ -7,6 +7,10 @@
 # CHANGELOG
 
 <p>
+<b>Version 1.0.32</b> - January 2023<br/>
+- FIX: Fixed Datapoint 9. There was too many decimals.<br/>
+</p>
+<p>
 <b>Version 1.0.31</b> - January 2023<br/>
 - NEW: added Datapoint 28.001: ASCII string (variable length) UTF-8<br/>
 </p>
