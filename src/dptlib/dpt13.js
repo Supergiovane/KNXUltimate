@@ -7,6 +7,15 @@
 // DPT13: 4-byte signed value
 //
 
+exports.fromBuffer = function (buf) {
+  if (buf.length != 4) {
+    knxLog.get().warn('DPT13: Buffer should be 4 bytes long, got', buf.length)
+    return null
+  } else {
+    return buf.readIntBE(0, 4)
+  }
+}
+
 // DPT13 base type info
 exports.basetype = {
   bitlength: 32,
