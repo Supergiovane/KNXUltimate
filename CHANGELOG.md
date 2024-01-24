@@ -6,7 +6,41 @@
 
 # CHANGELOG
 
-p>
+<p>
+<b>Version 1.0.47</b> - January 2024<br/>
+- NEW: added DPT 275.100.<br/>
+</p>
+<p>
+<b>Version 1.0.44</b> - December 2023<br/>
+- Fixed DPT 9.001 issue when sending numberso having > 2 decimals.<br/>
+</p>
+<p>
+<b>Version 1.0.43</b> - October 2023<br/>
+- Added help description for DPT 3.001 DIMMING stop telegram.<br/>
+</p>
+<p>
+<b>Version 1.0.42</b> - July 2023<br/>
+- Quick fix for MDT and Wienzler interfaces.<br/>
+</p>
+<p>
+<b>Version 1.0.41</b> - July 2023<br/>
+- Enabled compatibility with KNX Virtual software (BETA).<br/>
+</p>
+<p>
+<b>Version 1.0.39</b> - June 2023<br/>
+- Bump dependencies versions.<br/>
+- Increased TTL of dgram socket, from 128 to 250.<br/>
+- Set max hop count in tunneling/broadcast, from 6 to 7.<br/>
+</p>
+<p>
+<b>Version 1.0.37</b> - June 2023<br/>
+- Dependencies versions bump.<br/>
+</p>
+<p>
+<b>Version 1.0.36</b> - June 2023<br/>
+- Some internal changes due to integration with NOde-Red node.<br/>
+</p>
+<p>
 <b>Version 1.0.34</b> - March 2023<br/>
 - NEW: Added Datapoint 235.001 Tariff.<br/>
 </p>

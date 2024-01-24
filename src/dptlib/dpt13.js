@@ -7,15 +7,6 @@
 // DPT13: 4-byte signed value
 //
 
-exports.fromBuffer = function (buf) {
-  if (buf.length != 4) {
-    knxLog.get().warn('DPT13: Buffer should be 4 bytes long, got', buf.length)
-    return null
-  } else {
-    return buf.readIntBE(0, 4)
-  }
-}
-
 // DPT13 base type info
 exports.basetype = {
   bitlength: 32,
@@ -100,15 +91,15 @@ exports.subtypes = {
     unit: 's'
   },
 
-   // 13.1200 DeltaVolumeLiquid_Litre
-   1200: {
+  // 13.1200 DeltaVolumeLiquid_Litre
+  1200: {
     desc: 'DeltaVolumeLiquid_Litre',
     name: 'Delta Volume Liquid (litre)',
     unit: 'l'
   },
-   
-   // 13.1201 DeltaVolume_m3
-   1201: {
+
+  // 13.1201 DeltaVolume_m3
+  1201: {
     desc: 'DeltaVolume_m3',
     name: 'Delta Volume m3',
     unit: 'm3'
