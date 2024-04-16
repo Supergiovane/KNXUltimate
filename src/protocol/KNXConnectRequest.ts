@@ -10,7 +10,7 @@ export class KNXConnectRequest extends KNXPacket {
   hpaiData: HPAI;
   header: KNXHeader;
 
-  constructor(cri: CRIFactory, hpaiControl: HPAI = HPAI.NULLHPAI, hpaiData: HPAI = HPAI.NULLHPAI) {
+  constructor(cri: CRIFactory, hpaiControl = HPAI.NULLHPAI, hpaiData = HPAI.NULLHPAI) {
     super(KNX_CONSTANTS.CONNECT_REQUEST, hpaiControl.length + hpaiData.length + cri.length);
     this.cri = cri;
     this.hpaiControl = hpaiControl;
