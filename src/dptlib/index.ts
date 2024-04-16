@@ -44,15 +44,17 @@ import DPT275 from './dpt275'
 import DPT999 from './dpt999'
 import DPT6001 from './dpt60001'
 
+type Range = [number, number] | [undefined]
+
 interface DatapointSubtype {
-	scalar_range?: [number, number]
+	scalar_range?: Range 
 	name: string
 	use?: string
-	desc: string
+	desc?: string
 	force_encoding?: string
 	unit?: string
 	enc?: Record<number, string>
-	range?: [number, number] | [undefined, undefined]
+	range?: Range
 }
 
 export interface DatapointConfig {
@@ -62,7 +64,7 @@ export interface DatapointConfig {
 	basetype: {
 		bitlength: number
 		signedness?: string
-		range?: [number, number]
+		range?: Range
 		valuetype: string
 		desc?: string
     help?: string

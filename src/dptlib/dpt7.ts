@@ -152,3 +152,5 @@ return msg;`,
     },
   },
 };
+
+export default config
