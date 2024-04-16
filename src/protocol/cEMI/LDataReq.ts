@@ -1,6 +1,6 @@
 import CEMIMessage from "./CEMIMessage";
 import CEMIConstants from "./CEMIConstants";
-import KNXAddress from "../KNXAddress";
+import KNXAddress from "../KNXAddress.js";
 import ControlField from "./ControlField";
 import NPDU from "./NPDU";
 import KNXDataBuffer from "../KNXDataBuffer";
