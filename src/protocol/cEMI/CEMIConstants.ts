@@ -1,7 +1,4 @@
-'use strict'
-Object.defineProperty(exports, '__esModule', { value: true })
-exports.CEMIConstants = void 0
-exports.CEMIConstants = {
+const CEMIConstants = {
   PL_MEDIUM_INFO: 0x01,
   RF_MEDIUM_INFO: 0x02,
   BUSMONITOR_STATUS_INFO: 0x03,
@@ -25,4 +22,5 @@ exports.CEMIConstants = {
   INDIVIDUAL_RESPONSE: 0x04,
   TPCI_UNUMBERED_PACKET: 0x0
 }
-// # sourceMappingURL=CEMIConstants.js.map
+
+export default CEMIConstants
