@@ -4,6 +4,7 @@ import LDataCon from "./LDataCon";
 import LDataReq from "./LDataReq";
 import ControlField from "./ControlField";
 import NPDU from "./NPDU";
+import KNXAddress from "../KNXAddress";
 
 export default class CEMIFactory {
   static createFromBuffer(type: number, buffer: Buffer, offset: number): any {
@@ -21,8 +22,8 @@ export default class CEMIFactory {
 
   static newLDataRequestMessage(
     requestType: string,
-    srcAddress: string,
-    dstAddress: string,
+    srcAddress: KNXAddress,
+    dstAddress: KNXAddress,
     data: any
   ): any {
     const controlField = new ControlField();
@@ -46,8 +47,8 @@ export default class CEMIFactory {
 
   static newLDataIndicationMessage(
     requestType: string,
-    srcAddress: string,
-    dstAddress: string,
+    srcAddress: KNXAddress,
+    dstAddress: KNXAddress,
     data: any
   ): any {
     const controlField = new ControlField();

@@ -1,7 +1,6 @@
-'use strict'
-Object.defineProperty(exports, '__esModule', { value: true })
-exports.ConnectionStatus = exports.KNX_CONSTANTS = void 0
-exports.KNX_CONSTANTS = {
+'use strict';
+
+export const KNX_CONSTANTS = {
   KNXNETIP_VERSION_10: 0x10,
   HEADER_SIZE_10: 0x6,
   SEARCH_REQUEST: 0x0201,
@@ -61,23 +60,19 @@ exports.KNX_CONSTANTS = {
   KNX_PORT: 3671,
   KNX_IP: '224.0.23.12',
   IPV4_ADDRESS_LENGTH: 4,
-  // Search for KNX IP Secure Unicasts Setups
   SECURE_SEARCH_REQUEST: 0x20b,
   SECURE_SEARCH_RESPONSE: 0x20c,
-  // KNX IP Secure
   SECURE_WRAPPER: 0x0950,
   SECURE_SESSION_REQUEST: 0x0951,
   SECURE_SESSION_RESPONSE: 0x0952,
   SECURE_SESSION_AUTH: 0x0953,
   SECURE_SESSION_STATUS: 0x0954,
   SECURE_GROUP_SYNC: 0x0955
-}
+};
 
-let ConnectionStatus;
-(function (ConnectionStatus) {
-  ConnectionStatus[ConnectionStatus.E_CONNECTION_ID = exports.KNX_CONSTANTS.E_CONNECTION_ID] = 'E_CONNECTION_ID'
-  ConnectionStatus[ConnectionStatus.E_NO_ERROR = exports.KNX_CONSTANTS.E_NO_ERROR] = 'E_NO_ERROR'
-  ConnectionStatus[ConnectionStatus.E_DATA_CONNECTION = exports.KNX_CONSTANTS.E_DATA_CONNECTION] = 'E_DATA_CONNECTION'
-  ConnectionStatus[ConnectionStatus.E_KNX_CONNECTION = exports.KNX_CONSTANTS.E_KNX_CONNECTION] = 'E_KNX_CONNECTION'
-})(ConnectionStatus = exports.ConnectionStatus || (exports.ConnectionStatus = {}))
-// # sourceMappingURL=KNXConstants.js.map
+export enum ConnectionStatus {
+  E_CONNECTION_ID = KNX_CONSTANTS.E_CONNECTION_ID,
+  E_NO_ERROR = KNX_CONSTANTS.E_NO_ERROR,
+  E_DATA_CONNECTION = KNX_CONSTANTS.E_DATA_CONNECTION,
+  E_KNX_CONNECTION = KNX_CONSTANTS.E_KNX_CONNECTION
+}

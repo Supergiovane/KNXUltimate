@@ -1,4 +1,4 @@
-import { Buffer } from 'buffer';
+import { KNXAddressType } from "../KNXAddress";
 
 export enum FrameType {
   type0 = 0,
@@ -78,11 +78,11 @@ export default class ControlField {
     return this.control1 & 0x01;
   }
 
-  set addressType(type: OnOff) {
+  set addressType(type: KNXAddressType) {
     this.control2 = (this.control2 & 0x7F) | (Number(type) << 7);
   }
 
-  get addressType(): OnOff {
+  get addressType(): KNXAddressType {
     return (this.control2 & 0x80) >> 7;
   }
 
