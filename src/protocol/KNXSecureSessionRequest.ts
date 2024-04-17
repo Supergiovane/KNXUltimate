@@ -2,7 +2,7 @@ import KNXPacket from "./KNXPacket";
 import HPAI from "./HPAI";
 import CRIFactory from "./CRIFactory";
 import { KNX_CONSTANTS } from "./KNXConstants";
-import Curve25519 from '../Curve25519'
+import { generateKeyPair } from '../Curve25519'
 
 export default class KNXSecureSessionRequest extends KNXPacket {
   cri: any;
@@ -36,7 +36,7 @@ export default class KNXSecureSessionRequest extends KNXPacket {
       Buffer.from(authenticationPasswordHEX, "hex")
     );
     try {
-      const secret = Curve25519.generateKeyPair(
+      const secret = generateKeyPair(
         authenticationPasswordUint8Array
       );
       this.diffieHellmanClientPublicValue = Buffer.from(secret.public).toString(

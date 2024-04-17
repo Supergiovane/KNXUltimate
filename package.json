@@ -12,6 +12,7 @@
     "url": "https://github.com/Supergiovane/KNXUltimate"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "test": "",
     "test-connection": ""
   },

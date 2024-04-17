@@ -436,7 +436,7 @@ export default class KNXClient extends EventEmitter {
   }
 
   // sendWriteRequest(dstAddress, data) {
-  write(dstAddress: KNXAddress | string, data: Buffer, dptid: any): void {
+  write(dstAddress: KNXAddress | string, data: any, dptid: any): void {
     if (this._connectionState !== STATE.CONNECTED)
       throw new Error(
         "The socket is not connected. Unable to access the KNX BUS"

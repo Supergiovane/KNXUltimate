@@ -41,7 +41,7 @@ export default class LDataCon extends CEMIMessage {
       throw new Error("Buffer too short");
     }
     const addLength = buffer.readUInt8(offset++);
-    let additionalInfo = null;
+    let additionalInfo: KNXDataBuffer = null;
     if (addLength > 0) {
       additionalInfo = new KNXDataBuffer(buffer.slice(offset, addLength));
       offset += addLength;

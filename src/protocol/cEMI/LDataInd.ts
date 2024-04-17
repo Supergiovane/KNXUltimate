@@ -3,7 +3,7 @@ import CEMIConstants from "./CEMIConstants";
 import KNXAddress from "../KNXAddress.js";
 import ControlField from "./ControlField";
 import NPDU from "./NPDU";
-import { KNXDataBuffer } from "../KNXDataBuffer";
+import KNXDataBuffer from "../KNXDataBuffer";
 
 export default class LDataInd extends CEMIMessage {
   additionalInfo: KNXDataBuffer | null;

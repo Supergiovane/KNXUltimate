@@ -1,17 +1,18 @@
 import KNXAddress from "../KNXAddress";
+import KNXDataBuffer from "../KNXDataBuffer";
 import ControlField from "./ControlField";
 import NPDU from "./NPDU";
 
 export default class CEMIMessage {
   msgCode: number;
   length: number;
-  additionalInfo: Buffer | null;
+  additionalInfo: KNXDataBuffer | null;
   control: ControlField;
   srcAddress: KNXAddress;
   dstAddress: KNXAddress;
   npdu: NPDU;
 
-  constructor(msgCode: number, length: number, additionalInfo?: Buffer, control?: ControlField, srcAddress?: KNXAddress, dstAddress?: KNXAddress, npdu?: NPDU) {
+  constructor(msgCode: number, length: number, additionalInfo?: KNXDataBuffer, control?: ControlField, srcAddress?: KNXAddress, dstAddress?: KNXAddress, npdu?: NPDU) {
     this.msgCode = msgCode;
     this.length = length;
     this.additionalInfo = additionalInfo;
@@ -27,12 +28,12 @@ export default class CEMIMessage {
     const len = this.additionalInfo == null ? 0 : this.additionalInfo.length;
     buffer.writeUInt8(len, 1);
     if (this.additionalInfo) {
-      return Buffer.concat([buffer, this.additionalInfo]);
+      return Buffer.concat([buffer, this.additionalInfo.value]);
     }
     return buffer;
   }
 
-  static GetLength(additionalInfo: Buffer | null, control: ControlField, srcAddress: KNXAddress, dstAddress: KNXAddress, npdu: NPDU): number {
+  static GetLength(additionalInfo: KNXDataBuffer | null, control: ControlField, srcAddress: KNXAddress, dstAddress: KNXAddress, npdu: NPDU): number {
     const length = additionalInfo === null ? 1 : additionalInfo.length;
     const npduLength = npdu == null ? 0 : npdu.length;
     return 1 + length + control.length + srcAddress.length + dstAddress.length + npduLength;
