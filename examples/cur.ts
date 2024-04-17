@@ -1,5 +1,5 @@
 import dpts, { fromBuffer, resolve } from "../src/dptlib";
-import { KNXClient, KNXClientEvents } from "../src/KNXClient";
+import KNXClient, { KNXClientEvents } from "../src/KNXClient";
 import KNXAddress from "../src/protocol/KNXAddress";
 import KNXDataBuffer from "../src/protocol/KNXDataBuffer";
 
