@@ -1,23 +1,17 @@
 import KnxLog from '../KnxLog';
-import os from 'os';
+import os, { NetworkInterfaceInfo } from 'os';
 
-interface NetworkInterface {
-  address: string;
-  family: string | number;
-  internal: boolean;
-}
-
-function getIPv4Interfaces(): { [key: string]: NetworkInterface } {
-  const candidateInterfaces: { [key: string]: NetworkInterface } = {};
+function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
+  const candidateInterfaces: { [key: string]: NetworkInterfaceInfo } = {};
   const interfaces = os.networkInterfaces();
   for (const iface in interfaces) {
     for (const key in interfaces[iface]) {
-      const intf: NetworkInterface = interfaces[iface][key];
+      const intf = interfaces[iface][key];
       try {
         KnxLog.get().debug('ipAddressHelper.js: parsing interface: %s (%j)', iface, intf);
         if (
           intf.family !== undefined &&
-          (intf.family.toString().includes('4') || intf.family === 4) &&
+          (intf.family.toString().includes('4') || (intf as any).family === 4) &&
           !intf.internal
         ) {
           KnxLog.get().trace('ipAddressHelper.js: Found suitable interface: %s (%j)', iface, intf);
@@ -38,7 +32,7 @@ function getIPv4Interfaces(): { [key: string]: NetworkInterface } {
   return candidateInterfaces;
 }
 
-export function getLocalAddress(_interface: string = ''): string {
+export function getLocalAddress(_interface = ''): string {
   KnxLog.get().trace('ipAddressHelper.js: getLocalAddress: getting interfaces');
   const candidateInterfaces = getIPv4Interfaces();
   if (_interface !== '') {

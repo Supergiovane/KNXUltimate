@@ -21,7 +21,7 @@ export default class ServiceFamilies {
     return this._services;
   }
 
-  static createFromBuffer(buffer: Buffer, offset: number = 0): ServiceFamilies {
+  static createFromBuffer(buffer: Buffer, offset: number = 0) {
     if (offset >= buffer.length) {
       throw new Error(`offset ${offset} out of buffer range ${buffer.length}`);
     }
