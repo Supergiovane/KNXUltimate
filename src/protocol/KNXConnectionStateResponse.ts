@@ -6,8 +6,6 @@ export default class KNXConnectionStateResponse extends KNXPacket {
 
 	status: number
 
-	static KNXConnectionStateResponse: any
-
 	constructor(channelID: number, status: number) {
 		super(KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE, 2)
 		this.channelID = channelID

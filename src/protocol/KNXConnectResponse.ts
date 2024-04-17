@@ -12,8 +12,6 @@ export default class KNXConnectResponse extends KNXPacket {
 
 	crd: CRD | null
 
-	static KNXConnectResponse: any
-
 	constructor(
 		channelID: number,
 		status: number,

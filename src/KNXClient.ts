@@ -95,7 +95,7 @@ export function getDecodedKeyring() {
 }
 
 export default class KNXClient extends EventEmitter {
-	private _channelID: null | string
+	private _channelID: number
 
 	private _connectionState: string
 
@@ -304,7 +304,7 @@ export default class KNXClient extends EventEmitter {
 		}
 	}
 
-	get channelID(): null | string {
+	get channelID() {
 		return this._channelID
 	}
 
@@ -850,7 +850,7 @@ export default class KNXClient extends EventEmitter {
 				// 27/06/2023, leave some time to the dgram, do do the bind and read local ip and local port
 				const t = setTimeout(() => {
 					this._sendConnectRequestMessage(
-						new TunnelCRI.TunnelCRI(knxLayer),
+						new TunnelCRI(knxLayer),
 					)
 				}, 2000)
 			} catch (error) {}
@@ -868,7 +868,7 @@ export default class KNXClient extends EventEmitter {
 				this._clientTunnelSeqNumber = 0
 				if (this._options.isSecureKNXEnabled)
 					this._sendSecureSessionRequestMessage(
-						new TunnelCRI.TunnelCRI(knxLayer),
+						new TunnelCRI(knxLayer),
 					)
 			})
 		} else {
@@ -1165,7 +1165,7 @@ export default class KNXClient extends EventEmitter {
 						try {
 							this.emit(
 								KNXClientEvents.error,
-								KNXConnectResponse.KNXConnectResponse.statusToString(
+								KNXConnectResponse.statusToString(
 									knxConnectResponse.status,
 								),
 							)
@@ -1452,7 +1452,7 @@ export default class KNXClient extends EventEmitter {
 							try {
 								this.emit(
 									KNXClientEvents.error,
-									KNXConnectionStateResponse.KNXConnectionStateResponse.statusToString(
+									KNXConnectionStateResponse.statusToString(
 										knxConnectionStateResponse.status,
 									),
 								)
@@ -1495,7 +1495,7 @@ export default class KNXClient extends EventEmitter {
 	_sendDescriptionRequestMessage() {
 		this.send(
 			KNXProtocol.newKNXDescriptionRequest(
-				new HPAI.HPAI(this._options.localIPAddress),
+				new HPAI(this._options.localIPAddress),
 			),
 		)
 	}
@@ -1542,7 +1542,7 @@ export default class KNXClient extends EventEmitter {
 	}
 
 	_sendSecureSessionRequestMessage(cri) {
-		const oHPAI = new HPAI.HPAI(
+		const oHPAI = new HPAI(
 			'0.0.0.0',
 			0,
 			this._options.hostProtocol === 'TunnelTCP'

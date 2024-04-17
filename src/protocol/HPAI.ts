@@ -1,4 +1,5 @@
 import { KNX_CONSTANTS } from './KNXConstants'
+import KNXHeader from './KNXHeader'
 
 const HPAI_STRUCTURE_LENGTH: number = 8
 
@@ -16,9 +17,7 @@ export default class HPAI {
 
 	private _splitHost: RegExpMatchArray
 
-	private _header: any
-
-	static HPAI: any
+	private _header: KNXHeader
 
 	constructor(
 		_host: string,
