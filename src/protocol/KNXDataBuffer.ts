@@ -2,7 +2,7 @@ export default class KNXDataBuffer {
   private _data: any;
   private _info: any;
 
-  constructor(_data: any, _info: any) {
+  constructor(_data: Buffer, _info?: IDataPoint) {
     this._data = _data;
     this._info = _info;
   }
@@ -26,4 +26,15 @@ export default class KNXDataBuffer {
     // return !(this.info.type.type === '1');
     return this.info.type.type;
   }
+}
+
+export interface IDataPoint {
+  id: string;
+  value: any;
+  type: {
+    type: boolean;
+  };
+  bind: any | null;
+  read: () => any | null;
+  write: ((data: any) => void) | null;
 }

@@ -44,6 +44,7 @@ import DPT251 from './dpt251'
 import DPT275 from './dpt275'
 import DPT999 from './dpt999'
 import DPT6001 from './dpt60001'
+import { KNXDataBuffer } from '../protocol'
 
 type Range = [number, number] | [undefined]
 
@@ -143,9 +144,15 @@ export function resolve(dptid: string | number): DatapointConfig {
  * --  1) checks if the value adheres to the range set from the DPT's bitlength
  *
  */
+
+export type APDU = {
+  bitlength: number
+  data: Buffer,
+}
+
 export function populateAPDU(
 	value: any,
-	apdu: Datagram['cemi']['apdu'],
+	apdu: APDU,
 	dptid?: number | string,
 ) {
   // console.log ("BANANA " + dptid)
@@ -159,7 +166,8 @@ export function populateAPDU(
   if (typeof dpt.formatAPDU === 'function') {
     // nothing to do here, DPT-specific formatAPDU implementation will handle everything
     // knxLog.get().trace('>>> custom formatAPDU(%s): %j', dptid, value);
-    apdu.data = dpt.formatAPDU(value);
+    // TODO: this could return void, what to do in that case?
+    apdu.data = dpt.formatAPDU(value) as Buffer;
     // knxLog.get().trace('<<< custom formatAPDU(%s): %j', dptid, apdu.data);
   } else {
     if (!isFinite(value)) {

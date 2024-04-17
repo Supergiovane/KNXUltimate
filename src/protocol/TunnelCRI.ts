@@ -11,6 +11,8 @@ export enum TunnelTypes {
 
 export default class TunnelCRI extends CRI {
   private knxLayer: number;
+  static TunnelTypes: any;
+  static TunnelCRI: any;
 
   constructor(knxLayer: number) {
     super(KNX_CONSTANTS.TUNNEL_CONNECTION);

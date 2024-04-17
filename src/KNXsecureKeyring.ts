@@ -154,7 +154,7 @@ const keyring = (function () {
         keySize: keyLength,
         iterations,
         hasher: CryptoJS.algo.SHA256,
-        padding: CryptoJS.pad.NoPadding // FIXME: this options doesn't exists
+        // padding: CryptoJS.pad.NoPadding // FIXME: this options doesn't exists
       });
       return secretKey.toString(CryptoJS.enc.Base64);
     } catch (error) {

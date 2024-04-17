@@ -120,7 +120,7 @@ export default class KNXProtocol {
   static newKNXSecureSessionRequest(
     cri: any,
     hpaiData: HPAI = HPAI.NULLHPAI,
-    jKNXSecureKeyring: any
+    jKNXSecureKeyring?: any
   ) {
     return new KNXSecureSessionRequest(cri, hpaiData, jKNXSecureKeyring);
   }
