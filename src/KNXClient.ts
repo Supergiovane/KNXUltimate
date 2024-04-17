@@ -64,7 +64,7 @@ export type KNXClientOptions = {
 	physAddr: string
 	connectionKeepAliveTimeout?: number
 	ipAddr: string
-	ipPort: number
+	ipPort: number | string
 	hostProtocol: KNXClientProtocol
 	isSecureKNXEnabled?: boolean
 	suppress_ack_ldatareq?: boolean
@@ -157,7 +157,7 @@ export default class KNXClient extends EventEmitter {
 		this._options.connectionKeepAliveTimeout =
 			KNX_CONSTANTS.CONNECTION_ALIVE_TIME
 		this._peerHost = this._options.ipAddr
-		this._peerPort = this._options.ipPort
+		this._peerPort = parseInt(this._options.ipPort as string, 10)
 		this._options.localSocketAddress = options.localSocketAddress
 		this._connectionTimeoutTimer = null
 		this._heartbeatFailures = 0
@@ -849,9 +849,7 @@ export default class KNXClient extends EventEmitter {
 			try {
 				// 27/06/2023, leave some time to the dgram, do do the bind and read local ip and local port
 				const t = setTimeout(() => {
-					this._sendConnectRequestMessage(
-						new TunnelCRI(knxLayer),
-					)
+					this._sendConnectRequestMessage(new TunnelCRI(knxLayer))
 				}, 2000)
 			} catch (error) {}
 		} else if (this._options.hostProtocol === 'TunnelTCP') {

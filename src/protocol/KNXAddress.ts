@@ -46,7 +46,7 @@ export default class KNXAddress {
 	}
 
 	static createFromString(
-		address: string,
+		address: string | number,
 		type: KNXAddressType = KNXAddressType.TYPE_INDIVIDUAL,
 	): KNXAddress {
 		return new KNXAddress(
