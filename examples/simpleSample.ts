@@ -1,5 +1,5 @@
-const knx = require("./index.js");
-const dptlib = require('./src/dptlib');
+import { KNXClientEvents, KNXClient } from "../src";
+import { resolve, fromBuffer } from "../src/dptlib";
 
 // Set the properties
 let knxUltimateClientProperties = {
@@ -17,10 +17,10 @@ let knxUltimateClientProperties = {
 };
 
 // Instantiate the client
-const knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
+const knxUltimateClient = new KNXClient(knxUltimateClientProperties);
 
 // Setting handlers
-knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, function (_datagram, _echoed) {
+knxUltimateClient.on(KNXClientEvents.indication, function (_datagram, _echoed) {
 
     // This function is called whenever a KNX telegram arrives from BUS
 
@@ -41,16 +41,16 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, function (_datagr
     // Decode the telegram. 
     if (_dst === "0/1/1") {
         // We know, for example, that 0/1/1 is a boolean DPT 1.001
-        dpt = dptlib.resolve("1.001");
-        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+        const config = resolve("1.001");
+        jsValue = fromBuffer(_Rawvalue, config)
     } else if (_dst === "0/1/2") {
         // We know , for example, that 0/1/2 is a DPT 232.600 Color RGB
-        dpt = dptlib.resolve("232.600");
-        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+        const config = resolve("232.600");
+        jsValue = fromBuffer(_Rawvalue, config)
     } else {
         // All others... assume they are boolean
-        dpt = dptlib.resolve("1.001");
-        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+        const config = resolve("1.001");
+        jsValue = fromBuffer(_Rawvalue, config)
         if (jsValue === null) {
             // Opppsss, it's null. It means that the datapoint isn't 1.001
             // Raise whatever error you want.
@@ -60,7 +60,7 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, function (_datagr
 
 
 });
-knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
+knxUltimateClient.on(KNXClientEvents.connected, info => {
     // The client is connected
     console.log("Connected. On Duty", info);
     // WARNING, THIS WILL WRITE ON YOUR KNX BUS!

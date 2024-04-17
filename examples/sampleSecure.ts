@@ -1,7 +1,8 @@
 
-const knx = require("./index.js");
-const KNXsecureKeyring = require("./src/KNXsecureKeyring.js");
-const dptlib = require('./src/dptlib');
+import { KNXClientOptions } from "../src/KNXClient";
+import { getDecodedKeyring, KNXClient, KNXClientEvents } from "../src";
+import keyring from "../src/KNXsecureKeyring";
+import dptlib, { fromBuffer, resolve } from "../src/dptlib";
 
 // This is the content of the ETS Keyring file obtained doing this: https://www.youtube.com/watch?v=OpR7ZQTlMRU
 let rawjKNXSecureKeyring = `<?xml version="1.0" encoding="utf-8"?>
@@ -28,22 +29,22 @@ let rawjKNXSecureKeyring = `<?xml version="1.0" encoding="utf-8"?>
 </Keyring>`;
 
 // Set the properties
-let knxUltimateClientProperties = {
+let knxUltimateClientProperties: KNXClientOptions = {
     ipAddr: "192.168.1.54",
-    ipPort: "3671",
+    ipPort: 3671,
     physAddr: "1.1.100",
     suppress_ack_ldatareq: false,
     loglevel: "debug", // or "debug" is the default
     localEchoInTunneling: true, // Leave true, forever.
     hostProtocol: "TunnelTCP", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
     isSecureKNXEnabled: true, // Leave "false" until KNX-Secure has been released
-    KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
+    // KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
     jKNXSecureKeyring: "", // This is the unencrypted Keyring file content (see below)
 };
 
 async function LoadKeyringFile(_keyring, _password) {
-    return KNXsecureKeyring.keyring.load(_keyring, _password);
+    return keyring.load(_keyring, _password);
 }
 
 async function go() {
@@ -58,39 +59,39 @@ async function go() {
     console.log("KNX-Secure: Keyring for ETS proj " + knxUltimateClientProperties.jKNXSecureKeyring.ETSProjectName + ", created by " + knxUltimateClientProperties.jKNXSecureKeyring.ETSCreatedBy + " on " + knxUltimateClientProperties.jKNXSecureKeyring.ETSCreated + " succesfully validated with provided password");
 
     // Instantiate the client
-    var knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
+    var knxUltimateClient = new KNXClient(knxUltimateClientProperties);
 
     // This contains the decrypted keyring file, accessible to all .js files referencing the "index.js" module.
-    console.log(knx.getDecodedKeyring());
+    console.log(getDecodedKeyring());
 
     // Setting handlers
     // ######################################
-    knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, handleBusEvents);
-    knxUltimateClient.on(knx.KNXClient.KNXClientEvents.error, err => {
+    knxUltimateClient.on(KNXClientEvents.indication, handleBusEvents);
+    knxUltimateClient.on(KNXClientEvents.error, err => {
         // Error event
         console.log("Error", err)
     });
-    knxUltimateClient.on(knx.KNXClient.KNXClientEvents.ackReceived, (knxMessage, info) => {
+    knxUltimateClient.on(KNXClientEvents.ackReceived, (knxMessage, info) => {
         // In -->tunneling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
         // knxMessage: contains the telegram sent.
         // info is true it the last telegram has been acknowledge, otherwise false.
         console.log("Last telegram acknowledge", knxMessage, info)
     });
-    knxUltimateClient.on(knx.KNXClient.KNXClientEvents.disconnected, info => {
+    knxUltimateClient.on(KNXClientEvents.disconnected, info => {
         // The client is cisconnected
         console.log("Disconnected", info)
     });
-    knxUltimateClient.on(knx.KNXClient.KNXClientEvents.close, info => {
+    knxUltimateClient.on(KNXClientEvents.close, info => {
         // The client physical net socket has been closed
         console.log("Closed", info)
     });
-    knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
+    knxUltimateClient.on(KNXClientEvents.connected, info => {
         // The client is connected
         console.log("Connected. On Duty", info)
         // Write something to the BUS
         if (knxUltimateClient._getClearToSend()) knxUltimateClient.write("0/1/1", false, "1.001");
     });
-    knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connecting, info => {
+    knxUltimateClient.on(KNXClientEvents.connecting, info => {
         // The client is setting up the connection
         console.log("Connecting...", info)
     });
@@ -119,20 +120,20 @@ async function go() {
         // Decode the telegram. 
         if (_dst === "0/1/1") {
             // We know that 0/1/1 is a boolean DPT 1.001
-            dpt = dptlib.resolve("1.001");
-            jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+            const config = resolve("1.001");
+            jsValue = fromBuffer(_Rawvalue, config)
         } else if (_dst === "0/1/2") {
             // We know that 0/1/2 is a boolean DPT 232.600 Color RGB
-            dpt = dptlib.resolve("232.600");
-            jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+            const config = resolve("232.600");
+            jsValue = fromBuffer(_Rawvalue, config)
         } else {
             // All others... assume they are boolean
-            dpt = dptlib.resolve("1.001");
-            jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+            const config = resolve("1.001");
+            jsValue = fromBuffer(_Rawvalue, config)
             if (jsValue === null) {
                 // Is null, try if it's a numerical value
-                dpt = dptlib.resolve("5.001");
-                jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+                const config = resolve("5.001");
+                jsValue = fromBuffer(_Rawvalue, config)
             }
         }
         console.log("src: " + _src + " dest: " + _dst, " event: " + _evt, " value: " + jsValue);

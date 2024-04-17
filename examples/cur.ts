@@ -1,21 +1,8 @@
-import dpts, { fromBuffer, resolve } from "../src/dptlib";
+import { fromBuffer, resolve } from "../src/dptlib";
 import KNXClient, { KNXClientEvents } from "../src/KNXClient";
-import KNXAddress from "../src/protocol/KNXAddress";
-import KNXDataBuffer from "../src/protocol/KNXDataBuffer";
 
 // Create tunnel socket with source knx address 1.1.100
-const optionsDefaults: {
-  physAddr: string;
-  connectionKeepAliveTimeout: number;
-  ipAddr: string;
-  hostProtocol: string;
-  isSecureKNXEnabled: boolean;
-  ipPort: number;
-  suppress_ack_ldatareq: boolean;
-  loglevel: string;
-  localEchoInTunneling: boolean;
-  interface: string;
-} = {
+const knxClient = new KNXClient({
   physAddr: "15.15.21",
   connectionKeepAliveTimeout: 60,
   ipAddr: "192.168.1.15",
@@ -26,8 +13,7 @@ const optionsDefaults: {
   loglevel: "info",
   localEchoInTunneling: true,
   interface: "",
-};
-const knxClient: KNXClient = new KNXClient(optionsDefaults);
+});
 
 knxClient.on(KNXClientEvents.error, (err: any) => {
   console.log("BANANA ERRORE", err);

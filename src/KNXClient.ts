@@ -58,17 +58,16 @@ const jKNXSecureKeyring: string = ''
 
 export type KNXClientOptions = {
 	physAddr: string
-	connectionKeepAliveTimeout: number
+	connectionKeepAliveTimeout?: number
 	ipAddr: string
 	ipPort: number
 	hostProtocol: KNXClientProtocol
-	isSecureKNXEnabled: boolean
-	suppress_ack_ldatareq: boolean
-	loglevel: string
-	localEchoInTunneling: boolean
-	localIPAddress: string
-	interface: string
-	jKNXSecureKeyring: any
+	isSecureKNXEnabled?: boolean
+	suppress_ack_ldatareq?: boolean
+	localEchoInTunneling?: boolean
+	localIPAddress?: string
+	interface?: string
+	jKNXSecureKeyring?: any
 	localSocketAddress?: string
 } & KNXLoggerOptions
 
