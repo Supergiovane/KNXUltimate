@@ -872,13 +872,18 @@ export default class KNXClient extends EventEmitter {
 
   private async closeSocket() {
     return new Promise<void>((resolve, reject) => {
+      // already closed
+      if(!this._clientSocket) return
+
       const cb = (error?) => {
         if (error) {
           reject(error);
         } else {
+          this._clientSocket = null
           resolve();
         }
       };
+
 
       if (this._clientSocket instanceof UFPSocket) {
         this._clientSocket.close(cb);
@@ -896,7 +901,7 @@ export default class KNXClient extends EventEmitter {
     if (this._channelID === null) {
       // 11/10/2022 Close the socket
       try {
-        // TODO: both close and end provide a callback, make this async?
+        // TODO: this should be awaited
         this.closeSocket();
       } catch (error) {
         if (this.sysLogger !== undefined && this.sysLogger !== null)
@@ -956,6 +961,7 @@ export default class KNXClient extends EventEmitter {
 
     // 08/12/2021
     try {
+      // TODO: this should be awaited
       this.closeSocket();
     } catch (error) {}
 
