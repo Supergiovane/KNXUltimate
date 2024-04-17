@@ -1,5 +1,11 @@
 declare module 'log-driver' {
-	export type LogLevel = 'silent' | 'trace' | 'debug' | 'info' | 'warn' | 'error'
+	export type LogLevel =
+		| 'silent'
+		| 'trace'
+		| 'debug'
+		| 'info'
+		| 'warn'
+		| 'error'
 
 	export interface LogDriverOptions {
 		level: LogLevel

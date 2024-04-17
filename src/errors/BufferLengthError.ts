@@ -1,6 +1,5 @@
-
 export default class BufferLengthError extends Error {
-    public constructor() {
+	public constructor() {
 		super('Buffer Length')
 
 		// We need to set the prototype explicitly

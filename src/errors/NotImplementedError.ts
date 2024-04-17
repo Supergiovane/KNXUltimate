@@ -1,6 +1,5 @@
-
 export default class NotImplementedError extends Error {
-    public constructor() {
+	public constructor() {
 		super('Not implemented')
 
 		// We need to set the prototype explicitly
@@ -8,4 +7,3 @@ export default class NotImplementedError extends Error {
 		Object.getPrototypeOf(this).name = 'NotImplementedError'
 	}
 }
-

@@ -1,0 +1,8 @@
+/examples/
+/build/
+
+
+*.js
+
+*.md
+README.md

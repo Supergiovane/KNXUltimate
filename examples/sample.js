@@ -1,23 +1,23 @@
-const knx = require("./index.js");
-const dptlib = require('./src/dptlib');
+const knx = require("../src");
+const dptlib = require('../src/dptlib');
 
 // Get a list of supported datapoints
 // With this function, you can see what datapoints are supported and a sample on how you need to format the payload to be sent.
 // ######################################
 // Helpers
-sortBy = (field) => (a, b) => {
+const sortBy = (field) => (a, b) => {
     if (a[field] > b[field]) { return 1 } else { return -1 }
 };
-onlyDptKeys = (kv) => {
+const onlyDptKeys = (kv) => {
     return kv[0].startsWith("DPT")
 };
-extractBaseNo = (kv) => {
+const extractBaseNo = (kv) => {
     return {
         subtypes: kv[1].subtypes,
         base: parseInt(kv[1].id.replace("DPT", ""))
     }
 };
-convertSubtype = (baseType) => (kv) => {
+const convertSubtype = (baseType) => (kv) => {
     let value = `${baseType.base}.${kv[0]}`;
     //let sRet = value + " " + kv[1].name + (kv[1].unit === undefined ? "" : " (" + kv[1].unit + ")");
     let sRet = value + " " + kv[1].name;
@@ -26,7 +26,7 @@ convertSubtype = (baseType) => (kv) => {
         , text: sRet
     }
 }
-toConcattedSubtypes = (acc, baseType) => {
+const toConcattedSubtypes = (acc, baseType) => {
     let subtypes =
         Object.entries(baseType.subtypes)
             .sort(sortBy(0))
@@ -34,7 +34,7 @@ toConcattedSubtypes = (acc, baseType) => {
 
     return acc.concat(subtypes)
 };
-dptGetHelp = dpt => {
+const dptGetHelp = dpt => {
     var sDPT = dpt.split(".")[0]; // Takes only the main type
     var jRet;
     if (sDPT == "0") { // Special fake datapoint, meaning "Universal Mode"

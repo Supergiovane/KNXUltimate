@@ -1,12 +1,11 @@
 /**
-* KNXEngine - a KNX protocol stack in Javascript
-* (C) 2020-2022 Supergiovane
-*/
+ * KNXEngine - a KNX protocol stack in Javascript
+ * (C) 2020-2022 Supergiovane
+ */
 
 import * as util from 'util'
 import KnxLog from '../KnxLog'
 import { hasProp } from '../utils'
-
 
 import DPT1 from './dpt1'
 import DPT2 from './dpt2'
@@ -49,7 +48,7 @@ import { KNXDataBuffer } from '../protocol'
 type Range = [number, number] | [undefined]
 
 interface DatapointSubtype {
-	scalar_range?: Range 
+	scalar_range?: Range
 	name: string
 	use?: string
 	desc?: string
@@ -62,15 +61,15 @@ interface DatapointSubtype {
 export interface DatapointConfig {
 	id: string
 	subtypeid?: string
-  desc?: string
+	desc?: string
 	basetype: {
 		bitlength: number
 		signedness?: string
 		range?: Range
 		valuetype: string
 		desc?: string
-    help?: string
-    helplink?: string
+		help?: string
+		helplink?: string
 	}
 	subtype?: DatapointSubtype
 	subtypes?: Record<string, DatapointSubtype>
@@ -104,7 +103,7 @@ const dpts: Record<string, DatapointConfig> = {
 	[DPT28.id]: DPT28,
 	[DPT29.id]: DPT29,
 	[DPT213.id]: DPT213,
-  [DPT222.id]: DPT222,
+	[DPT222.id]: DPT222,
 	[DPT232.id]: DPT232,
 	[DPT235.id]: DPT235,
 	[DPT237.id]: DPT237,
@@ -146,83 +145,80 @@ export function resolve(dptid: string | number): DatapointConfig {
  */
 
 export type APDU = {
-  bitlength: number
-  data: Buffer,
+	bitlength: number
+	data: Buffer
 }
 
-export function populateAPDU(
-	value: any,
-	apdu: APDU,
-	dptid?: number | string,
-) {
-  // console.log ("BANANA " + dptid)
-  const dpt = resolve(dptid || 'DPT1')
+export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
+	// console.log ("BANANA " + dptid)
+	const dpt = resolve(dptid || 'DPT1')
 	const nbytes = Math.ceil(dpt.basetype.bitlength / 8)
-  // apdu.data = new Buffer(nbytes); // 14/09/2020 Supregiovane: Deprecated. Replaced with below.
-  apdu.data = Buffer.alloc(nbytes);
-  apdu.bitlength = dpt.basetype && dpt.basetype.bitlength || 1;
-  let tgtvalue = value;
-  // get the raw APDU data for the given JS value
-  if (typeof dpt.formatAPDU === 'function') {
-    // nothing to do here, DPT-specific formatAPDU implementation will handle everything
-    // knxLog.get().trace('>>> custom formatAPDU(%s): %j', dptid, value);
-    // TODO: this could return void, what to do in that case?
-    apdu.data = dpt.formatAPDU(value) as Buffer;
-    // knxLog.get().trace('<<< custom formatAPDU(%s): %j', dptid, apdu.data);
-  } else {
-    if (!isFinite(value)) {
-      throw new Error(util.format(
-        'Invalid value, expected a %s',
-        dpt.desc,
-      ));
-    }
-    // check if value is in range, be it explicitly defined or implied from bitlength
-    const range = (hasProp(dpt.basetype, 'range'))
-      ? dpt.basetype.range
-      : [0, 2 ** dpt.basetype.bitlength - 1];
-    // is there a scalar range? eg. DPT5.003 angle degrees (0=0, ff=360)
-    if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 
-      'scalar_range',
-    )) {
-      const scalar = dpt.subtype.scalar_range;
-      if (value < scalar[0] || value > scalar[1]) {
-        KnxLog.get().trace(
-          'Value %j(%s) out of scalar range(%j) for %s',
-          value, (
-          typeof value),
-          scalar,
-          dpt.id,
-        );
-      } else {
-        // convert value from its scalar representation
-        // e.g. in DPT5.001, 50(%) => 0x7F , 100(%) => 0xFF
-        const a = (scalar[1] - scalar[0]) / (range[1] - range[0]);
-        const b = (scalar[0] - range[0]);
-        tgtvalue = Math.round((value - b) / a);
-      }
-    } else {
-      // just a plain numeric value, only check if within bounds
-      if (value < range[0] || value > range[1]) {
-        KnxLog.get().trace(
-          'Value %j(%s) out of bounds(%j) for %s.%s',
-          value, (
-          typeof value),
-          range,
-          dpt.id,
-          dpt.subtypeid,
-        );
-      }
-    }
-    // generic APDU is assumed to convey an unsigned integer of arbitrary bitlength
-    if (hasProp(dpt.basetype, 'signedness') && dpt.basetype.signedness === 'signed') {
-      apdu.data.writeIntBE(tgtvalue, 0, nbytes);
-    } else {
-      apdu.data.writeUIntBE(tgtvalue, 0, nbytes);
-    }
-  }
-  // knxLog.get().trace('generic populateAPDU tgtvalue=%j(%s) nbytes=%d => apdu=%j', tgtvalue, typeof tgtvalue, nbytes, apdu);
-  return apdu;
-};
+	// apdu.data = new Buffer(nbytes); // 14/09/2020 Supregiovane: Deprecated. Replaced with below.
+	apdu.data = Buffer.alloc(nbytes)
+	apdu.bitlength = (dpt.basetype && dpt.basetype.bitlength) || 1
+	let tgtvalue = value
+	// get the raw APDU data for the given JS value
+	if (typeof dpt.formatAPDU === 'function') {
+		// nothing to do here, DPT-specific formatAPDU implementation will handle everything
+		// knxLog.get().trace('>>> custom formatAPDU(%s): %j', dptid, value);
+		// TODO: this could return void, what to do in that case?
+		apdu.data = dpt.formatAPDU(value) as Buffer
+		// knxLog.get().trace('<<< custom formatAPDU(%s): %j', dptid, apdu.data);
+	} else {
+		if (!isFinite(value)) {
+			throw new Error(
+				util.format('Invalid value, expected a %s', dpt.desc),
+			)
+		}
+		// check if value is in range, be it explicitly defined or implied from bitlength
+		const range = hasProp(dpt.basetype, 'range')
+			? dpt.basetype.range
+			: [0, 2 ** dpt.basetype.bitlength - 1]
+		// is there a scalar range? eg. DPT5.003 angle degrees (0=0, ff=360)
+		if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 'scalar_range')) {
+			const scalar = dpt.subtype.scalar_range
+			if (value < scalar[0] || value > scalar[1]) {
+				KnxLog.get().trace(
+					'Value %j(%s) out of scalar range(%j) for %s',
+					value,
+					typeof value,
+					scalar,
+					dpt.id,
+				)
+			} else {
+				// convert value from its scalar representation
+				// e.g. in DPT5.001, 50(%) => 0x7F , 100(%) => 0xFF
+				const a = (scalar[1] - scalar[0]) / (range[1] - range[0])
+				const b = scalar[0] - range[0]
+				tgtvalue = Math.round((value - b) / a)
+			}
+		} else {
+			// just a plain numeric value, only check if within bounds
+			// eslint-disable-next-line no-lonely-if
+			if (value < range[0] || value > range[1]) {
+				KnxLog.get().trace(
+					'Value %j(%s) out of bounds(%j) for %s.%s',
+					value,
+					typeof value,
+					range,
+					dpt.id,
+					dpt.subtypeid,
+				)
+			}
+		}
+		// generic APDU is assumed to convey an unsigned integer of arbitrary bitlength
+		if (
+			hasProp(dpt.basetype, 'signedness') &&
+			dpt.basetype.signedness === 'signed'
+		) {
+			apdu.data.writeIntBE(tgtvalue, 0, nbytes)
+		} else {
+			apdu.data.writeUIntBE(tgtvalue, 0, nbytes)
+		}
+	}
+	// knxLog.get().trace('generic populateAPDU tgtvalue=%j(%s) nbytes=%d => apdu=%j', tgtvalue, typeof tgtvalue, nbytes, apdu);
+	return apdu
+}
 
 /* get the correct Javascript value from a APDU buffer for the given DPT
  * - either by a custom DPT formatAPDU function
@@ -230,43 +226,46 @@ export function populateAPDU(
  * --  1) checks if the value adheres to the range set from the DPT's bitlength
  */
 export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
-  // sanity check
-  if (!dpt) throw util.format('DPT %s not found', dpt);
-  let value = 0;
-  // get the raw APDU data for the given JS value
-  if (typeof dpt.fromBuffer === 'function') {
-    // nothing to do here, DPT-specific fromBuffer implementation will handle everything
-    value = dpt.fromBuffer(buf);
-  } else {
-    // knxLog.get().trace('%s buflength == %d => %j', typeof buf, buf.length, JSON.stringify(buf) );
-    // get a raw unsigned integer from the buffer
-    if (buf.length > 6) {
-      throw 'cannot handle unsigned integers more then 6 bytes in length';
-    }
-    if (hasProp(dpt.basetype, 'signedness') && dpt.basetype.signedness == 'signed') {
-      value = buf.readIntBE(0, buf.length);
-    } else {
-      value = buf.readUIntBE(0, buf.length);
-    }
-    // knxLog.get().trace(' ../knx/src/index.js : DPT : ' + JSON.stringify(dpt));   // for exploring dpt and implementing description
-    if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 
-      'scalar_range',
-    )) {
-      const range = (hasProp(dpt.basetype, 'range'))
-        ? dpt.basetype.range
-        : [0, 2 ** dpt.basetype.bitlength - 1];
-      const scalar = dpt.subtype.scalar_range;
-      // convert value from its scalar representation
-      // e.g. in DPT5.001, 50(%) => 0x7F , 100(%) => 0xFF
-      const a = (scalar[1] - scalar[0]) / (range[1] - range[0]);
-      const b = (scalar[0] - range[0]);
-      value = Math.round(a * value + b);
-      // knxLog.get().trace('fromBuffer scalar a=%j b=%j %j', a,b, value);
-    }
-  }
-  //  knxLog.get().trace('generic fromBuffer buf=%j, value=%j', buf, value);
-  return value;
-};
+	// sanity check
+	if (!dpt) throw Error(util.format('DPT %s not found', dpt))
+	let value = 0
+	// get the raw APDU data for the given JS value
+	if (typeof dpt.fromBuffer === 'function') {
+		// nothing to do here, DPT-specific fromBuffer implementation will handle everything
+		value = dpt.fromBuffer(buf)
+	} else {
+		// knxLog.get().trace('%s buflength == %d => %j', typeof buf, buf.length, JSON.stringify(buf) );
+		// get a raw unsigned integer from the buffer
+		if (buf.length > 6) {
+			throw Error(
+				'cannot handle unsigned integers more then 6 bytes in length',
+			)
+		}
+		if (
+			hasProp(dpt.basetype, 'signedness') &&
+			dpt.basetype.signedness === 'signed'
+		) {
+			value = buf.readIntBE(0, buf.length)
+		} else {
+			value = buf.readUIntBE(0, buf.length)
+		}
+		// knxLog.get().trace(' ../knx/src/index.js : DPT : ' + JSON.stringify(dpt));   // for exploring dpt and implementing description
+		if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 'scalar_range')) {
+			const range = hasProp(dpt.basetype, 'range')
+				? dpt.basetype.range
+				: [0, 2 ** dpt.basetype.bitlength - 1]
+			const scalar = dpt.subtype.scalar_range
+			// convert value from its scalar representation
+			// e.g. in DPT5.001, 50(%) => 0x7F , 100(%) => 0xFF
+			const a = (scalar[1] - scalar[0]) / (range[1] - range[0])
+			const b = scalar[0] - range[0]
+			value = Math.round(a * value + b)
+			// knxLog.get().trace('fromBuffer scalar a=%j b=%j %j', a,b, value);
+		}
+	}
+	//  knxLog.get().trace('generic fromBuffer buf=%j, value=%j', buf, value);
+	return value
+}
 
 const cloneDpt = (d: DatapointConfig) => {
 	const { fromBuffer: fb, formatAPDU: fa } = d
