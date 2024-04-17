@@ -113,24 +113,26 @@
 //   }
 
 // https://support.knx.org/hc/it/articles/360001582259-Usare-keyring-al-di-fuori-di-ETS-Falcon-SDK
-const KnxLog = require('./KnxLog')
-const xml2js = require('xml2js')
-const CryptoJS = require('crypto-js')
+import KnxLog from './KnxLog';
+import xml2js from 'xml2js';
+import CryptoJS from 'crypto-js';
+
 const keyringSalt = '1.keyring.ets.knx.org'
 
 // Class returned by the keyring function after the load
-const _retJson = {}
+const _retJson: any = {};
 
-let signature = ''
-let createdHash = ''
-let passwordHash = ''
-let jSonXMLKeyringFile = {}// Holds the Keyring XML in JSON Format
-let XMLKeyringFileString = '' // Holds the Keyring XML in string Format
+let signature: string = '';
+let createdHash: string = '';
+let passwordHash: string = '';
+let jSonXMLKeyringFile: any = {};// Holds the Keyring XML in JSON Format
+let XMLKeyringFileString: string = ''; // Holds the Keyring XML in string Format
 
-async function xml2json (_sXML) {
+async function xml2json (_sXML: string): Promise<any> {
   return new Promise((resolve, reject) => {
     try {
-      xml2js.Parser({ explicitArray: false }).parseString(_sXML, function (err, json) {
+      const parser = new xml2js.Parser({ explicitArray: false })
+      parser.parseString(_sXML, function (err: any, json: any) {
         if (err) { reject(err) } else { resolve(json) }
       })
     } catch (error) {
@@ -141,48 +143,47 @@ async function xml2json (_sXML) {
 
 const keyring = (function () {
   // Return byte, input char[] password, byte[] salt
-  async function pbkdf2WithHmacSha256 (password, salt) {
-    const iterations = 65536
-    const keyLength = 4
+  async function pbkdf2WithHmacSha256 (password: string, salt: string): Promise<string> {
+    const iterations: number = 65536;
+    const keyLength: number = 4;
     if ((password == null) || (password.length === 0)) {
-      password = '\0'
+      password = '\0';
     }
     try {
-      // password = CryptoJS.enc.Base64.parse(key);
       const secretKey = CryptoJS.PBKDF2(password, salt, {
         keySize: keyLength,
         iterations,
         hasher: CryptoJS.algo.SHA256,
-        padding: CryptoJS.pad.NoPadding
-      })
-      return secretKey.toString(CryptoJS.enc.Base64)
+        padding: CryptoJS.pad.NoPadding // FIXME: this options doesn't exists
+      });
+      return secretKey.toString(CryptoJS.enc.Base64);
     } catch (error) {
-      KnxLog.get().error('pbkdf2WithHmacSha256 ' + error.message)
-      throw error
+      KnxLog.get().error('pbkdf2WithHmacSha256 ' + error.message);
+      throw error;
     }
   }
 
   // Return bytes
-  async function sha256 (_input) {
+  async function sha256 (_input: string): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
-        const hash = CryptoJS.SHA256(_input)
-        let buffer = Buffer.from(hash.toString(CryptoJS.enc.Hex), 'hex')
-        buffer = buffer.slice(0, 16)
-        resolve(buffer.toString('base64'))
+        const hash = CryptoJS.SHA256(_input);
+        let buffer = Buffer.from(hash.toString(CryptoJS.enc.Hex), 'hex');
+        buffer = buffer.slice(0, 16);
+        resolve(buffer.toString('base64'));
       } catch (error) {
-        reject(error)
+        reject(error);
       }
     })
   }
 
   // Return byte, input char[]
-  async function hashKeyringPwd (keyringPwd) {
+  async function hashKeyringPwd (keyringPwd: string): Promise<string> {
     try {
-      return pbkdf2WithHmacSha256(keyringPwd, keyringSalt)
+      return pbkdf2WithHmacSha256(keyringPwd, keyringSalt);
     } catch (error) {
-      KnxLog.get().error('hashKeyringPwd ' + error.message)
-      throw error
+      KnxLog.get().error('hashKeyringPwd ' + error.message);
+      throw error;
     }
   }
 
@@ -196,127 +197,125 @@ const keyring = (function () {
   // 	cipher.init(Cipher.DECRYPT_MODE, keySpec, params);
   // 	return cipher.doFinal(input);
   // }
-  async function aes128Cbc (_inputBase64, _pwdKeyringHashBase64, _createdHashBase64) {
-    // var decrypted = CryptoJS.AES.decrypt(_input,_pwdKeyringHash,{iv:iv,padding:CryptoJS.pad.ZeroPadding});
+  async function aes128Cbc (_inputBase64: string, _pwdKeyringHashBase64: string, _createdHashBase64: string): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
         const decrypted = CryptoJS.AES.decrypt(_inputBase64,
           CryptoJS.enc.Base64.parse(_pwdKeyringHashBase64),
-          { iv: CryptoJS.enc.Base64.parse(_createdHashBase64), mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.ZeroPadding })
+          { iv: CryptoJS.enc.Base64.parse(_createdHashBase64), mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.ZeroPadding });
 
-        // resolve(CryptoJS.enc.Base64.stringify(decrypted));
-        resolve(CryptoJS.enc.Hex.stringify(decrypted))
+        resolve(CryptoJS.enc.Hex.stringify(decrypted));
       } catch (error) {
-        KnxLog.get().error('aes128Cbc ' + error)
-        reject(error)
+        KnxLog.get().error('aes128Cbc ' + error);
+        reject(error);
       }
     })
   }
-  async function verifySignature (passwordHash) {
-    const sRows = XMLKeyringFileString.split('>')
-    const aFiltered = []
+  async function verifySignature (passwordHash: string): Promise<boolean> {
+    const sRows = XMLKeyringFileString.split('>');
+    const aFiltered: any[] = [];
 
     try {
       for (let index = 0; index < sRows.length; index++) {
-        let sRow = sRows[index] + '>'
-        let bEndElement = false
-        sRow = sRow.trim()
+        let sRow = sRows[index] + '>';
+        let bEndElement = false;
+        sRow = sRow.trim();
         // Clean close tags
         if (sRow !== '' && !sRow.startsWith('<?xml')) {
           if (sRow.startsWith('<\/') || sRow.endsWith('\/>')) {
-            bEndElement = true
+            bEndElement = true;
           }
           if (sRow.startsWith('<') && !sRow.startsWith('<\/')) {
             // START_ELEMENT
-            aFiltered.push(Uint8Array.from([1]))
+            aFiltered.push(Uint8Array.from([1]));
           }
           if (!sRow.startsWith('<\/')) {
-            sRow = sRow.replace(/</g, '')
-            sRow = sRow.replace(/\/>/g, '')
-            sRow = sRow.replace(/>/g, '')
-            sRow = sRow.trim()
+            sRow = sRow.replace(/</g, '');
+            sRow = sRow.replace(/\/>/g, '');
+            sRow = sRow.replace(/>/g, '');
+            sRow = sRow.trim();
             // sRow is something like this: Backbone MulticastAddress="224.0.23.12" Latency="1000" Key="VGnz2DbdiMqN5EE4I7tqLw=="
 
             // Get the TAG
-            let sTag = ''
-            let sTemp = ''
-            let sAttribute = ''
-            let sValue = ''
+            let sTag = '';
+            let sTemp = '';
+            let sAttribute = '';
+            let sValue = '';
             // Find the TAG
             for (let index = 0; index < sRow.length; index++) {
-              const _char = sRow[index]
+              const _char = sRow[index];
               if (_char !== ' ') {
-                sTemp += _char
+                sTemp += _char;
               } else {
                 // Got the tag
-                sTag = sTemp
-                break
+                sTag = sTemp;
+                break;
               }
             }
-            if (sTag === '') sTag = sTemp // In case of TAG without attributes
-            sTemp = ''
-            sRow = sRow.substring(sTag.length + 1) // Purge TAG
+            if (sTag === '') sTag = sTemp; // In case of TAG without attributes
+            sTemp = '';
+            sRow = sRow.substring(sTag.length + 1); // Purge TAG
 
             // Attributes and values MulticastAddress="224.0.23.12" Banana="22sdsf02312=="
-            const aAttribs = []
+            const aAttribs: any[] = [];
             do {
-              sAttribute = sRow.substring(0, sRow.indexOf('=')) // Get attribute
-              sRow = sRow.substring(sRow.indexOf('=') + 1).trim() // Purge attribute
-              sValue = sRow.substring(0, sRow.indexOf('"', 1) + 1) // Get value
-              sRow = sRow.substring(sValue.length + 1).trim() // Purge value
-              sValue = sValue.replace(/\"/g, '')
+              sAttribute = sRow.substring(0, sRow.indexOf('=')); // Get attribute
+              sRow = sRow.substring(sRow.indexOf('=') + 1).trim(); // Purge attribute
+              sValue = sRow.substring(0, sRow.indexOf('"', 1) + 1); // Get value
+              sRow = sRow.substring(sValue.length + 1).trim(); // Purge value
+              sValue = sValue.replace(/\"/g, '');
               if (sAttribute !== 'xmlns' && sAttribute !== 'Signature') {
-                aAttribs.push({ attlen: sAttribute.length, att: sAttribute, vallen: sValue.length, val: sValue })
+                aAttribs.push({ attlen: sAttribute.length, att: sAttribute, vallen: sValue.length, val: sValue });
               }
-              sAttribute = ''
-              sValue = ''
-            } while (sRow.length > 0)
+              sAttribute = '';
+              sValue = '';
+            } while (sRow.length > 0);
 
             if (sTag.length > 0) {
-              aFiltered.push(Uint8Array.from([sTag.length]))
-              aFiltered.push(new TextEncoder().encode(sTag))
+              aFiltered.push(Uint8Array.from([sTag.length]));
+              aFiltered.push(new TextEncoder().encode(sTag));
             }
 
             // Order the attribute array
-            const aAttribsSorted = aAttribs.sort((a, b) => (a.att > b.att) ? 1 : ((b.att > a.att) ? -1 : 0))
+            const aAttribsSorted = aAttribs.sort((a, b) => (a.att > b.att) ? 1 : ((b.att > a.att) ? -1 : 0));
             // Put all togheddder
             for (let index = 0; index < aAttribsSorted.length; index++) {
-              const element = aAttribsSorted[index]
+              const element = aAttribsSorted[index];
               if (element.attlen > 0) {
-                aFiltered.push(Uint8Array.from([element.attlen]))
-                aFiltered.push(new TextEncoder().encode(element.att))
-                aFiltered.push(Uint8Array.from([element.vallen]))
-                aFiltered.push(new TextEncoder().encode(element.val))
+                aFiltered.push(Uint8Array.from([element.attlen]));
+                aFiltered.push(new TextEncoder().encode(element.att));
+                aFiltered.push(Uint8Array.from([element.vallen]));
+                aFiltered.push(new TextEncoder().encode(element.val));
               }
             }
             // Add the end element tag.
             if (bEndElement) {
               // END_ELEMENT
-              aFiltered.push(Uint8Array.from([2]))
-              bEndElement = false
+              aFiltered.push(Uint8Array.from([2]));
+              bEndElement = false;
             }
           } else {
             // END_ELEMENT
-            aFiltered.push(Uint8Array.from([2]))
+            aFiltered.push(Uint8Array.from([2]));
           }
         }
       }
 
       // Add the has password
-      aFiltered.push(Uint8Array.from([passwordHash.length]))
-      aFiltered.push(new TextEncoder().encode(passwordHash))
+      aFiltered.push(Uint8Array.from([passwordHash.length]));
+      aFiltered.push(new TextEncoder().encode(passwordHash));
 
-      const buffKeyringFileForHashing = Buffer.concat(aFiltered)
-      const keyringFileForHashing = Buffer.from(buffKeyringFileForHashing).toString()
+      const buffKeyringFileForHashing = Buffer.concat(aFiltered);
+      const keyringFileForHashing = Buffer.from(buffKeyringFileForHashing).toString();
 
-      const outputHash = await sha256(keyringFileForHashing)
+      const outputHash = await sha256(keyringFileForHashing);
       if (outputHash === signature) {
-        return true
+        return true;
       } else {
-        throw (new Error('verifySignature failed'))
+        throw (new Error('verifySignature failed'));
       }
     } catch (error) {
-      throw (new Error('verifySignature ') + error.message)
+      throw (new Error('verifySignature ') + error.message);
     }
   }
 
@@ -329,11 +328,11 @@ const keyring = (function () {
      * @param _createdHashBase64 the keyring created datetime hash
      * @return decrypted key base64
      */
-  async function decryptKey (_inputBase64, _pwdKeyringHashBase64, _createdHashBase64) {
+  async function decryptKey (_inputBase64: string, _pwdKeyringHashBase64: string, _createdHashBase64: string): Promise<string> {
     try {
-      return await aes128Cbc(_inputBase64, _pwdKeyringHashBase64, _createdHashBase64)
+      return await aes128Cbc(_inputBase64, _pwdKeyringHashBase64, _createdHashBase64);
     } catch (error) {
-      throw new Error('decryptKey ' + error.message)
+      throw new Error('decryptKey ' + error.message);
     } finally {
       // Arrays.fill(_pwdKeyringHash, (byte) 0);
     }
@@ -347,85 +346,85 @@ const keyring = (function () {
      * @param _createdHashBase64 the created hash
      * @return decrypted password in plain text
      */
-  async function decryptPassword (_inputBase64, _pwdKeyringHashBase64, _createdHashBase64) {
+  async function decryptPassword (_inputBase64: string, _pwdKeyringHashBase64: string, _createdHashBase64: string): Promise<string> {
     try {
-      const pwdData = await extractPassword(await decryptKey(_inputBase64, _pwdKeyringHashBase64, _createdHashBase64))
-      let ret = []
+      const pwdData = await extractPassword(await decryptKey(_inputBase64, _pwdKeyringHashBase64, _createdHashBase64));
+      let ret = '';
       for (let index = 0; index < pwdData.length; index++) {
-        const element = pwdData[index]
-        ret += String.fromCharCode(pwdData[index] & 0xff)
+        const element = pwdData[index];
+        ret += String.fromCharCode(pwdData[index] & 0xff);
       }
-      return ret
+      return ret;
     } catch (error) {
-      throw new Error('decrypting password data', error)
+      throw new Error('Error while decrypting password data: ' + error.message );
     }
   }
 
   // 18/11/2021 Estraggo la password smanettando sul range.
-  async function extractPassword (data) {
-    data = Buffer.from(data.toString('hex'), 'hex')
-    const b = data[data.length - 1] & 0xff
-    const range = await copyOfRange(data, 8, data.length - b)
-    return range
+  async function extractPassword (data: any): Promise<any> {
+    data = Buffer.from(data.toString('hex'), 'hex');
+    const b = data[data.length - 1] & 0xff;
+    const range = await copyOfRange(data, 8, data.length - b);
+    return range;
   }
 
   // 18/11/2021 Copy of array range. If _to is > _arr.length, append 0
-  async function copyOfRange (_arr, _start, _to) {
-    const ret = []
+  async function copyOfRange (_arr: any[], _start: number, _to: number): Promise<any[]> {
+    const ret: any[] = [];
     for (let index = _start; index < _to; index++) {
       try {
-        ret.push(_arr[index])
+        ret.push(_arr[index]);
       } catch (error) {
-        ret.push(0)
+        ret.push(0);
       }
     }
-    return ret
+    return ret;
   }
 
   // Read the XML text
   // Returns an object with all necessary info, or error if the keyring password is wrong or something is going bad
-  async function load (_sXML, _keyringPassword) {
-    if (_keyringPassword === undefined) _keyringPassword = ''
-    if (_sXML === undefined) _sXML = ''
+  async function load (_sXML: string, _keyringPassword?: string): Promise<any> {
+    if (_keyringPassword === undefined) _keyringPassword = '';
+    if (_sXML === undefined) _sXML = '';
 
     // All returned key are in base64 per comodità.
     try {
-      jSonXMLKeyringFile = await xml2json(_sXML)
-      XMLKeyringFileString = _sXML
-      _retJson.ETSProjectName = jSonXMLKeyringFile.Keyring.$.Project
-      const createdBy = jSonXMLKeyringFile.Keyring.$.CreatedBy
-      _retJson.ETSCreatedBy = createdBy
-      var created = jSonXMLKeyringFile.Keyring.$.Created
-      _retJson.ETSCreated = created
+      jSonXMLKeyringFile = await xml2json(_sXML);
+      XMLKeyringFileString = _sXML;
+      _retJson.ETSProjectName = jSonXMLKeyringFile.Keyring.$.Project;
+      const createdBy = jSonXMLKeyringFile.Keyring.$.CreatedBy;
+      _retJson.ETSCreatedBy = createdBy;
+      var created = jSonXMLKeyringFile.Keyring.$.Created;
+      _retJson.ETSCreated = created;
     } catch (error) {
-      KnxLog.get().error('load ' + error.message)
-      throw (error)
+      KnxLog.get().error('load ' + error.message);
+      throw (error);
     }
 
     try {
       // Get the hash from the keyring password
-      passwordHash = await hashKeyringPwd(_keyringPassword)
-      _retJson.HASHkeyringPasswordBase64 = passwordHash
+      passwordHash = await hashKeyringPwd(_keyringPassword);
+      _retJson.HASHkeyringPasswordBase64 = passwordHash;
     } catch (error) {
-      KnxLog.get().error('passwordHash ' + error.message)
-      throw (new Error('passwordHash ' + error.message))
+      KnxLog.get().error('passwordHash ' + error.message);
+      throw (new Error('passwordHash ' + error.message));
     }
     // Get the hash from the created tac
-    createdHash = await sha256(created)
-    _retJson.HASHCreatedBase64 = createdHash
-    KnxLog.get().debug('createdHash ' + createdHash) // OK !!!
+    createdHash = await sha256(created);
+    _retJson.HASHCreatedBase64 = createdHash;
+    KnxLog.get().debug('createdHash ' + createdHash); // OK !!!
 
     // Get the signature from the KEYRING attribute
-    signature = jSonXMLKeyringFile.Keyring.$.Signature.toString('base64')
-    KnxLog.get().debug('signature ' + signature) // OK !!!
+    signature = jSonXMLKeyringFile.Keyring.$.Signature.toString('base64');
+    KnxLog.get().debug('signature ' + signature); // OK !!!
 
     if (_keyringPassword.length > 0) {
       try {
-        await verifySignature(passwordHash)
-        KnxLog.get().debug('verifySignature OK')
+        await verifySignature(passwordHash);
+        KnxLog.get().debug('verifySignature OK');
       } catch (error) {
-        KnxLog.get().error('signature verification failed for keyring ' + _keyringPassword)
-        throw (new Error('The password is wrong'))
+        KnxLog.get().error('signature verification failed for keyring ' + _keyringPassword);
+        throw (new Error('The password is wrong'));
       }
     }
 
@@ -435,10 +434,10 @@ const keyring = (function () {
         multicastAddress: jSonXMLKeyringFile.Keyring.Backbone.$.MulticastAddress,
         latency: jSonXMLKeyringFile.Keyring.Backbone.$.Latency,
         key: await decryptKey(jSonXMLKeyringFile.Keyring.Backbone.$.Key, passwordHash, createdHash)
-      }
+      };
     } catch (error) {
-      KnxLog.get().error('KNX-Secure: Backbone details ' + error.message)
-      throw (new Error('KNX-Secure: Backbone details ' + error.message))
+      KnxLog.get().error('KNX-Secure: Backbone details ' + error.message);
+      throw (new Error('KNX-Secure: Backbone details ' + error.message));
     }
 
     // Get the INTERFACES details
@@ -452,10 +451,10 @@ const keyring = (function () {
     //     authenticationPassword: ""
     // }];
     try {
-      _retJson.interfaces = []
+      _retJson.interfaces = [];
       if (jSonXMLKeyringFile.Keyring.hasOwnProperty('Interface')) {
         for (let index = 0; index < jSonXMLKeyringFile.Keyring.Interface.length; index++) {
-          const element = jSonXMLKeyringFile.Keyring.Interface[index]
+          const element = jSonXMLKeyringFile.Keyring.Interface[index];
           _retJson.interfaces.push({
             individualAddress: element.$.IndividualAddress,
             type: element.$.Type,
@@ -463,12 +462,12 @@ const keyring = (function () {
             userID: element.$.UserID,
             managementPassword: element.$.hasOwnProperty('Password') ? await decryptPassword(element.$.Password, passwordHash, createdHash) : null,
             authenticationPassword: element.$.hasOwnProperty('Authentication') ? await decryptPassword(element.$.Authentication, passwordHash, createdHash) : null
-          })
+          });
         }
       }
     } catch (error) {
-      KnxLog.get().error('KNX-Secure: Interfaces details ' + error.message)
-      throw (new Error('KNX-Secure: Interfaces details ' + error.message))
+      KnxLog.get().error('KNX-Secure: Interfaces details ' + error.message);
+      throw (new Error('KNX-Secure: Interfaces details ' + error.message));
     }
 
     // Get the GROUP ADDRESSES details
@@ -478,30 +477,30 @@ const keyring = (function () {
     //     key: ""
     // }];
     try {
-      _retJson.groupAddresses = []
+      _retJson.groupAddresses = [];
       if (jSonXMLKeyringFile.Keyring.hasOwnProperty('GroupAddresses')) {
         for (let index = 0; index < jSonXMLKeyringFile.Keyring.GroupAddresses.Group.length; index++) {
-          const element = jSonXMLKeyringFile.Keyring.GroupAddresses.Group[index]
+          const element = jSonXMLKeyringFile.Keyring.GroupAddresses.Group[index];
           _retJson.groupAddresses.push({
             address: await getKNXAddressfromXML(element.$.Address),
             key: element.$.hasOwnProperty('Key') ? await decryptKey(element.$.Key, passwordHash, createdHash) : null
-          })
+          });
         }
       }
     } catch (error) {
-      KnxLog.get().error('KNX-Secure: GroupAddres details ' + error.message)
-      throw (new Error('KNX-Secure: GroupAddres details ' + error.message))
+      KnxLog.get().error('KNX-Secure: GroupAddres details ' + error.message);
+      throw (new Error('KNX-Secure: GroupAddres details ' + error.message));
     }
 
     // 18/11/2021 Recupero il gruppo dall'XML
-    async function getKNXAddressfromXML (_rawAddress) {
-      const digits = []
+    async function getKNXAddressfromXML (_rawAddress: number): Promise<string> {
+      const digits: number[] = [];
       if (_rawAddress > 0x7FF) {
-        digits.push((_rawAddress >> 11) & 0x1F)
+        digits.push((_rawAddress >> 11) & 0x1F);
       }
-      digits.push((_rawAddress >> 8) & 0x07)
-      digits.push(_rawAddress & 0xFF)
-      return digits.join('/')
+      digits.push((_rawAddress >> 8) & 0x07);
+      digits.push(_rawAddress & 0xFF);
+      return digits.join('/');
     }
 
     // Get the DEVICES details
@@ -515,29 +514,29 @@ const keyring = (function () {
     //     authenticationPassword: ""
     // }];
     try {
-      _retJson.Devices = []
+      _retJson.Devices = [];
       if (jSonXMLKeyringFile.Keyring.hasOwnProperty('Devices')) {
         for (let index = 0; index < jSonXMLKeyringFile.Keyring.Devices.Device.length; index++) {
-          const element = jSonXMLKeyringFile.Keyring.Devices.Device[index]
+          const element = jSonXMLKeyringFile.Keyring.Devices.Device[index];
           _retJson.Devices.push({
             individualAddress: element.$.IndividualAddress,
             sequenceNumber: element.$.SequenceNumber,
             toolKey: element.$.hasOwnProperty('ToolKey') ? await decryptKey(element.$.ToolKey, passwordHash, createdHash) : null,
             managementPassword: element.$.hasOwnProperty('ManagementPassword') ? await decryptPassword(element.$.ManagementPassword, passwordHash, createdHash) : null,
             authenticationPassword: element.$.hasOwnProperty('Authentication') ? await decryptPassword(element.$.Authentication, passwordHash, createdHash) : null
-          })
+          });
         }
       }
     } catch (error) {
-      KnxLog.get().error('KNX-Secure: Devices details ' + error.message)
-      throw (new Error('KNX-Secure: Devices details ' + error.message))
+      KnxLog.get().error('KNX-Secure: Devices details ' + error.message);
+      throw (new Error('KNX-Secure: Devices details ' + error.message));
     }
-    return _retJson
+    return _retJson;
   }
 
   return {
 
     load
   }
-})()
-exports.keyring = keyring
+})();
+export default keyring;
