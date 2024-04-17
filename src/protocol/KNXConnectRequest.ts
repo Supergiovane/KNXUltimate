@@ -1,16 +1,15 @@
-import { KNXPacket } from './KNXPacket';
+import KNXPacket  from './KNXPacket';
 import HPAI from './HPAI';
 import CRIFactory from './CRIFactory';
 import { KNX_CONSTANTS } from './KNXConstants';
-import KNXHeader from './KNXHeader';
+import TunnelCRI from './TunnelCRI';
 
-export class KNXConnectRequest extends KNXPacket {
-  cri: CRIFactory;
+export default class KNXConnectRequest extends KNXPacket {
+  cri: TunnelCRI;
   hpaiControl: HPAI;
   hpaiData: HPAI;
-  header: KNXHeader;
 
-  constructor(cri: CRIFactory, hpaiControl = HPAI.NULLHPAI, hpaiData = HPAI.NULLHPAI) {
+  constructor(cri: TunnelCRI, hpaiControl = HPAI.NULLHPAI, hpaiData = HPAI.NULLHPAI) {
     super(KNX_CONSTANTS.CONNECT_REQUEST, hpaiControl.length + hpaiData.length + cri.length);
     this.cri = cri;
     this.hpaiControl = hpaiControl;

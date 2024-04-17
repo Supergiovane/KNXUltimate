@@ -5,7 +5,6 @@ import KNXSecureKeyring from './KNXsecureKeyring.js'
 
 import { KNXClient, KNXClientEvents, getDecodedKeyring, appendPropertyToDecodedKeyring } from "./KNXClient.js";
 
-
 export {
     KNXClient,
     KNXClientEvents,

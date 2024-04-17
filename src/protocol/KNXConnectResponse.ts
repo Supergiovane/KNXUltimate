@@ -1,26 +1,36 @@
+import CRD from "./CRD";
+import HPAI from "./HPAI";
+import { KNX_CONSTANTS } from "./KNXConstants";
+import KNXPacket from "./KNXPacket";
 
-import CRD from './CRD';
-import HPAI from './HPAI';
-import { KNX_CONSTANTS } from './KNXConstants';
-import { KNXPacket } from './KNXPacket';
-
-export class KNXConnectResponse extends KNXPacket {
+export default class KNXConnectResponse extends KNXPacket {
   channelID: number;
   status: number;
   hpai: HPAI | null;
   crd: CRD | null;
 
-  constructor(channelID: number, status: number, hpai: HPAI | null, crd: CRD | null) {
-    super(KNX_CONSTANTS.CONNECT_RESPONSE, hpai == null ? 2 : 2 + hpai.length + crd.length);
+  constructor(
+    channelID: number,
+    status: number,
+    hpai: HPAI | null,
+    crd: CRD | null
+  ) {
+    super(
+      KNX_CONSTANTS.CONNECT_RESPONSE,
+      hpai == null ? 2 : 2 + hpai.length + crd.length
+    );
     this.channelID = channelID;
     this.status = status;
     this.hpai = hpai;
     this.crd = crd;
   }
 
-  static createFromBuffer(buffer: Buffer, offset: number = 0): KNXConnectResponse {
+  static createFromBuffer(
+    buffer: Buffer,
+    offset: number = 0
+  ): KNXConnectResponse {
     if (offset + 2 > buffer.length) {
-      throw new Error('Buffer too short');
+      throw new Error("Buffer too short");
     }
     const channelID = buffer.readUInt8(offset++);
     const status = buffer.readUInt8(offset++);
@@ -36,19 +46,19 @@ export class KNXConnectResponse extends KNXPacket {
   static statusToString(status: number): string {
     switch (status) {
       case KNX_CONSTANTS.E_SEQUENCE_NUMBER:
-        return 'Invalid Sequence Number';
+        return "Invalid Sequence Number";
       case KNX_CONSTANTS.E_CONNECTION_TYPE:
-        return 'Invalid Connection Type';
+        return "Invalid Connection Type";
       case KNX_CONSTANTS.E_CONNECTION_OPTION:
-        return 'Invalid Connection Option';
+        return "Invalid Connection Option";
       case KNX_CONSTANTS.E_NO_MORE_CONNECTIONS:
-        return 'No More Connections';
+        return "No More Connections";
       case KNX_CONSTANTS.E_DATA_CONNECTION:
-        return 'Invalid Data Connection';
+        return "Invalid Data Connection";
       case KNX_CONSTANTS.E_KNX_CONNECTION:
-        return 'Invalid KNX Connection';
+        return "Invalid KNX Connection";
       case KNX_CONSTANTS.E_TUNNELING_LAYER:
-        return 'Invalid Tunneling Layer';
+        return "Invalid Tunneling Layer";
       default:
         return `Unknown error ${status}`;
     }

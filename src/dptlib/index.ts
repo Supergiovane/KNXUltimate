@@ -33,6 +33,7 @@ import DPT22 from './dpt22'
 import DPT28 from './dpt28'
 import DPT29 from './dpt29'
 import DPT213 from './dpt213'
+import DPT222 from './dpt222'
 import DPT232 from './dpt232'
 import DPT235 from './dpt235'
 import DPT237 from './dpt237'
@@ -102,6 +103,7 @@ const dpts: Record<string, DatapointConfig> = {
 	[DPT28.id]: DPT28,
 	[DPT29.id]: DPT29,
 	[DPT213.id]: DPT213,
+  [DPT222.id]: DPT222,
 	[DPT232.id]: DPT232,
 	[DPT235.id]: DPT235,
 	[DPT237.id]: DPT237,

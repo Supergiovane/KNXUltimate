@@ -1,4 +1,3 @@
-'use strict';
 
 export const KNX_CONSTANTS = {
   KNXNETIP_VERSION_10: 0x10,

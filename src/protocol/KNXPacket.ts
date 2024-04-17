@@ -1,6 +1,6 @@
 import KNXHeader from './KNXHeader';
 
-export class KNXPacket {
+export default class KNXPacket {
   private _header: KNXHeader;
   public type: number;
   public length: number;
