@@ -1,6 +1,6 @@
 export default class RequestTimeoutError extends Error {
-    public constructor() {
-		super('Request timeout')
+    public constructor(details: string) {
+		super('Request timeout: ' + details)
 
 		// We need to set the prototype explicitly
 		Object.setPrototypeOf(this, RequestTimeoutError.prototype)

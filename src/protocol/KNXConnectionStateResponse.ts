@@ -4,6 +4,7 @@ import { KNX_CONSTANTS } from './KNXConstants';
 export default class KNXConnectionStateResponse extends KNXPacket {
   channelID: number;
   status: number;
+  static KNXConnectionStateResponse: any;
 
   constructor(channelID: number, status: number) {
     super(KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE, 2);

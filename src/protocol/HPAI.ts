@@ -14,6 +14,7 @@ export default class HPAI {
   private _splitHost: RegExpMatchArray;
 
   private _header: any
+  static HPAI: any;
 
   constructor(
     _host: string,

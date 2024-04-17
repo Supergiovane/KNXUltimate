@@ -8,6 +8,7 @@ export default class KNXConnectResponse extends KNXPacket {
   status: number;
   hpai: HPAI | null;
   crd: CRD | null;
+  static KNXConnectResponse: any;
 
   constructor(
     channelID: number,

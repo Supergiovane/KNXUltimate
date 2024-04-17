@@ -5,6 +5,7 @@ import LDataReq from "./LDataReq";
 import ControlField from "./ControlField";
 import NPDU from "./NPDU";
 import KNXAddress from "../KNXAddress";
+import KNXDataBuffer from "../KNXDataBuffer";
 
 export default class CEMIFactory {
   static createFromBuffer(type: number, buffer: Buffer, offset: number): any {
@@ -24,8 +25,8 @@ export default class CEMIFactory {
     requestType: string,
     srcAddress: KNXAddress,
     dstAddress: KNXAddress,
-    data: any
-  ): any {
+    data: KNXDataBuffer
+  ) {
     const controlField = new ControlField();
 
     const npdu = new NPDU();
@@ -49,8 +50,8 @@ export default class CEMIFactory {
     requestType: string,
     srcAddress: KNXAddress,
     dstAddress: KNXAddress,
-    data: any
-  ): any {
+    data: KNXDataBuffer
+  ) {
     const controlField = new ControlField();
 
     const npdu = new NPDU();
