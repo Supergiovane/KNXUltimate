@@ -3,16 +3,17 @@ import HPAI from './HPAI'
 import CRIFactory from './CRIFactory'
 import { KNX_CONSTANTS } from './KNXConstants'
 import { generateKeyPair } from '../Curve25519'
+import TunnelCRI from './TunnelCRI'
 
 export default class KNXSecureSessionRequest extends KNXPacket {
-	cri: any
+	cri: TunnelCRI
 
 	hpaiData: HPAI
 
 	diffieHellmanClientPublicValue: string
 
 	constructor(
-		cri: any,
+		cri: TunnelCRI,
 		hpaiData: HPAI = HPAI.NULLHPAI,
 		private _jKNXSecureKeyring: any = {},
 	) {

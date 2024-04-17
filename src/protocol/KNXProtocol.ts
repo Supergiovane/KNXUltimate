@@ -15,11 +15,14 @@ import KNXRoutingIndication from './KNXRoutingIndication'
 import KNXSecureSessionRequest from './KNXSecureSessionRequest'
 import HPAI from './HPAI'
 import { KNX_CONSTANTS } from './KNXConstants'
+import TunnelCRI from './TunnelCRI'
+import CEMIMessage from './cEMI/CEMIMessage'
 
 export default class KNXProtocol {
 	static parseMessage(buffer: Buffer) {
 		const knxHeader: KNXHeader = KNXHeader.createFromBuffer(buffer)
 		const knxData: Buffer = buffer.slice(knxHeader.headerLength)
+		// TODO: improve type
 		let knxMessage
 		switch (knxHeader.service_type) {
 			case KNX_CONSTANTS.SEARCH_REQUEST:
@@ -77,7 +80,7 @@ export default class KNXProtocol {
 	}
 
 	static newKNXConnectRequest(
-		cri: any,
+		cri: TunnelCRI,
 		hpaiControl: HPAI = HPAI.NULLHPAI,
 		hpaiData: HPAI = HPAI.NULLHPAI,
 	) {
@@ -85,41 +88,45 @@ export default class KNXProtocol {
 	}
 
 	static newKNXConnectionStateRequest(
-		channelID: any,
+		channelID: number,
 		hpaiControl: HPAI = HPAI.NULLHPAI,
 	) {
 		return new KNXConnectionStateRequest(channelID, hpaiControl)
 	}
 
 	static newKNXDisconnectRequest(
-		channelID: any,
+		channelID: number,
 		hpaiControl: HPAI = HPAI.NULLHPAI,
 	) {
 		return new KNXDisconnectRequest(channelID, hpaiControl)
 	}
 
-	static newKNXDisconnectResponse(channelID: any, status: any) {
+	static newKNXDisconnectResponse(channelID: number, status: number) {
 		return new KNXDisconnectResponse(channelID, status)
 	}
 
-	static newKNXTunnelingACK(channelID: any, seqCounter: any, status: any) {
+	static newKNXTunnelingACK(
+		channelID: number,
+		seqCounter: number,
+		status: number,
+	) {
 		return new KNXTunnelingAck(channelID, seqCounter, status)
 	}
 
 	static newKNXTunnelingRequest(
-		channelID: any,
-		seqCounter: any,
-		cEMIMessage: any,
+		channelID: number,
+		seqCounter: number,
+		cEMIMessage: CEMIMessage,
 	) {
 		return new KNXTunnelingRequest(channelID, seqCounter, cEMIMessage)
 	}
 
-	static newKNXRoutingIndication(cEMIMessage: any) {
+	static newKNXRoutingIndication(cEMIMessage: CEMIMessage) {
 		return new KNXRoutingIndication(cEMIMessage)
 	}
 
 	static newKNXSecureSessionRequest(
-		cri: any,
+		cri: TunnelCRI,
 		hpaiData: HPAI = HPAI.NULLHPAI,
 		jKNXSecureKeyring?: any,
 	) {
