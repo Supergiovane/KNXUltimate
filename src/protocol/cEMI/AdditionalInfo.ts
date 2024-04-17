@@ -27,7 +27,7 @@ export default class AdditionalInfo {
 		return new AdditionalInfo(_getOneTLV())
 	}
 
-	addTLV(tlv) {
+	addTLV(tlv: TLVInfo) {
 		this._tlvs.push(tlv)
 	}
 
