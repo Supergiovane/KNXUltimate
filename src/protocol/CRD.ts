@@ -52,10 +52,7 @@ export default class CRD {
 		offset += 1
 		const connectionType: ConnectionType = buffer.readUInt8(offset++)
 		const knxAddress: number = buffer.readUInt16BE(offset)
-		return new CRD(
-			connectionType,
-			KNXAddress.createFromString(knxAddress.toString()),
-		)
+		return new CRD(connectionType, KNXAddress.createFromString(knxAddress))
 	}
 
 	toBuffer(): Buffer {
