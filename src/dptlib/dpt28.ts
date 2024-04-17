@@ -49,6 +49,10 @@ const config: DatapointConfig = {
 		bitlength: 14 * 8,
 		valuetype: 'basic',
 		desc: '14-character string',
+		help: `// Send a text to a display
+msg.payload = "Hello UTF-8!"
+return msg;`,
+		helplink: '',
 	},
 
 	// DPT28 subtypes

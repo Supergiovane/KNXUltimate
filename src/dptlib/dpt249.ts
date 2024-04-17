@@ -94,6 +94,11 @@ const config: DatapointConfig = {
 		bitlength: 2 * 16 + 2 * 8,
 		valuetype: 'basic',
 		desc: 'PDT_GENERIC_06',
+		help: `// Brightness Colour Temperature Transition.
+// Properties: transitionTime is in milliseconds, colourTemperature is Kelvin (0-65535 with resolution of 1K)
+// absoluteBrightness (0-255), isTimePeriodValid (true/false), isAbsoluteColourTemperatureValid (true/false), isAbsoluteBrightnessValid (true/false)
+msg.payload={transitionTime:100, colourTemperature:1000, absoluteBrightness:80, isTimePeriodValid:true, isAbsoluteColourTemperatureValid:true, isAbsoluteBrightnessValid:true};
+return msg;`,
 	},
 
 	subtypes: {
@@ -101,8 +106,8 @@ const config: DatapointConfig = {
 			desc: 'DPT_Brightness_Colour_Temperature_Transition',
 			name: 'Brightness Colour Temperature Transition',
 			unit: '',
-			scalar_range: [undefined, undefined],
-			range: [undefined, undefined],
+			scalar_range: [,],
+			range: [,],
 		},
 	},
 }
