@@ -1,5 +1,5 @@
-const knx = require("../src");
-const dptlib = require('../src/dptlib');
+import { KNXClientEvents, KNXClient } from "../src";
+import dptlib, { resolve, fromBuffer } from "../src/dptlib";
 
 // Get a list of supported datapoints
 // With this function, you can see what datapoints are supported and a sample on how you need to format the payload to be sent.
@@ -95,30 +95,30 @@ try {
 }
 
 // Let's go
-knxUltimateClient = new knx.KNXClient(knxUltimateClientProperties);
+knxUltimateClient = new KNXClient(knxUltimateClientProperties);
 
 // Setting handlers
 // ######################################
-knxUltimateClient.on(knx.KNXClient.KNXClientEvents.indication, handleBusEvents);
-knxUltimateClient.on(knx.KNXClient.KNXClientEvents.error, err => {
+knxUltimateClient.on(KNXClientEvents.indication, handleBusEvents);
+knxUltimateClient.on(KNXClientEvents.error, err => {
     // Error event
     console.log("Error", err)
 });
-knxUltimateClient.on(knx.KNXClient.KNXClientEvents.disconnected, info => {
+knxUltimateClient.on(KNXClientEvents.disconnected, info => {
     // The client is disconnected. Here you can handle the reconnection
     console.log("Disconnected", info)
 });
-knxUltimateClient.on(knx.KNXClient.KNXClientEvents.close, info => {
+knxUltimateClient.on(KNXClientEvents.close, info => {
     // The client physical net socket has been closed
     console.log("Closed", info)
 });
-knxUltimateClient.on(knx.KNXClient.KNXClientEvents.ackReceived, (knxMessage, info) => {
+knxUltimateClient.on(KNXClientEvents.ackReceived, (knxMessage, info) => {
     // In -->tunneling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
     // knxMessage: contains the telegram sent.
     // info is true it the last telegram has been acknowledge, otherwise false.
     console.log("Last telegram acknowledge", knxMessage, info)
 });
-knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
+knxUltimateClient.on(KNXClientEvents.connected, info => {
     // The client is connected
     console.log("Connected. On Duty", info)
 
@@ -129,7 +129,7 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
 
     // // Send a WRITE telegram to the KNX BUS
     // // You need: group address, payload (true/false/or any message), datapoint as string
-    let payload = false;
+    let payload: any = false;
     if (knxUltimateClient._getClearToSend()) knxUltimateClient.write("0/1/1", payload, "1.001");
 
     // Send a color RED to an RGB datapoint
@@ -145,7 +145,7 @@ knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connected, info => {
     if (knxUltimateClient._getClearToSend()) knxUltimateClient.respond("0/0/1", payload, "1.001");
 
 });
-knxUltimateClient.on(knx.KNXClient.KNXClientEvents.connecting, info => {
+knxUltimateClient.on(KNXClientEvents.connecting, info => {
     // The client is setting up the connection
     console.log("Connecting...", info)
 });
@@ -176,20 +176,20 @@ function handleBusEvents(_datagram, _echoed) {
     // Decode the telegram. 
     if (_dst === "0/1/1") {
         // We know that 0/1/1 is a boolean DPT 1.001
-        dpt = dptlib.resolve("1.001");
-        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+        const config = resolve("1.001");
+        jsValue = fromBuffer(_Rawvalue, config)
     } else if (_dst === "0/1/2") {
         // We know that 0/1/2 is a boolean DPT 232.600 Color RGB
-        dpt = dptlib.resolve("232.600");
-        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+        const config = resolve("232.600");
+        jsValue = fromBuffer(_Rawvalue, config)
     } else {
         // All others... assume they are boolean
-        dpt = dptlib.resolve("1.001");
-        jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+        const config = resolve("1.001");
+        jsValue = fromBuffer(_Rawvalue, config)
         if (jsValue === null) {
             // Is null, try if it's a numerical value
-            dpt = dptlib.resolve("5.001");
-            jsValue = dptlib.fromBuffer(_Rawvalue, dpt)
+            const config = resolve("5.001");
+            jsValue = fromBuffer(_Rawvalue, config)
         }
     }
     console.log("src: " + _src + " dest: " + _dst, " event: " + _evt, " value: " + jsValue);
