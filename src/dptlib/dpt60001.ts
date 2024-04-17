@@ -333,6 +333,11 @@ const config: DatapointConfig = {
 		bitlength: 4 * 8 + 2 * 6 + 1 * 10,
 		valuetype: 'composite',
 		desc: 'Commands for solar shading actors',
+		help: `// Sample of 60001.
+		// Now are only  the local operation implemented.
+		// For example, for 60001, set the sector 42 localy up.  
+		msg.payload = { command: "operation code", data: ["localoperation", "long up"], sectors: [42] };
+		return msg;`,
 	},
 	subtypes: {
 		'001': {

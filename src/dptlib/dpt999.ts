@@ -44,6 +44,10 @@ const config: DatapointConfig = {
 		bitlength: 80,
 		valuetype: 'basic',
 		desc: '10-bytes',
+		help: `// Send a code to an alarm keypad
+		msg.payload = '123400000000000000'; // Or  msg.payload = '$12 $34 $00 $00 $00 $00 $00 $00 $00';
+		return msg;`,
+		helplink: '',
 	},
 
 	// DPT999 subtypes

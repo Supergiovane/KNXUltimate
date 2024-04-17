@@ -81,6 +81,15 @@ const config: DatapointConfig = {
 		bitlength: 48,
 		valuetype: 'basic',
 		desc: '6 octect Tariff_ActiveEnergy',
+		help: `// Set the ActiveElectricalEnergy, Tariff and Validity of Tariff and Validity of Energy
+	msg.payload = {
+	  activeElectricalEnergy:1540, 
+	  tariff:20,
+	  validityTariff:true,
+	  validityEnergy:true 
+	  };
+	return msg;`,
+		helplink: '',
 	},
 
 	// DPT subtypes

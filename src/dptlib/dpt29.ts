@@ -31,6 +31,11 @@ const config: DatapointConfig = {
 		valuetype: 'basic',
 		desc: '8-byte V64 signed value',
 		// range: [-9223372036854775808, 9223372036854775807],
+		help: `// Send 8-byte signed value range: [-9223372036854775808, 9223372036854775807].
+	// REMEMBER to add "n" after a big integer number, or pass the number as string
+	msg.payload = 9223372036854775808n; // numerical value with "n" at the end, representing a bigint
+	msg.payload = "9223372036854775808"; // string value, that will be automatically converted into bigint
+	return msg;`,
 	},
 
 	// DPT29 subtypes

@@ -87,6 +87,14 @@ const config: DatapointConfig = {
 		bitlength: 4 * 16,
 		valuetype: 'basic',
 		desc: '4x 16-Bit Signed Value',
+		help: `// Sample of 213.100.
+// Set the temperatures between -272°C and 655.34°C with 0,02°C of resolution.
+// These 4 property names, are valid for 213.101, 213.102 etc... as well.
+// For example, for 213.101, LegioProtect is the "Comfort" property, Normal is "Standby", etc...
+msg.payload = {Comfort:21.4, Standby:20, Economy:18.2, BuildingProtection:-1};
+return msg;`,
+		helplink:
+			'https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-Sample---DPT213',
 	},
 
 	// DPT213 subtypes

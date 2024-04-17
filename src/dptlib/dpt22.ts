@@ -152,9 +152,31 @@ const config: DatapointConfig = {
 	},
 	basetype: {
 		bitlength: 16,
-		range: [undefined, undefined],
+		range: [,],
 		valuetype: 'basic',
 		desc: '2-byte',
+		help: `// You can set all parameters you want.
+		// Every parameter is optional.
+		// Please respect the upper and lowercase letters.
+		// For help about meaning of each parameter, please see the sample in the Wiki
+		var s1={}; 
+		s1.Fault = true;
+		s1.StatusEcoH = false;
+		s1.TempFlowLimit = false;
+		s1.TempReturnLimit = false;
+		s1.StatusMorningBoostH = false;
+		s1.StatusStartOptim = false;
+		s1.StatusStopOptim = false;
+		s1.HeatingDisabled = true;
+		s1.HeatCoolMode = true;
+		s1.StatusEcoC = false;
+		s1.StatusPreCool = false;
+		s1.CoolingDisabled = true;
+		s1.DewPointStatus = false;
+		s1.FrostAlarm = false;
+		s1.OverheatAlarm = true;
+		return {payload:s1};`,
+		helplink: '',
 	},
 	subtypes: {
 		// 22.101 DPT_StatusRHCC
@@ -162,8 +184,8 @@ const config: DatapointConfig = {
 			name: 'RHCC Status',
 			desc: 'RHCC Status',
 			unit: '',
-			scalar_range: [undefined, undefined],
-			range: [undefined, undefined],
+			scalar_range: [,],
+			range: [,],
 		},
 	},
 }

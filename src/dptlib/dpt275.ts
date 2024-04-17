@@ -65,6 +65,9 @@ const config: DatapointConfig = {
 		bitlength: 64,
 		valuetype: 'basic',
 		desc: 'Quadruple setpoints (comfort,standby,economy,buildingProtection) (4 float with 16 Bit)',
+		help: `// Send comfort, standby, economy mode and buildingProtection temperatures, as n.4 DPT9.001.
+	  msg.payload = {comfort:22, standby:21.5, economy:21, buildingProtection:15};
+	  return msg;`,
 	},
 
 	// DPT9 subtypes
