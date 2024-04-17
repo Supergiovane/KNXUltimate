@@ -43,7 +43,6 @@ import DPT251 from './dpt251'
 import DPT275 from './dpt275'
 import DPT999 from './dpt999'
 import DPT6001 from './dpt60001'
-import { KNXDataBuffer } from '../protocol'
 
 type Range = [number, number] | [undefined]
 

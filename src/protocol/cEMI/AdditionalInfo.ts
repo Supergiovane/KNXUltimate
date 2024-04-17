@@ -1,7 +1,7 @@
 import TLVInfo from './TLVInfo'
 
 export default class AdditionalInfo {
-	_tlvs: any[]
+	_tlvs: TLVInfo[]
 
 	_length: number
 

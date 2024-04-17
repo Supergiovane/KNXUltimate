@@ -18,6 +18,10 @@ import * as DPTLib from './dptlib'
 import KnxLog, { KNXLoggerOptions } from './KnxLog'
 import CEMIMessage from './protocol/cEMI/CEMIMessage'
 import { Logger } from 'log-driver'
+import { KNXPacket } from './protocol'
+import KNXRoutingIndication from './protocol/KNXRoutingIndication'
+import KNXConnectRequest from './protocol/KNXConnectRequest'
+import KNXTunnelingRequest from './protocol/KNXTunnelingRequest'
 
 enum STATE {
 	STARTED = 'STARTED',
@@ -137,7 +141,7 @@ export default class KNXClient extends EventEmitter {
 
 	public physAddr: KNXAddress
 
-	constructor(options: any) {
+	constructor(options: KNXClientOptions) {
 		super()
 
 		if (options === undefined) {
@@ -336,24 +340,17 @@ export default class KNXClient extends EventEmitter {
 		return new KNXDataBuffer(adpu.data, datapoint)
 	}
 
-	send(knxPacket: any): void {
+	send(knxPacket: KNXPacket): void {
 		if (this.sysLogger !== undefined && this.sysLogger !== null) {
 			try {
-				if (
-					knxPacket.constructor.name !== undefined &&
-					knxPacket.constructor.name.toLowerCase() ===
-						'knxconnectrequest'
-				) {
+				if (knxPacket instanceof KNXConnectRequest) {
 					this.sysLogger.debug(
 						`Sending KNX packet: ${knxPacket.constructor.name} Host:${this._peerHost}:${this._peerPort}`,
 					)
 				}
 				if (
-					knxPacket.constructor.name !== undefined &&
-					(knxPacket.constructor.name.toLowerCase() ===
-						'knxtunnelingrequest' ||
-						knxPacket.constructor.name.toLowerCase() ===
-							'knxroutingindication')
+					knxPacket instanceof KNXTunnelingRequest ||
+					knxPacket instanceof KNXRoutingIndication
 				) {
 					let sTPCI = ''
 					if (knxPacket.cEMIMessage.npdu.isGroupRead) {
@@ -380,8 +377,8 @@ export default class KNXClient extends EventEmitter {
 							knxPacket.constructor.name
 						} ${sDebugString} Host:${this._peerHost}:${
 							this._peerPort
-						} channelID:${knxPacket.channelID} seqCounter:${
-							knxPacket.seqCounter
+						} channelID:${(knxPacket as KNXTunnelingRequest).channelID} seqCounter:${
+							(knxPacket as KNXTunnelingRequest).seqCounter
 						} Dest:${knxPacket.cEMIMessage.dstAddress.toString()}`,
 						` Data:${knxPacket.cEMIMessage.npdu.dataValue.toString(
 							'hex',
@@ -423,7 +420,7 @@ export default class KNXClient extends EventEmitter {
 						`Sending KNX packet: Send UDP Catch error: ${
 							error.message
 						} ${typeof knxPacket} seqCounter:${
-							knxPacket.seqCounter
+							(knxPacket as any).seqCounter || ''
 						}`,
 					)
 				}
