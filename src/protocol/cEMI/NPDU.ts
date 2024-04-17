@@ -1,191 +1,212 @@
-import KNXDataBuffer from "../KNXDataBuffer";
-import CEMIConstants from "./CEMIConstants";
-import KnxLog  from "./../../KnxLog";
+import KNXDataBuffer from '../KNXDataBuffer'
+import CEMIConstants from './CEMIConstants'
+import KnxLog from '../../KnxLog'
 
- // 08/04/2021 new logger to adhere to the loglevel selected in the config-window
+// 08/04/2021 new logger to adhere to the loglevel selected in the config-window
 const sysLogger = KnxLog.get()
 
 export default class NPDU {
-  private _tpci: number;
-  private _apci: number;
-  private _data: KNXDataBuffer | null;
+	private _tpci: number
 
-  constructor(
-    _tpci: number = 0x0,
-    _apci: number = 0x0,
-    _data: KNXDataBuffer | null = null
-  ) {
-    this._tpci = _tpci;
-    this._apci = _apci;
-    this._data = _data;
-  }
+	private _apci: number
 
-  set tpci(tpci: number) {
-    if (isNaN(tpci) || (tpci < 0 && tpci > 0xff)) {
-      throw new Error("Invalid TPCI");
-    }
-    this._tpci = tpci;
-  }
+	private _data: KNXDataBuffer | null
 
-  get tpci(): number {
-    return this._tpci;
-  }
+	constructor(
+		_tpci: number = 0x0,
+		_apci: number = 0x0,
+		_data: KNXDataBuffer | null = null,
+	) {
+		this._tpci = _tpci
+		this._apci = _apci
+		this._data = _data
+	}
 
-  set apci(apci: number) {
-    if (isNaN(apci) || (apci < 0 && apci > 0xff)) {
-      throw new Error("Invalid APCI");
-    }
-    this._apci = apci;
-  }
+	set tpci(tpci: number) {
+		if (isNaN(tpci) || (tpci < 0 && tpci > 0xff)) {
+			throw new Error('Invalid TPCI')
+		}
+		this._tpci = tpci
+	}
 
-  get apci(): number {
-    return this._apci;
-  }
+	get tpci(): number {
+		return this._tpci
+	}
 
-  get dataBuffer(): KNXDataBuffer | null {
-    return this._data;
-  }
+	set apci(apci: number) {
+		if (isNaN(apci) || (apci < 0 && apci > 0xff)) {
+			throw new Error('Invalid APCI')
+		}
+		this._apci = apci
+	}
 
-  get dataValue(): Buffer {
-    if (this._data == null) {
-      const val = this.apci & 0x3f;
-      return Buffer.alloc(1, val);
-    }
-    return this._data.value;
-  }
+	get apci(): number {
+		return this._apci
+	}
 
-  set data(data: KNXDataBuffer | null) {
-    if (data == null) {
-      this._data = null;
-      return;
-    }
-    if (!(data instanceof KNXDataBuffer)) {
-      throw new Error("Invalid data Buffer");
-    }
+	get dataBuffer(): KNXDataBuffer | null {
+		return this._data
+	}
 
-    if (data.sixBits() && data.length === 1 && data.value.readUInt8(0) < 0x3f) {
-      this.apci = (this.apci & 0xc0) | data.value.readUInt8(0);
-      this._data = null;
-      return;
-    }
+	get dataValue(): Buffer {
+		if (this._data == null) {
+			const val = this.apci & 0x3f
+			return Buffer.alloc(1, val)
+		}
+		return this._data.value
+	}
 
-    this._data = data;
-  }
+	set data(data: KNXDataBuffer | null) {
+		if (data == null) {
+			this._data = null
+			return
+		}
+		if (!(data instanceof KNXDataBuffer)) {
+			throw new Error('Invalid data Buffer')
+		}
 
-  get length(): number {
-    if (this._data === null) {
-      return 3;
-    }
-    return 3 + this._data.length;
-  }
+		if (
+			data.sixBits() &&
+			data.length === 1 &&
+			data.value.readUInt8(0) < 0x3f
+		) {
+			this.apci = (this.apci & 0xc0) | data.value.readUInt8(0)
+			this._data = null
+			return
+		}
 
-  get action(): number {
-    return ((this.apci & 0xc0) >> 6) | ((this.tpci & 0x3) << 2);
-  }
+		this._data = data
+	}
 
-  set action(action: number) {
-    this.tpci = (action & 0xc) << 4;
-    if (
-      this.action === NPDU.GROUP_READ ||
-      this.action >= NPDU.INDIVIDUAL_WRITE
-    ) {
-      this.apci = (action & 0x3) << 6;
-    } else {
-      this.apci = ((action & 0x3) << 6) | (this.apci & 0x3f);
-    }
-  }
+	get length(): number {
+		if (this._data === null) {
+			return 3
+		}
+		return 3 + this._data.length
+	}
 
-  get isGroupRead(): boolean {
-    return this.action === NPDU.GROUP_READ;
-  }
+	get action(): number {
+		return ((this.apci & 0xc0) >> 6) | ((this.tpci & 0x3) << 2)
+	}
 
-  get isGroupWrite(): boolean {
-    return this.action === NPDU.GROUP_WRITE;
-  }
+	set action(action: number) {
+		this.tpci = (action & 0xc) << 4
+		if (
+			this.action === NPDU.GROUP_READ ||
+			this.action >= NPDU.INDIVIDUAL_WRITE
+		) {
+			this.apci = (action & 0x3) << 6
+		} else {
+			this.apci = ((action & 0x3) << 6) | (this.apci & 0x3f)
+		}
+	}
 
-  get isGroupResponse(): boolean {
-    return this.action === NPDU.GROUP_RESPONSE;
-  }
+	get isGroupRead(): boolean {
+		return this.action === NPDU.GROUP_READ
+	}
 
-  static get GROUP_READ(): number {
-    return CEMIConstants.GROUP_READ;
-  }
+	get isGroupWrite(): boolean {
+		return this.action === NPDU.GROUP_WRITE
+	}
 
-  static get GROUP_RESPONSE(): number {
-    return CEMIConstants.GROUP_RESPONSE;
-  }
+	get isGroupResponse(): boolean {
+		return this.action === NPDU.GROUP_RESPONSE
+	}
 
-  static get GROUP_WRITE(): number {
-    return CEMIConstants.GROUP_WRITE;
-  }
+	static get GROUP_READ(): number {
+		return CEMIConstants.GROUP_READ
+	}
 
-  static get INDIVIDUAL_WRITE(): number {
-    return CEMIConstants.INDIVIDUAL_WRITE;
-  }
+	static get GROUP_RESPONSE(): number {
+		return CEMIConstants.GROUP_RESPONSE
+	}
 
-  static get INDIVIDUAL_READ(): number {
-    return CEMIConstants.INDIVIDUAL_READ;
-  }
+	static get GROUP_WRITE(): number {
+		return CEMIConstants.GROUP_WRITE
+	}
 
-  static get INDIVIDUAL_RESPONSE(): number {
-    return CEMIConstants.INDIVIDUAL_RESPONSE;
-  }
+	static get INDIVIDUAL_WRITE(): number {
+		return CEMIConstants.INDIVIDUAL_WRITE
+	}
 
-  static get TPCI_UNUMBERED_PACKET(): number {
-    return CEMIConstants.TPCI_UNUMBERED_PACKET;
-  }
+	static get INDIVIDUAL_READ(): number {
+		return CEMIConstants.INDIVIDUAL_READ
+	}
 
-  static createFromBuffer(buffer: Buffer, offset: number = 0): NPDU {
-    if (offset > buffer.length) {
-      if (sysLogger !== undefined && sysLogger !== null)
-        sysLogger.error("NPDU: createFromBuffer: offset out of buffer range ");
-      throw new Error(`offset ${offset}  out of buffer range ${buffer.length}`);
-    }
-    let npduLength = null;
-    let tpci = null;
-    let apci = null;
-    let data = null;
+	static get INDIVIDUAL_RESPONSE(): number {
+		return CEMIConstants.INDIVIDUAL_RESPONSE
+	}
 
-    try {
-      npduLength = buffer.readUInt8(offset++);
-    } catch (error) {
-      if (sysLogger !== undefined && sysLogger !== null)
-        sysLogger.error(
-          "NPDU: createFromBuffer: error npduLength: " + error.message
-        );
-    }
-    try {
-      tpci = buffer.readUInt8(offset++);
-    } catch (error) {
-      if (sysLogger !== undefined && sysLogger !== null)
-        sysLogger.error("NPDU: createFromBuffer: error tpci: " + error.message);
-    }
-    try {
-      apci = buffer.readUInt8(offset++);
-    } catch (error) {
-      if (sysLogger !== undefined && sysLogger !== null)
-        sysLogger.error("NPDU: createFromBuffer: error apci: " + error.message);
-    }
-    try {
-      data =
-        npduLength > 1 ? buffer.slice(offset, offset + npduLength - 1) : null;
-    } catch (error) {
-      if (sysLogger !== undefined && sysLogger !== null)
-        sysLogger.error("NPDU: createFromBuffer: error data: " + error.message);
-    }
-    return new NPDU(tpci, apci, data == null ? null : new KNXDataBuffer(data));
-  }
+	static get TPCI_UNUMBERED_PACKET(): number {
+		return CEMIConstants.TPCI_UNUMBERED_PACKET
+	}
 
-  toBuffer(): Buffer {
-    const length = this._data == null ? 1 : this._data.length + 1;
-    const buffer = Buffer.alloc(3);
-    buffer.writeUInt8(length, 0);
-    buffer.writeUInt8(this.tpci, 1);
-    buffer.writeUInt8(this.apci, 2);
-    if (length === 1) {
-      return buffer;
-    }
-    return Buffer.concat([buffer, this._data.value]);
-  }
+	static createFromBuffer(buffer: Buffer, offset: number = 0): NPDU {
+		if (offset > buffer.length) {
+			if (sysLogger !== undefined && sysLogger !== null)
+				sysLogger.error(
+					'NPDU: createFromBuffer: offset out of buffer range ',
+				)
+			throw new Error(
+				`offset ${offset}  out of buffer range ${buffer.length}`,
+			)
+		}
+		let npduLength = null
+		let tpci = null
+		let apci = null
+		let data = null
+
+		try {
+			npduLength = buffer.readUInt8(offset++)
+		} catch (error) {
+			if (sysLogger !== undefined && sysLogger !== null)
+				sysLogger.error(
+					`NPDU: createFromBuffer: error npduLength: ${error.message}`,
+				)
+		}
+		try {
+			tpci = buffer.readUInt8(offset++)
+		} catch (error) {
+			if (sysLogger !== undefined && sysLogger !== null)
+				sysLogger.error(
+					`NPDU: createFromBuffer: error tpci: ${error.message}`,
+				)
+		}
+		try {
+			apci = buffer.readUInt8(offset++)
+		} catch (error) {
+			if (sysLogger !== undefined && sysLogger !== null)
+				sysLogger.error(
+					`NPDU: createFromBuffer: error apci: ${error.message}`,
+				)
+		}
+		try {
+			data =
+				npduLength > 1
+					? buffer.slice(offset, offset + npduLength - 1)
+					: null
+		} catch (error) {
+			if (sysLogger !== undefined && sysLogger !== null)
+				sysLogger.error(
+					`NPDU: createFromBuffer: error data: ${error.message}`,
+				)
+		}
+		return new NPDU(
+			tpci,
+			apci,
+			data == null ? null : new KNXDataBuffer(data),
+		)
+	}
+
+	toBuffer(): Buffer {
+		const length = this._data == null ? 1 : this._data.length + 1
+		const buffer = Buffer.alloc(3)
+		buffer.writeUInt8(length, 0)
+		buffer.writeUInt8(this.tpci, 1)
+		buffer.writeUInt8(this.apci, 2)
+		if (length === 1) {
+			return buffer
+		}
+		return Buffer.concat([buffer, this._data.value])
+	}
 }
-

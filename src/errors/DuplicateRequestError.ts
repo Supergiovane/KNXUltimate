@@ -1,7 +1,5 @@
-
 export default class DuplicateRequestError extends Error {
-
-    public constructor() {
+	public constructor() {
 		super('Duplicate request')
 
 		// We need to set the prototype explicitly
@@ -9,4 +7,3 @@ export default class DuplicateRequestError extends Error {
 		Object.getPrototypeOf(this).name = 'DuplicateRequestError'
 	}
 }
-

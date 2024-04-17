@@ -1,23 +1,25 @@
-import KNXHeader from './KNXHeader';
+import KNXHeader from './KNXHeader'
 
 export default class KNXPacket {
-  private _header: KNXHeader;
-  public type: number;
-  public length: number;
+	private _header: KNXHeader
 
-  constructor(type: number, length: number) {
-    this.type = type;
-    this.length = length;
-    this._header = new KNXHeader(type, length);
-    this.type = type;
-    this.length = length;
-  }
+	public type: number
 
-  get header(): KNXHeader {
-    return this._header;
-  }
+	public length: number
 
-  toBuffer(): Buffer {
-    return Buffer.alloc(0);
-  }
+	constructor(type: number, length: number) {
+		this.type = type
+		this.length = length
+		this._header = new KNXHeader(type, length)
+		this.type = type
+		this.length = length
+	}
+
+	get header(): KNXHeader {
+		return this._header
+	}
+
+	toBuffer(): Buffer {
+		return Buffer.alloc(0)
+	}
 }

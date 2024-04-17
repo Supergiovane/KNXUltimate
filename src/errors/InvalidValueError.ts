@@ -1,6 +1,5 @@
-
 export default class InvalidValueError extends Error {
-    public constructor() {
+	public constructor() {
 		super('invalid value')
 
 		// We need to set the prototype explicitly

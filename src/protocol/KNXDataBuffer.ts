@@ -1,40 +1,41 @@
 export default class KNXDataBuffer {
-  private _data: any;
-  private _info: any;
+	private _data: any
 
-  constructor(_data: Buffer, _info?: IDataPoint) {
-    this._data = _data;
-    this._info = _info;
-  }
+	private _info: any
 
-  get length(): number {
-    return this._data == null ? 0 : this._data.length;
-  }
+	constructor(_data: Buffer, _info?: IDataPoint) {
+		this._data = _data
+		this._info = _info
+	}
 
-  get value(): any {
-    return this._data;
-  }
+	get length(): number {
+		return this._data == null ? 0 : this._data.length
+	}
 
-  get info(): any {
-    return this._info;
-  }
+	get value(): any {
+		return this._data
+	}
 
-  sixBits(): boolean {
-    if (this.info == null) {
-      return true;
-    }
-    // return !(this.info.type.type === '1');
-    return this.info.type.type;
-  }
+	get info(): any {
+		return this._info
+	}
+
+	sixBits(): boolean {
+		if (this.info == null) {
+			return true
+		}
+		// return !(this.info.type.type === '1');
+		return this.info.type.type
+	}
 }
 
 export interface IDataPoint {
-  id: string;
-  value: any;
-  type: {
-    type: boolean;
-  };
-  bind: any | null;
-  read: () => any | null;
-  write: ((data: any) => void) | null;
+	id: string
+	value: any
+	type: {
+		type: boolean
+	}
+	bind: any | null
+	read: () => any | null
+	write: ((data: any) => void) | null
 }

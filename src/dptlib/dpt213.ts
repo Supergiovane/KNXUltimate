@@ -1,7 +1,7 @@
 /**
-* KNXEngine - a KNX protocol stack in Javascript
-* (C) 2020 Supergiovane
-*/
+ * KNXEngine - a KNX protocol stack in Javascript
+ * (C) 2020 Supergiovane
+ */
 
 import Log from '../KnxLog'
 import type { DatapointConfig } from '.'
@@ -10,8 +10,6 @@ import { hasProp, getHex, getFloat } from '../utils'
 //
 // DPT213: Data Type 4x 16-Signed Value
 //
-
-
 
 // 07/01/2021 Supergiovane
 // Send to BUS
