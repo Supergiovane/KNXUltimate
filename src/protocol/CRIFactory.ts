@@ -1,5 +1,5 @@
 import { KNX_CONSTANTS } from './KNXConstants';
-import { TunnelCRI } from './TunnelCRI';
+import TunnelCRI from './TunnelCRI';
 
 export default class CRIFactory {
   static createFromBuffer(buffer: Buffer, offset: number): any {

@@ -1,29 +1,28 @@
 import KNXPacket from "./KNXPacket";
-import { KNX_CONSTANTS } from "./KNXConstants";
 import HPAI from "./HPAI";
+import { KNX_CONSTANTS } from "./KNXConstants";
 
-export default class KNXConnectionStateRequest extends KNXPacket {
+export default class KNXDisconnectRequest extends KNXPacket {
   channelID: number;
   hpaiControl: HPAI;
 
-  constructor(channelID: number, hpaiControl: HPAI | string = HPAI.NULLHPAI) {
-    super(KNX_CONSTANTS.CONNECTIONSTATE_REQUEST, hpaiControl.length + 2);
+  constructor(channelID: number, hpaiControl: HPAI = HPAI.NULLHPAI) {
+    super(KNX_CONSTANTS.DISCONNECT_REQUEST, hpaiControl.length + 2);
     this.channelID = channelID;
-    this.hpaiControl =
-      typeof hpaiControl === "string" ? new HPAI(hpaiControl) : hpaiControl;
+    this.hpaiControl = hpaiControl;
   }
 
   static createFromBuffer(
     buffer: Buffer,
     offset: number = 0
-  ): KNXConnectionStateRequest {
+  ): KNXDisconnectRequest {
     if (offset >= buffer.length) {
       throw new Error("Buffer too short");
     }
     const channelID = buffer.readUInt8(offset++);
     offset++;
     const hpaiControl = HPAI.createFromBuffer(buffer, offset);
-    return new KNXConnectionStateRequest(channelID, hpaiControl);
+    return new KNXDisconnectRequest(channelID, hpaiControl);
   }
 
   toBuffer(): Buffer {
