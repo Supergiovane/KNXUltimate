@@ -25,6 +25,7 @@ import KNXHeader from './protocol/KNXHeader'
 import KNXTunnelingAck from './protocol/KNXTunnelingAck'
 import KNXSearchResponse from './protocol/KNXSearchResponse'
 import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
+import { wait } from './utils'
 
 export enum ConncetionState {
 	STARTED = 'STARTED',
@@ -828,6 +829,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const deadError = new Error(
 			`Connection dead with ${this._peerHost}:${this._peerPort}`,
 		)
+
 		this._heartbeatTimer = setTimeout(() => {
 			this._heartbeatTimer = null
 			this.sysLogger.error(
@@ -868,44 +870,40 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		})
 	}
 
-	Disconnect() {
+	async Disconnect() {
 		if (this._clientSocket === null) {
 			throw new Error('No client socket defined')
 		}
 		// 20/04/2022 this._channelID === null can happen when the KNX Gateway is already disconnected
 		if (this._channelID === null) {
 			// 11/10/2022 Close the socket
-			try {
-				// TODO: this should be awaited
-				this.closeSocket()
-			} catch (error) {
-				this.sysLogger.debug(
-					`KNXClient: into Disconnect(), this._clientSocket.close(): ${this._options.ipAddr}:${this._options.ipPort} ${error.message}`,
-				)
-			}
-			// TODO: not sure this is correct
-			throw new Error('KNX Socket is already disconnected')
+			this.sysLogger.debug(
+				`KNXClient: into Disconnect(), channel id is not defined so skip disconnect packet and close socket`,
+			)
+			await this.closeSocket()
+			return
 		}
 		this.stopHeartBeat()
 		this._connectionState = ConncetionState.DISCONNECTING
+
 		this._awaitingResponseType = KNX_CONSTANTS.DISCONNECT_RESPONSE
 		this._sendDisconnectRequestMessage(this._channelID)
 
+		// wait for response
+		await wait(2000)
 		// 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
-		const t = setTimeout(() => {
-			// 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
-			if (this._connectionState !== ConncetionState.DISCONNECTED)
-				this._setDisconnected(
-					"Forced call from KNXClient Disconnect() function, because the KNX Interface hasn't sent the DISCONNECT_RESPONSE in time.",
-				)
-		}, 2000)
+		if (this._connectionState !== ConncetionState.DISCONNECTED) {
+			this._setDisconnected(
+				"Forced call from KNXClient Disconnect() function, because the KNX Interface hasn't sent the DISCONNECT_RESPONSE in time.",
+			)
+		}
 	}
 
 	isConnected() {
 		return this._connectionState === ConncetionState.CONNECTED
 	}
 
-	_setDisconnected(_sReason = '') {
+	async _setDisconnected(_sReason = '') {
 		this.sysLogger.debug(
 			`KNXClient: called _setDisconnected ${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
 		)
@@ -919,9 +917,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._clientTunnelSeqNumber = -1
 		this._channelID = null
 
-		// 08/12/2021
-		// TODO: this should be awaited
-		this.closeSocket()
+		await this.closeSocket()
 
 		this.emit(
 			KNXClientEvents.disconnected,
