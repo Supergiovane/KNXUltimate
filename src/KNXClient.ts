@@ -1,5 +1,4 @@
 // Made with love by Supergiovane
-import { EventEmitter } from 'events'
 import dgram, { RemoteInfo, UFPSocket } from 'dgram'
 import net, { Socket as TCPSocket } from 'net'
 import { ConnectionStatus, KNX_CONSTANTS } from './protocol/KNXConstants'
@@ -16,23 +15,20 @@ import KNXAddress from './protocol/KNXAddress'
 import KNXDataBuffer, { IDataPoint } from './protocol/KNXDataBuffer'
 import * as DPTLib from './dptlib'
 import KnxLog, { KNXLoggerOptions } from './KnxLog'
-import CEMIMessage from './protocol/cEMI/CEMIMessage'
 import { Logger } from 'log-driver'
 import { KNXPacket } from './protocol'
 import KNXRoutingIndication from './protocol/KNXRoutingIndication'
 import KNXConnectRequest from './protocol/KNXConnectRequest'
 import KNXTunnelingRequest from './protocol/KNXTunnelingRequest'
+import { TypedEventEmitter } from './TypedEmitter'
+import KNXHeader from './protocol/KNXHeader'
 
-enum STATE {
+export enum ConncetionState {
 	STARTED = 'STARTED',
 	CONNECTING = 'CONNECTING',
 	CONNECTED = 'CONNECTED',
 	DISCONNECTING = 'DISCONNECTING',
 	DISCONNECTED = 'DISCONNECTED',
-}
-
-enum TUNNELSTATE {
-	READY = 'READY',
 }
 
 export enum SocketEvents {
@@ -56,6 +52,19 @@ export enum KNXClientEvents {
 	connecting = 'connecting',
 	ackReceived = 'ackReceived',
 	close = 'close',
+}
+
+export interface KNXClientEventCallbacks {
+	error: (error: Error) => void
+	disconnected: (reason: string) => void
+	discover: (host: string, header: KNXHeader, message: KNXPacket) => void
+	indication: (packet: KNXPacket, value: any) => void
+	connected: (options: KNXClientOptions) => void
+	ready: () => void
+	response: (host: string, header: KNXHeader, message: KNXPacket) => void
+	connecting: (options: KNXClientOptions) => void
+	ackReceived: (packet: KNXPacket, value: any) => void
+	close: () => void
 }
 
 const jKNXSecureKeyring: string = ''
@@ -94,7 +103,7 @@ export function getDecodedKeyring() {
 	return jKNXSecureKeyring
 }
 
-export default class KNXClient extends EventEmitter {
+export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks> {
 	private _channelID: number
 
 	private _connectionState: string
@@ -159,7 +168,7 @@ export default class KNXClient extends EventEmitter {
 		})
 
 		this._channelID = null
-		this._connectionState = STATE.DISCONNECTED
+		this._connectionState = ConncetionState.DISCONNECTED
 		this._timerWaitingForACK = null
 		this._numFailedTelegramACK = 0
 		this._clientTunnelSeqNumber = -1
@@ -410,7 +419,7 @@ export default class KNXClient extends EventEmitter {
 
 	// sendWriteRequest(dstAddress, data) {
 	write(dstAddress: KNXAddress | string, data: any, dptid: any): void {
-		if (this._connectionState !== STATE.CONNECTED)
+		if (this._connectionState !== ConncetionState.CONNECTED)
 			throw new Error(
 				'The socket is not connected. Unable to access the KNX BUS',
 			)
@@ -473,7 +482,7 @@ export default class KNXClient extends EventEmitter {
 
 	// sendResponseRequest
 	respond(dstAddress: KNXAddress | string, data: Buffer, dptid: any): void {
-		if (this._connectionState !== STATE.CONNECTED)
+		if (this._connectionState !== ConncetionState.CONNECTED)
 			throw new Error(
 				'The socket is not connected. Unable to access the KNX BUS',
 			)
@@ -536,7 +545,7 @@ export default class KNXClient extends EventEmitter {
 
 	// sendReadRequest
 	read(dstAddress: KNXAddress | string): void {
-		if (this._connectionState !== STATE.CONNECTED)
+		if (this._connectionState !== ConncetionState.CONNECTED)
 			throw new Error(
 				'The socket is not connected. Unable to access the KNX BUS',
 			)
@@ -601,7 +610,7 @@ export default class KNXClient extends EventEmitter {
 	): void {
 		// bitlength is unused and only for backward compatibility
 
-		if (this._connectionState !== STATE.CONNECTED)
+		if (this._connectionState !== ConncetionState.CONNECTED)
 			throw new Error(
 				'The socket is not connected. Unable to access the KNX BUS',
 			)
@@ -730,21 +739,21 @@ export default class KNXClient extends EventEmitter {
 		if (this._clientSocket == null) {
 			throw new Error('No client socket defined')
 		}
-		if (this._connectionState === STATE.DISCONNECTING) {
+		if (this._connectionState === ConncetionState.DISCONNECTING) {
 			throw new Error(
 				'Socket is disconnecting. Please wait until disconnected.',
 			)
 		}
-		if (this._connectionState === STATE.CONNECTING) {
+		if (this._connectionState === ConncetionState.CONNECTING) {
 			throw new Error(
 				'Socket is connecting. Please wait until connected.',
 			)
 		}
-		if (this._connectionState === STATE.CONNECTED) {
+		if (this._connectionState === ConncetionState.CONNECTED) {
 			throw new Error('Socket is already connected. Disconnect first.')
 		}
 
-		this._connectionState = STATE.CONNECTING
+		this._connectionState = ConncetionState.CONNECTING
 		this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
 		this._clearToSend = true // 26/12/2021 allow to send
 
@@ -788,7 +797,7 @@ export default class KNXClient extends EventEmitter {
 			})
 		} else {
 			// Multicast
-			this._connectionState = STATE.CONNECTED
+			this._connectionState = ConncetionState.CONNECTED
 
 			// 16/03/2022 These two are referring to tunneling connection, but i set it here as well. Non si sa mai.
 			this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
@@ -814,7 +823,7 @@ export default class KNXClient extends EventEmitter {
 			this.sysLogger.error(
 				`KNXClient: getConnectionStatus Timeout ${this._heartbeatFailures} out of ${this.max_HeartbeatFailures}`,
 			)
-			// this.emit(KNXClientEvents.error, timeoutError);
+			// this.emit(KNXClientEvents.error, timeoutError)
 
 			this._heartbeatFailures++
 			if (this._heartbeatFailures >= this.max_HeartbeatFailures) {
@@ -868,14 +877,14 @@ export default class KNXClient extends EventEmitter {
 			throw new Error('KNX Socket is already disconnected')
 		}
 		this.stopHeartBeat()
-		this._connectionState = STATE.DISCONNECTING
+		this._connectionState = ConncetionState.DISCONNECTING
 		this._awaitingResponseType = KNX_CONSTANTS.DISCONNECT_RESPONSE
 		this._sendDisconnectRequestMessage(this._channelID)
 
 		// 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
 		const t = setTimeout(() => {
 			// 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
-			if (this._connectionState !== STATE.DISCONNECTED)
+			if (this._connectionState !== ConncetionState.DISCONNECTED)
 				this._setDisconnected(
 					"Forced call from KNXClient Disconnect() function, because the KNX Interface hasn't sent the DISCONNECT_RESPONSE in time.",
 				)
@@ -883,14 +892,14 @@ export default class KNXClient extends EventEmitter {
 	}
 
 	isConnected() {
-		return this._connectionState === STATE.CONNECTED
+		return this._connectionState === ConncetionState.CONNECTED
 	}
 
 	_setDisconnected(_sReason = '') {
 		this.sysLogger.debug(
 			`KNXClient: called _setDisconnected ${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
 		)
-		this._connectionState = STATE.DISCONNECTED
+		this._connectionState = ConncetionState.DISCONNECTED
 		this.stopHeartBeat()
 		this._timerTimeoutSendDisconnectRequestMessage = null
 		if (this._connectionTimeoutTimer !== null)
@@ -1031,7 +1040,7 @@ export default class KNXClient extends EventEmitter {
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.CONNECT_RESPONSE
 			) {
-				if (this._connectionState === STATE.CONNECTING) {
+				if (this._connectionState === ConncetionState.CONNECTING) {
 					if (this._connectionTimeoutTimer !== null)
 						clearTimeout(this._connectionTimeoutTimer)
 					this._connectionTimeoutTimer = null
@@ -1042,8 +1051,10 @@ export default class KNXClient extends EventEmitter {
 					) {
 						this.emit(
 							KNXClientEvents.error,
-							KNXConnectResponse.statusToString(
-								knxConnectResponse.status,
+							Error(
+								KNXConnectResponse.statusToString(
+									knxConnectResponse.status,
+								),
 							),
 						)
 						this._setDisconnected(
@@ -1057,7 +1068,7 @@ export default class KNXClient extends EventEmitter {
 						clearTimeout(this._timerWaitingForACK)
 
 					this._channelID = knxConnectResponse.channelID
-					this._connectionState = STATE.CONNECTED
+					this._connectionState = ConncetionState.CONNECTED
 					this._numFailedTelegramACK = 0 // 16/03/2022 Reset the failed ACK counter
 					this._clearToSend = true // 16/03/2022 allow to send
 
@@ -1075,7 +1086,7 @@ export default class KNXClient extends EventEmitter {
 					`Received KNX packet: DISCONNECT_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 				)
 
-				if (this._connectionState !== STATE.DISCONNECTING) {
+				if (this._connectionState !== ConncetionState.DISCONNECTING) {
 					this.emit(
 						KNXClientEvents.error,
 						new Error('Unexpected Disconnect Response.'),
@@ -1096,7 +1107,7 @@ export default class KNXClient extends EventEmitter {
 					`Received KNX packet: DISCONNECT_REQUEST, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 				)
 
-				this._connectionState = STATE.DISCONNECTING
+				this._connectionState = ConncetionState.DISCONNECTING
 				this._sendDisconnectResponseMessage(
 					knxDisconnectRequest.channelID,
 				)
@@ -1245,8 +1256,10 @@ export default class KNXClient extends EventEmitter {
 						) {
 							this.emit(
 								KNXClientEvents.error,
-								KNXConnectionStateResponse.statusToString(
-									knxConnectionStateResponse.status,
+								Error(
+									KNXConnectionStateResponse.statusToString(
+										knxConnectionStateResponse.status,
+									),
 								),
 							)
 							this._setDisconnected(
