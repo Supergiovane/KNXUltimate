@@ -8,13 +8,13 @@
 [![MIT License][license-image]][license-url]
 [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 [![Youtube][youtube-image]][youtube-url]
-[![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square)](https://www.paypal.me/techtoday) 
+[![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square)](https://www.paypal.me/techtoday)
 
 <br/>
 
 Control your KNX intallation via Node.js!
 
-> This is the official engine of Node-Red node KNX-Ultimate (https://flows.nodered.org/node/node-red-contrib-knx-ultimate)
+> This is the official engine of Node-Red node KNX-Ultimate (<https://flows.nodered.org/node/node-red-contrib-knx-ultimate>)
 > I had many users asking for a node.js release of that engine, so here is it.
 > The node will be KNX Secure compatible. I'm already working on that.
 
@@ -57,8 +57,7 @@ High knowledge of cryptography and KNX is needed.
 | isSecureKNXEnabled (bool) | True: Enables the secure connection. Leave false until KNX-Secure has been released. |
 | jKNXSecureKeyring (string) | ETS Keyring JSON file content (leave blank until KNX-Secure has been released) |
 | localIPAddress (string) | The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate |
-| KNXEthInterface (string) | "Auto": Bind to the first avaiable local interfavce. "Manual": if you wish to specify the interface (for example eth1); in this case, set the property **interface** to the interface name (interface:"eth1") |
-| interface (string) | Specifies the local eth interface to be used to connect to the KNX Bus. **Do not add** this parameter if you've set **KNXEthInterface** to "Auto"|
+| interface (string) | Specifies the local eth interface to be used to connect to the KNX Bus.|
 
 <br/>
 <br/>
@@ -101,14 +100,14 @@ You should see something like this in the console window (the **msg.payload** is
 
 Please see the sample.js file. This sample contains all events triggered by KNXUltimate.
 
-
-
 <br/>
 <br/>
 
 ## DECONDING THE TELEGRAMS FROM BUS
+
 Decoding is very simple.
 Just require the dptlib and use it to decode the RAW telegram
+
 ```javascript
 const dptlib = require('./src/dptlib');
 let dpt = dptlib.resolve("1.001");
@@ -118,8 +117,7 @@ let jsValue = dptlib.fromBuffer(RAW VALUE (SEE SAMPLES), dpt); // THIS IS THE DE
 <br/>
 <br/>
 
-
-## Simple sample (you can find this sample in the "simpleSample.js" file):
+## Simple sample (you can find this sample in the "simpleSample.js" file)
 
 ```javascript
 const knx = require("./index.js");
@@ -137,7 +135,6 @@ let knxUltimateClientProperties = {
     isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
     jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
-    KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
 };
 
 // Instantiate the client
@@ -199,11 +196,10 @@ try {
 knxUltimateClient.Connect();
 ```
 
-
 <br/>
 <br/>
 
-## Full featured sample (you can find this sample in the "sample.js" file):
+## Full featured sample (you can find this sample in the "sample.js" file)
 
 ```javascript
 const knx = require("./index.js");
@@ -289,7 +285,6 @@ let knxUltimateClientProperties = {
     isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
     jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
-    KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
 };
 
 var knxUltimateClient;
@@ -413,7 +408,7 @@ setTimeout(() => {
 <br/>
 <br/>
 
-# KNX Secure connection sample (you can find this sample in the "sampleSecure.js" file):
+# KNX Secure connection sample (you can find this sample in the "sampleSecure.js" file)
 
 The knx secure is under development. You can see this sample as reference, if you wish to contribute to the project.<br/>
 KNX Secure is not ready and it still in pre alfa.<br/>
@@ -459,7 +454,6 @@ let knxUltimateClientProperties = {
     localEchoInTunneling: true, // Leave true, forever.
     hostProtocol: "TunnelTCP", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
     isSecureKNXEnabled: true, // Leave "false" until KNX-Secure has been released
-    KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
     jKNXSecureKeyring: "", // This is the unencrypted Keyring file content (see below)
 };
@@ -569,9 +563,9 @@ go();
 <br/>
 <br/>
 
-
 ## SUGGESTION
-> Why not to try Node-Red https://nodered.org and the awesome KNX-Ultimate node https://flows.nodered.org/node/node-red-contrib-knx-ultimate ?
+>
+> Why not to try Node-Red <https://nodered.org> and the awesome KNX-Ultimate node <https://flows.nodered.org/node/node-red-contrib-knx-ultimate> ?
 
 <br/>
 

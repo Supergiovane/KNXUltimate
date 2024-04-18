@@ -15,8 +15,6 @@ const client = new KNXClient({
 	ipPort: '3671',
 	physAddr: '15.15.15',
 	loglevel: 'trace',
-	// KNXEthInterface: 'Auto', // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
-	// KNXEthInterface: "Manual", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
 	interface: 'wlp2s0',
 	suppress_ack_ldatareq: false,
 	localEchoInTunneling: true, // Leave true, forever.

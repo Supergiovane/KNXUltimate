@@ -38,7 +38,6 @@ let knxUltimateClientProperties: KNXClientOptions = {
     localEchoInTunneling: true, // Leave true, forever.
     hostProtocol: "TunnelTCP", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
     isSecureKNXEnabled: true, // Leave "false" until KNX-Secure has been released
-    // KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
     jKNXSecureKeyring: "", // This is the unencrypted Keyring file content (see below)
 };
