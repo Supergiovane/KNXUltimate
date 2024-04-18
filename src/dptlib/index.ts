@@ -76,7 +76,7 @@ export interface DatapointConfig {
 	fromBuffer?: (buf: Buffer) => any
 }
 
-const dpts: Record<string, DatapointConfig> = {
+export const dpts: Record<string, DatapointConfig> = {
 	[DPT1.id]: DPT1,
 	[DPT2.id]: DPT2,
 	[DPT3.id]: DPT3,
@@ -270,5 +270,3 @@ const cloneDpt = (d: DatapointConfig) => {
 	const { fromBuffer: fb, formatAPDU: fa } = d
 	return { ...JSON.parse(JSON.stringify(d)), fromBuffer: fb, formatAPDU: fa }
 }
-
-export default dpts

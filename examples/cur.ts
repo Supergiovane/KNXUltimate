@@ -1,4 +1,3 @@
-import { KNXPacket } from "src/protocol";
 import { fromBuffer, resolve } from "../src/dptlib";
 import KNXClient, { KNXClientEvents } from "../src/KNXClient";
 import KNXRoutingIndication from "src/protocol/KNXRoutingIndication";
