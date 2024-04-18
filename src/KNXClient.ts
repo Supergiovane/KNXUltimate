@@ -22,6 +22,7 @@ import KNXConnectRequest from './protocol/KNXConnectRequest'
 import KNXTunnelingRequest from './protocol/KNXTunnelingRequest'
 import { TypedEventEmitter } from './TypedEmitter'
 import KNXHeader from './protocol/KNXHeader'
+import KNXTunnelingAck from './protocol/KNXTunnelingAck'
 
 export enum ConncetionState {
 	STARTED = 'STARTED',
@@ -58,12 +59,15 @@ export interface KNXClientEventCallbacks {
 	error: (error: Error) => void
 	disconnected: (reason: string) => void
 	discover: (host: string, header: KNXHeader, message: KNXPacket) => void
-	indication: (packet: KNXPacket, value: any) => void
+	indication: (packet: KNXRoutingIndication, echoed: boolean) => void
 	connected: (options: KNXClientOptions) => void
 	ready: () => void
 	response: (host: string, header: KNXHeader, message: KNXPacket) => void
 	connecting: (options: KNXClientOptions) => void
-	ackReceived: (packet: KNXPacket, value: any) => void
+	ackReceived: (
+		packet: KNXTunnelingAck | KNXTunnelingRequest,
+		ack: boolean,
+	) => void
 	close: () => void
 }
 

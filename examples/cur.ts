@@ -1,5 +1,7 @@
+import { KNXPacket } from "src/protocol";
 import { fromBuffer, resolve } from "../src/dptlib";
 import KNXClient, { KNXClientEvents } from "../src/KNXClient";
+import KNXRoutingIndication from "src/protocol/KNXRoutingIndication";
 
 // Create tunnel socket with source knx address 1.1.100
 const knxClient = new KNXClient({
@@ -25,20 +27,20 @@ knxClient.on(KNXClientEvents.discover, (info: string) => {
   discoverCB(ip, port);
 });
 
-knxClient.on(KNXClientEvents.disconnected, (info: any) => {
-  console.log("BANANA DISCONNESSO", info);
+knxClient.on(KNXClientEvents.disconnected, (reason) => {
+  console.log("BANANA DISCONNESSO", reason);
 });
 
-knxClient.on(KNXClientEvents.close, (info: any) => {
-  console.log("BANANA CHIUSO", info);
+knxClient.on(KNXClientEvents.close, () => {
+  console.log("BANANA CHIUSO");
 });
 
-knxClient.on(KNXClientEvents.connected, (info: any) => {
+knxClient.on(KNXClientEvents.connected, () => {
   console.log("CONNESSO CON CHANNEL ID ", knxClient.channelID);
 });
 
-knxClient.on(KNXClientEvents.connecting, (info: any) => {
-  console.log("CONNECTING ", info);
+knxClient.on(KNXClientEvents.connecting, (options) => {
+  console.log("CONNECTING ", options);
 });
 
 const wait = (t: number = 3000): Promise<void> => {
@@ -50,37 +52,36 @@ const wait = (t: number = 3000): Promise<void> => {
 };
 
 const handleBusEvent = function (
-  _datagram: any,
-  _echoed: any,
-  rawCEMISocketMessage: any
+  packet: KNXRoutingIndication,
+  echoed: boolean,
 ) {
   try {
     var dpt = resolve("DPT1.001");
-    var jsvalue = fromBuffer(_datagram.cEMIMessage.npdu.dataValue, dpt);
+    var jsvalue = fromBuffer(packet.cEMIMessage.npdu.dataValue, dpt);
   } catch (error) {
     console.log(error);
   }
 
   let sType = "";
-  if (_datagram.cEMIMessage.npdu.isGroupRead) sType = "GroupValue_Read";
-  if (_datagram.cEMIMessage.npdu.isGroupResponse) sType = "GroupValue_Response";
-  if (_datagram.cEMIMessage.npdu.isGroupWrite) sType = "GroupValue_Write";
+  if (packet.cEMIMessage.npdu.isGroupRead) sType = "GroupValue_Read";
+  if (packet.cEMIMessage.npdu.isGroupResponse) sType = "GroupValue_Response";
+  if (packet.cEMIMessage.npdu.isGroupWrite) sType = "GroupValue_Write";
 
-  let srcAddress = _datagram.cEMIMessage.srcAddress.toString();
-  let dstAddress = _datagram.cEMIMessage.dstAddress.toString();
+  let srcAddress = packet.cEMIMessage.srcAddress.toString();
+  let dstAddress = packet.cEMIMessage.dstAddress.toString();
 
-  let isRepeated = _datagram.cEMIMessage.control.repeat === 1 ? false : true;
+  let isRepeated = packet.cEMIMessage.control.repeat === 1 ? false : true;
 
   let cemiETS = "";
 
-  if (rawCEMISocketMessage !== undefined) {
-    try {
-      var iStart = _datagram._header._headerLength + 4;
-      cemiETS = rawCEMISocketMessage.toString("hex").substring(iStart * 2);
-    } catch (error) {
-      cemiETS = "";
-    }
-  }
+  // if (rawCEMISocketMessage !== undefined) {
+  //   try {
+  //     var iStart = _datagram._header._headerLength + 4;
+  //     cemiETS = rawCEMISocketMessage.toString("hex").substring(iStart * 2);
+  //   } catch (error) {
+  //     cemiETS = "";
+  //   }
+  // }
 
   console.log(
     "BANANA",
@@ -88,7 +89,7 @@ const handleBusEvent = function (
     dstAddress,
     jsvalue,
     "Echoed",
-    _echoed,
+    echoed,
     "Type",
     sType,
     "Repeat",
