@@ -1,5 +1,5 @@
 // Made with love by Supergiovane
-import dgram, { RemoteInfo, UFPSocket } from 'dgram'
+import dgram, { RemoteInfo, Socket as UDPSocket } from 'dgram'
 import net, { Socket as TCPSocket } from 'net'
 import { ConnectionStatus, KNX_CONSTANTS } from './protocol/KNXConstants'
 import CEMIConstants from './protocol/cEMI/CEMIConstants'
@@ -145,7 +145,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _awaitingResponseType: number
 
-	private _clientSocket: UFPSocket | TCPSocket
+	private _clientSocket: UDPSocket | TCPSocket
 
 	private sysLogger: Logger
 
@@ -222,16 +222,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._clientSocket = dgram.createSocket({
 				type: 'udp4',
 				reuseAddr: false,
-			}) as UFPSocket
+			}) as UDPSocket
 			this._clientSocket.removeAllListeners()
 			this._clientSocket.bind(
 				{ port: null, address: this._options.localIPAddress },
 				() => {
 					try {
-						;(this._clientSocket as UFPSocket).setTTL(250)
+						;(this._clientSocket as UDPSocket).setTTL(250)
 						if (this._options.localSocketAddress === undefined) {
 							this._options.localSocketAddress = (
-								this._clientSocket as UFPSocket
+								this._clientSocket as UDPSocket
 							).address().address
 						}
 					} catch (error) {
@@ -267,7 +267,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._clientSocket = dgram.createSocket({
 				type: 'udp4',
 				reuseAddr: true,
-			}) as UFPSocket
+			}) as UDPSocket
 			this._clientSocket.removeAllListeners()
 			this._clientSocket.on(SocketEvents.listening, () => {})
 			this._clientSocket.on(
@@ -281,7 +281,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.emit(KNXClientEvents.close),
 			)
 			this._clientSocket.bind(this._peerPort, () => {
-				const client = this._clientSocket as UFPSocket
+				const client = this._clientSocket as UDPSocket
 				try {
 					client.setMulticastTTL(250)
 					client.setMulticastInterface(this._options.localIPAddress)
@@ -381,7 +381,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._options.hostProtocol === 'TunnelUDP'
 		) {
 			try {
-				;(this._clientSocket as UFPSocket).send(
+				;(this._clientSocket as UDPSocket).send(
 					knxPacket.toBuffer(),
 					this._peerPort,
 					this._peerHost,
@@ -863,7 +863,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				// we could try to see if `end()` works well too
 				;(this._clientSocket as TCPSocket).destroy()
 			} else {
-				;(this._clientSocket as UFPSocket).close(cb)
+				;(this._clientSocket as UDPSocket).close(cb)
 			}
 		})
 	}
