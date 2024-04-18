@@ -1,8 +1,6 @@
 
-import { KNXClientOptions } from "../src/KNXClient";
-import { getDecodedKeyring, KNXClient, KNXClientEvents } from "../src";
+import { getDecodedKeyring, KNXClient, KNXClientEvents, dptlib, KNXClientOptions } from "../src";
 import keyring from "../src/KNXsecureKeyring";
-import dptlib, { fromBuffer, resolve } from "../src/dptlib";
 
 // This is the content of the ETS Keyring file obtained doing this: https://www.youtube.com/watch?v=OpR7ZQTlMRU
 let rawjKNXSecureKeyring = `<?xml version="1.0" encoding="utf-8"?>
@@ -119,20 +117,20 @@ async function go() {
         // Decode the telegram. 
         if (_dst === "0/1/1") {
             // We know that 0/1/1 is a boolean DPT 1.001
-            const config = resolve("1.001");
-            jsValue = fromBuffer(_Rawvalue, config)
+            const config = dptlib.resolve("1.001");
+            jsValue = dptlib.fromBuffer(_Rawvalue, config)
         } else if (_dst === "0/1/2") {
             // We know that 0/1/2 is a boolean DPT 232.600 Color RGB
-            const config = resolve("232.600");
-            jsValue = fromBuffer(_Rawvalue, config)
+            const config = dptlib.resolve("232.600");
+            jsValue = dptlib.fromBuffer(_Rawvalue, config)
         } else {
             // All others... assume they are boolean
-            const config = resolve("1.001");
-            jsValue = fromBuffer(_Rawvalue, config)
+            const config = dptlib.resolve("1.001");
+            jsValue = dptlib.fromBuffer(_Rawvalue, config)
             if (jsValue === null) {
                 // Is null, try if it's a numerical value
-                const config = resolve("5.001");
-                jsValue = fromBuffer(_Rawvalue, config)
+                const config = dptlib.resolve("5.001");
+                jsValue = dptlib.fromBuffer(_Rawvalue, config)
             }
         }
         console.log("src: " + _src + " dest: " + _dst, " event: " + _evt, " value: " + jsValue);

@@ -1,6 +1,5 @@
 import { KNXClientOptions } from "../src/KNXClient";
-import { KNXClientEvents, KNXClient } from "../src";
-import dptlib, { resolve, fromBuffer } from "../src/dptlib";
+import { KNXClientEvents, KNXClient, dptlib } from "../src";
 
 // Get a list of supported datapoints
 // With this function, you can see what datapoints are supported and a sample on how you need to format the payload to be sent.
@@ -47,7 +46,7 @@ const dptGetHelp = dpt => {
     }
     jRet = { "help": "No sample currently avaiable", "helplink": "https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-SamplesHome" };
     const dpts =
-        Object.entries(dptlib)
+        Object.entries(dptlib.dpts)
             .filter(onlyDptKeys)
     for (let index = 0; index < dpts.length; index++) {
         if (dpts[index][0].toUpperCase() === "DPT" + sDPT) {
@@ -58,7 +57,7 @@ const dptGetHelp = dpt => {
     return (jRet);
 }
 const dpts =
-    Object.entries(dptlib)
+    Object.entries(dptlib.dpts)
         .filter(onlyDptKeys)
         .map(extractBaseNo)
         .sort(sortBy("base"))
@@ -176,20 +175,20 @@ function handleBusEvents(_datagram, _echoed) {
     // Decode the telegram. 
     if (_dst === "0/1/1") {
         // We know that 0/1/1 is a boolean DPT 1.001
-        const config = resolve("1.001");
-        jsValue = fromBuffer(_Rawvalue, config)
+        const config = dptlib.resolve("1.001");
+        jsValue = dptlib.fromBuffer(_Rawvalue, config)
     } else if (_dst === "0/1/2") {
         // We know that 0/1/2 is a boolean DPT 232.600 Color RGB
-        const config = resolve("232.600");
-        jsValue = fromBuffer(_Rawvalue, config)
+        const config = dptlib.resolve("232.600");
+        jsValue = dptlib.fromBuffer(_Rawvalue, config)
     } else {
         // All others... assume they are boolean
-        const config = resolve("1.001");
-        jsValue = fromBuffer(_Rawvalue, config)
+        const config = dptlib.resolve("1.001");
+        jsValue = dptlib.fromBuffer(_Rawvalue, config)
         if (jsValue === null) {
             // Is null, try if it's a numerical value
-            const config = resolve("5.001");
-            jsValue = fromBuffer(_Rawvalue, config)
+            const config = dptlib.resolve("5.001");
+            jsValue = dptlib.fromBuffer(_Rawvalue, config)
         }
     }
     console.log("src: " + _src + " dest: " + _dst, " event: " + _evt, " value: " + jsValue);
