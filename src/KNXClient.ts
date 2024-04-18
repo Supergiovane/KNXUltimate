@@ -862,10 +862,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 			}
 
-			if (this._clientSocket instanceof UFPSocket) {
-				this._clientSocket.close(cb)
+			if (this._options.hostProtocol === 'TunnelTCP') {
+				;(this._clientSocket as TCPSocket).end(cb)
 			} else {
-				this._clientSocket.end(cb)
+				;(this._clientSocket as UFPSocket).close(cb)
 			}
 		})
 	}
