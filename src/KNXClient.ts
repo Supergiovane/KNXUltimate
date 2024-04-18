@@ -277,7 +277,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._clientSocket.on(SocketEvents.error, (error) =>
 				this.emit(KNXClientEvents.error, error),
 			)
-			this._clientSocket.on('close', () =>
+			this._clientSocket.on(SocketEvents.close, () =>
 				this.emit(KNXClientEvents.close),
 			)
 			this._clientSocket.bind(this._peerPort, () => {
