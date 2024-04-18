@@ -71,3 +71,9 @@ export function getFloat(_value0: number, _value1: number) {
 	mantissa = sign === 1 ? ~(mantissa ^ 2047) : mantissa
 	return parseFloat(ldexp(0.01 * mantissa, exponent).toPrecision(15))
 }
+
+export function wait(ms: number) {
+	return new Promise<void>((r) => {
+		setTimeout(r, ms)
+	})
+}
