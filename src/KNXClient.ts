@@ -859,7 +859,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			}
 
 			if (this._options.hostProtocol === 'TunnelTCP') {
-				;(this._clientSocket as TCPSocket).end(cb)
+				// use destroy instead of end here to ensure socket is closed
+				// we could try to see if `end()` works well too
+				;(this._clientSocket as TCPSocket).destroy()
 			} else {
 				;(this._clientSocket as UFPSocket).close(cb)
 			}
