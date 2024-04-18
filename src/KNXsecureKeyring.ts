@@ -177,7 +177,7 @@ const keyring = (function () {
 			try {
 				const hash = CryptoJS.SHA256(_input)
 				let buffer = Buffer.from(hash.toString(CryptoJS.enc.Hex), 'hex')
-				buffer = buffer.slice(0, 16)
+				buffer = buffer.subarray(0, 16)
 				resolve(buffer.toString('base64'))
 			} catch (error) {
 				reject(error)
