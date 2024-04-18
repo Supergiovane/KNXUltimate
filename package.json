@@ -64,7 +64,6 @@
   "dependencies": {
     "binary-parser": "2.2.1",
     "crypto-js": "4.2.0",
-    "ipaddr.js": "2.1.0",
     "log-driver": "1.2.7",
     "mkdirp": "3.0.1",
     "ping": "0.4.4",
