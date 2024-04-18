@@ -4,7 +4,7 @@ import net, { Socket as TCPSocket } from 'net'
 import { ConnectionStatus, KNX_CONSTANTS } from './protocol/KNXConstants'
 import CEMIConstants from './protocol/cEMI/CEMIConstants'
 import CEMIFactory from './protocol/cEMI/CEMIFactory'
-import KNXProtocol from './protocol/KNXProtocol'
+import KNXProtocol, { KnxResponse } from './protocol/KNXProtocol'
 import KNXConnectResponse from './protocol/KNXConnectResponse'
 import HPAI from './protocol/HPAI'
 import TunnelCRI, { TunnelTypes } from './protocol/TunnelCRI'
@@ -23,6 +23,8 @@ import KNXTunnelingRequest from './protocol/KNXTunnelingRequest'
 import { TypedEventEmitter } from './TypedEmitter'
 import KNXHeader from './protocol/KNXHeader'
 import KNXTunnelingAck from './protocol/KNXTunnelingAck'
+import KNXSearchResponse from './protocol/KNXSearchResponse'
+import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
 
 export enum ConncetionState {
 	STARTED = 'STARTED',
@@ -58,11 +60,15 @@ export enum KNXClientEvents {
 export interface KNXClientEventCallbacks {
 	error: (error: Error) => void
 	disconnected: (reason: string) => void
-	discover: (host: string, header: KNXHeader, message: KNXPacket) => void
+	discover: (
+		host: string,
+		header: KNXHeader,
+		message: KNXSearchResponse,
+	) => void
 	indication: (packet: KNXRoutingIndication, echoed: boolean) => void
 	connected: (options: KNXClientOptions) => void
 	ready: () => void
-	response: (host: string, header: KNXHeader, message: KNXPacket) => void
+	response: (host: string, header: KNXHeader, message: KnxResponse) => void
 	connecting: (options: KNXClientOptions) => void
 	ackReceived: (
 		packet: KNXTunnelingAck | KNXTunnelingRequest,
@@ -1039,7 +1045,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					KNXClientEvents.discover,
 					`${rinfo.address}:${rinfo.port}`,
 					knxHeader,
-					knxMessage,
+					knxMessage as KNXSearchResponse,
 				)
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.CONNECT_RESPONSE
@@ -1048,7 +1054,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					if (this._connectionTimeoutTimer !== null)
 						clearTimeout(this._connectionTimeoutTimer)
 					this._connectionTimeoutTimer = null
-					const knxConnectResponse = knxMessage
+					const knxConnectResponse = knxMessage as KNXConnectResponse
 					if (
 						knxConnectResponse.status !==
 						ConnectionStatus.E_NO_ERROR
@@ -1102,7 +1108,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.DISCONNECT_REQUEST
 			) {
-				const knxDisconnectRequest = knxMessage
+				const knxDisconnectRequest = knxMessage as KNXDisconnectResponse
 				if (knxDisconnectRequest.channelID !== this._channelID) {
 					return
 				}
@@ -1126,7 +1132,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.TUNNELING_REQUEST
 			) {
-				const knxTunnelingRequest = knxMessage
+				const knxTunnelingRequest = knxMessage as KNXTunnelingRequest
 				if (knxTunnelingRequest.channelID !== this._channelID) {
 					this.sysLogger.debug(
 						`Received KNX packet: TUNNELING: L_DATA_IND, NOT FOR ME: MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnelingRequest.channelID} ReceivedPacketseqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
@@ -1182,7 +1188,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)
 				}
 			} else if (knxHeader.service_type === KNX_CONSTANTS.TUNNELING_ACK) {
-				const knxTunnelingAck = knxMessage
+				const knxTunnelingAck = knxMessage as KNXTunnelingAck
 				if (knxTunnelingAck.channelID !== this._channelID) {
 					return
 				}
@@ -1199,7 +1205,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this._numFailedTelegramACK = 0 // 25/12/2021 clear the current ACK failed telegram number
 						this._clearToSend = true // I'm ready to send a new datagram now
 						// 08/04/2022 Emits the event informing that the last ACK has been acknowledge.
-						this.emit(KNXClientEvents.ackReceived, knxMessage, true)
+						this.emit(
+							KNXClientEvents.ackReceived,
+							knxTunnelingAck,
+							true,
+						)
 
 						this.sysLogger.debug(
 							`Received KNX packet: TUNNELING: DELETED_TUNNELING_ACK FROM PENDING ACK's, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
@@ -1217,7 +1227,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				knxHeader.service_type === KNX_CONSTANTS.ROUTING_INDICATION
 			) {
 				// 07/12/2021 Multicast routing indication
-				const knxRoutingInd = knxMessage
+				const knxRoutingInd = knxMessage as KNXRoutingIndication
 				if (
 					knxRoutingInd.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_IND
@@ -1253,7 +1263,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							`Received KNX packet: CONNECTIONSTATE_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 						)
 
-						const knxConnectionStateResponse = knxMessage
+						const knxConnectionStateResponse =
+							knxMessage as KNXConnectionStateResponse
 						if (
 							knxConnectionStateResponse.status !==
 							KNX_CONSTANTS.E_NO_ERROR
@@ -1281,7 +1292,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					KNXClientEvents.response,
 					`${rinfo.address}:${rinfo.port}`,
 					knxHeader,
-					knxMessage,
+					knxMessage as KnxResponse,
 				)
 			}
 		} catch (e) {

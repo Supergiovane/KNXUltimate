@@ -1,10 +1,11 @@
 import KNXSecureKeyring from './KNXsecureKeyring'
 
-import KNXClient, { KNXClientEvents, getDecodedKeyring } from './KNXClient'
+import KNXClient from './KNXClient'
+
+export * from './KNXClient'
+export * from './protocol'
 
 export {
 	KNXClient,
-	KNXClientEvents,
-	getDecodedKeyring,
 	// KNXSecureKeyring
 }
