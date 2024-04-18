@@ -1,8 +1,9 @@
 import { KNXClientEvents, KNXClient } from "../src";
 import { resolve, fromBuffer } from "../src/dptlib";
+import { KNXClientOptions } from "../src/KNXClient";
 
 // Set the properties
-let knxUltimateClientProperties = {
+let knxUltimateClientProperties: KNXClientOptions = {
     ipAddr: "224.0.23.12",
     ipPort: "3671",
     physAddr: "1.1.100",
@@ -13,7 +14,6 @@ let knxUltimateClientProperties = {
     isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
     jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
-    KNXEthInterface: "Auto", // Bind to the first avaiable local interfavce. "Manual" if you wish to specify the interface (for example eth1); in this case, set the property interface to the interface name (interface:"eth1")
 };
 
 // Instantiate the client
