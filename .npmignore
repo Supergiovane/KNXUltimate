@@ -1,2 +1,4 @@
 img
 examples/
+.*
+tsconfig*
