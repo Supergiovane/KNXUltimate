@@ -18,12 +18,30 @@ import { KNX_CONSTANTS } from './KNXConstants'
 import TunnelCRI from './TunnelCRI'
 import CEMIMessage from './cEMI/CEMIMessage'
 
+export type KnxResponse =
+	| KNXConnectResponse
+	| KNXSearchResponse
+	| KNXDescriptionResponse
+	| KNXConnectionStateResponse
+	| KNXDisconnectResponse
+	| KNXTunnelingAck
+	| KNXRoutingIndication
+
+export type KnxRequest =
+	| KNXConnectRequest
+	| KNXSearchRequest
+	| KNXDescriptionRequest
+	| KNXConnectionStateRequest
+	| KNXDisconnectRequest
+	| KNXTunnelingRequest
+
+export type KnxMessage = KnxResponse | KnxRequest
+
 export default class KNXProtocol {
 	static parseMessage(buffer: Buffer) {
 		const knxHeader: KNXHeader = KNXHeader.createFromBuffer(buffer)
 		const knxData: Buffer = buffer.subarray(knxHeader.headerLength)
-		// TODO: improve type
-		let knxMessage
+		let knxMessage: KnxMessage
 		switch (knxHeader.service_type) {
 			case KNX_CONSTANTS.SEARCH_REQUEST:
 				knxMessage = KNXSearchRequest.createFromBuffer(knxData)
