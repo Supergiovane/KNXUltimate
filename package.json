@@ -25,6 +25,7 @@
     },
     "git": {
       "tagName": "v${version}",
+      "requireBranch": "typescript",
       "commitMessage": "chore(release): ${version}"
     },
     "hooks": {
