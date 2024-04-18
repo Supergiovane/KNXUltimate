@@ -1,4 +1,4 @@
-import { KNXClient, KNXClientEvents } from '../'
+import { KNXClient, KNXClientEvents } from '../src'
 
 if (process.argv.length < 3) {
 	console.log('usage: %s <ga> <optional: status_ga> to toggle a light on & off',

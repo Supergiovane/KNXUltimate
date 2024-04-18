@@ -1,5 +1,5 @@
 import { KNX_CONSTANTS } from './KNXConstants'
-import KNXAddress from './KNXAddress.js'
+import KNXAddress from './KNXAddress'
 
 const CRD_LENGTH: number = 4
 
