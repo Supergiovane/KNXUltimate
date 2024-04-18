@@ -76,13 +76,13 @@ async function go() {
         // info is true it the last telegram has been acknowledge, otherwise false.
         console.log("Last telegram acknowledge", knxMessage, info)
     });
-    knxUltimateClient.on(KNXClientEvents.disconnected, info => {
+    knxUltimateClient.on(KNXClientEvents.disconnected, (reason) => {
         // The client is cisconnected
-        console.log("Disconnected", info)
+        console.log("Disconnected", reason)
     });
-    knxUltimateClient.on(KNXClientEvents.close, info => {
+    knxUltimateClient.on(KNXClientEvents.close, () => {
         // The client physical net socket has been closed
-        console.log("Closed", info)
+        console.log("Closed")
     });
     knxUltimateClient.on(KNXClientEvents.connected, info => {
         // The client is connected
