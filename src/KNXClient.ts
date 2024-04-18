@@ -849,17 +849,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private async closeSocket() {
-		return new Promise<void>((resolve, reject) => {
+		return new Promise<void>((resolve) => {
 			// already closed
 			if (!this._clientSocket) return
 
-			const cb = (error?) => {
-				if (error) {
-					reject(error)
-				} else {
-					this._clientSocket = null
-					resolve()
-				}
+			const cb = () => {
+				this._clientSocket = null
+				resolve()
 			}
 
 			if (this._options.hostProtocol === 'TunnelTCP') {
