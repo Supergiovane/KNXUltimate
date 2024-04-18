@@ -146,14 +146,23 @@ export default class KNXClient extends EventEmitter {
 
 		if (options === undefined) {
 			options = optionsDefaults
+		} else {
+			options = {
+				...optionsDefaults,
+				...options,
+			}
 		}
+		this._options = options
+
+		this.sysLogger = KnxLog.get({
+			loglevel: this._options.loglevel,
+		})
 
 		this._channelID = null
 		this._connectionState = STATE.DISCONNECTED
 		this._timerWaitingForACK = null
 		this._numFailedTelegramACK = 0
 		this._clientTunnelSeqNumber = -1
-		this._options = options
 		this._options.connectionKeepAliveTimeout =
 			KNX_CONSTANTS.CONNECTION_ALIVE_TIME
 		this._peerHost = this._options.ipAddr
@@ -166,17 +175,11 @@ export default class KNXClient extends EventEmitter {
 		this._discovery_timer = null
 		this._awaitingResponseType = null
 		this._clientSocket = null
-		this.sysLogger = null
 		this.jKNXSecureKeyring = this._options.jKNXSecureKeyring
 
-		try {
-			this.sysLogger = KnxLog.get({
-				loglevel: this._options.loglevel,
-			})
-		} catch (error) {
-			console.log('BANANA ERRORE this.sysLogger = require', error.message)
-			throw error
-		}
+		// add an error listener otherwise without this
+		// the emit error would throw
+		this.on('error', (error) => {})
 
 		if (typeof this._options.physAddr === 'string') {
 			this.physAddr = KNXAddress.createFromString(this._options.physAddr)
@@ -187,11 +190,9 @@ export default class KNXClient extends EventEmitter {
 				this._options.interface,
 			)
 		} catch (error) {
-			if (this.sysLogger !== undefined && this.sysLogger !== null) {
-				this.sysLogger.error(
-					`ipAddressHelper.getLocalAddress:${error.message}`,
-				)
-			}
+			this.sysLogger.error(
+				`ipAddressHelper.getLocalAddress:${error.message}`,
+			)
 			throw error
 		}
 
@@ -214,15 +215,9 @@ export default class KNXClient extends EventEmitter {
 							).address().address
 						}
 					} catch (error) {
-						if (
-							this.sysLogger !== undefined &&
-							this.sysLogger !== null
-						) {
-							this.sysLogger.error(
-								`UDP:  Error setting SetTTL ${error.message}` ||
-									'',
-							)
-						}
+						this.sysLogger.error(
+							`UDP:  Error setting SetTTL ${error.message}` || '',
+						)
 					}
 				},
 			)
@@ -271,15 +266,10 @@ export default class KNXClient extends EventEmitter {
 					client.setMulticastTTL(250)
 					client.setMulticastInterface(this._options.localIPAddress)
 				} catch (error) {
-					if (
-						this.sysLogger !== undefined &&
-						this.sysLogger !== null
-					) {
-						this.sysLogger.error(
-							`Multicast: Error setting SetTTL ${error.message}` ||
-								'',
-						)
-					}
+					this.sysLogger.error(
+						`Multicast: Error setting SetTTL ${error.message}` ||
+							'',
+					)
 				}
 				try {
 					client.addMembership(
@@ -287,18 +277,11 @@ export default class KNXClient extends EventEmitter {
 						this._options.localIPAddress,
 					)
 				} catch (err) {
-					if (
-						this.sysLogger !== undefined &&
-						this.sysLogger !== null
-					) {
-						this.sysLogger.error(
-							'Multicast: cannot add membership (%s)',
-							err,
-						)
-					}
-					try {
-						this.emit(KNXClientEvents.error, err)
-					} catch (error) {}
+					this.sysLogger.error(
+						'Multicast: cannot add membership (%s)',
+						err,
+					)
+					this.emit(KNXClientEvents.error, err)
 				}
 			})
 		}
@@ -316,17 +299,11 @@ export default class KNXClient extends EventEmitter {
 		)
 		const isSixBits: boolean = adpu.bitlength <= 6
 
-		try {
-			if (this.sysLogger !== undefined && this.sysLogger !== null) {
-				this.sysLogger.trace(
-					`isSixBits:${isSixBits} Includes (should be = isSixBits):${[
-						1, 2, 3, 5, 9, 10, 11, 14, 18,
-					].includes(iDatapointType)} ADPU BitLenght:${
-						adpu.bitlength
-					}`,
-				)
-			}
-		} catch (error) {}
+		this.sysLogger.trace(
+			`isSixBits:${isSixBits} Includes (should be = isSixBits):${[
+				1, 2, 3, 5, 9, 10, 11, 14, 18,
+			].includes(iDatapointType)} ADPU BitLenght:${adpu.bitlength}`,
+		)
 
 		const datapoint: IDataPoint = {
 			id: '',
@@ -341,51 +318,47 @@ export default class KNXClient extends EventEmitter {
 	}
 
 	send(knxPacket: KNXPacket): void {
-		if (this.sysLogger !== undefined && this.sysLogger !== null) {
+		if (knxPacket instanceof KNXConnectRequest) {
+			this.sysLogger.debug(
+				`Sending KNX packet: ${knxPacket.constructor.name} Host:${this._peerHost}:${this._peerPort}`,
+			)
+		}
+		if (
+			knxPacket instanceof KNXTunnelingRequest ||
+			knxPacket instanceof KNXRoutingIndication
+		) {
+			let sTPCI = ''
+			if (knxPacket.cEMIMessage.npdu.isGroupRead) {
+				sTPCI = 'Read'
+			}
+			if (knxPacket.cEMIMessage.npdu.isGroupResponse) {
+				sTPCI = 'Response'
+			}
+			if (knxPacket.cEMIMessage.npdu.isGroupWrite) {
+				sTPCI = 'Write'
+			}
+
+			let sDebugString = '???'
 			try {
-				if (knxPacket instanceof KNXConnectRequest) {
-					this.sysLogger.debug(
-						`Sending KNX packet: ${knxPacket.constructor.name} Host:${this._peerHost}:${this._peerPort}`,
-					)
-				}
-				if (
-					knxPacket instanceof KNXTunnelingRequest ||
-					knxPacket instanceof KNXRoutingIndication
-				) {
-					let sTPCI = ''
-					if (knxPacket.cEMIMessage.npdu.isGroupRead) {
-						sTPCI = 'Read'
-					}
-					if (knxPacket.cEMIMessage.npdu.isGroupResponse) {
-						sTPCI = 'Response'
-					}
-					if (knxPacket.cEMIMessage.npdu.isGroupWrite) {
-						sTPCI = 'Write'
-					}
-
-					let sDebugString = '???'
-					try {
-						sDebugString = `Data: ${JSON.stringify(
-							knxPacket.cEMIMessage.npdu,
-						)}`
-						sDebugString += ` srcAddress: ${knxPacket.cEMIMessage.srcAddress.toString()}`
-						sDebugString += ` dstAddress: ${knxPacket.cEMIMessage.dstAddress.toString()}`
-					} catch (error) {}
-
-					this.sysLogger.debug(
-						`Sending KNX packet: ${
-							knxPacket.constructor.name
-						} ${sDebugString} Host:${this._peerHost}:${
-							this._peerPort
-						} channelID:${(knxPacket as KNXTunnelingRequest).channelID} seqCounter:${
-							(knxPacket as KNXTunnelingRequest).seqCounter
-						} Dest:${knxPacket.cEMIMessage.dstAddress.toString()}`,
-						` Data:${knxPacket.cEMIMessage.npdu.dataValue.toString(
-							'hex',
-						)} TPCI:${sTPCI}`,
-					)
-				}
+				sDebugString = `Data: ${JSON.stringify(
+					knxPacket.cEMIMessage.npdu,
+				)}`
+				sDebugString += ` srcAddress: ${knxPacket.cEMIMessage.srcAddress.toString()}`
+				sDebugString += ` dstAddress: ${knxPacket.cEMIMessage.dstAddress.toString()}`
 			} catch (error) {}
+
+			this.sysLogger.debug(
+				`Sending KNX packet: ${
+					knxPacket.constructor.name
+				} ${sDebugString} Host:${this._peerHost}:${
+					this._peerPort
+				} channelID:${(knxPacket as KNXTunnelingRequest).channelID} seqCounter:${
+					(knxPacket as KNXTunnelingRequest).seqCounter
+				} Dest:${knxPacket.cEMIMessage.dstAddress.toString()}`,
+				` Data:${knxPacket.cEMIMessage.npdu.dataValue.toString(
+					'hex',
+				)} TPCI:${sTPCI}`,
+			)
 		}
 
 		if (
@@ -399,34 +372,22 @@ export default class KNXClient extends EventEmitter {
 					this._peerHost,
 					(err) => {
 						if (err) {
-							if (
-								this.sysLogger !== undefined &&
-								this.sysLogger !== null
-							) {
-								this.sysLogger.error(
-									`Sending KNX packet: Send UDP sending error: ${err.message}` ||
-										'Undef error',
-								)
-							}
-							try {
-								this.emit(KNXClientEvents.error, err)
-							} catch (error) {}
+							this.sysLogger.error(
+								`Sending KNX packet: Send UDP sending error: ${err.message}`,
+							)
+							this.emit(KNXClientEvents.error, err)
 						}
 					},
 				)
 			} catch (error) {
-				if (this.sysLogger !== undefined && this.sysLogger !== null) {
-					this.sysLogger.error(
-						`Sending KNX packet: Send UDP Catch error: ${
-							error.message
-						} ${typeof knxPacket} seqCounter:${
-							(knxPacket as any).seqCounter || ''
-						}`,
-					)
-				}
-				try {
-					this.emit(KNXClientEvents.error, error)
-				} catch (err) {}
+				this.sysLogger.error(
+					`Sending KNX packet: Send UDP Catch error: ${
+						error.message
+					} ${typeof knxPacket} seqCounter:${
+						(knxPacket as any).seqCounter || ''
+					}`,
+				)
+				this.emit(KNXClientEvents.error, error)
 			}
 		} else {
 			try {
@@ -434,29 +395,20 @@ export default class KNXClient extends EventEmitter {
 					knxPacket.toBuffer(),
 					(err) => {
 						if (err) {
-							if (
-								this.sysLogger !== undefined &&
-								this.sysLogger !== null
-							) {
-								this.sysLogger.error(
-									`Sending KNX packet: Send TCP sending error: ${err.message}` ||
-										'Undef error',
-								)
-							}
+							this.sysLogger.error(
+								`Sending KNX packet: Send TCP sending error: ${err.message}` ||
+									'Undef error',
+							)
 							this.emit(KNXClientEvents.error, err)
 						}
 					},
 				)
 			} catch (error) {
-				if (this.sysLogger !== undefined && this.sysLogger !== null) {
-					this.sysLogger.error(
-						`Sending KNX packet: Send TCP Catch error: ${error.message}` ||
-							'Undef error',
-					)
-				}
-				try {
-					this.emit(KNXClientEvents.error, error)
-				} catch (err) {}
+				this.sysLogger.error(
+					`Sending KNX packet: Send TCP Catch error: ${error.message}` ||
+						'Undef error',
+				)
+				this.emit(KNXClientEvents.error, error)
 			}
 		}
 	}
@@ -517,17 +469,10 @@ export default class KNXClient extends EventEmitter {
 			)
 			if (!this._options.suppress_ack_ldatareq)
 				this._setTimerWaitingForACK(knxPacketRequest)
-			// if (this.sysLogger !== undefined && this.sysLogger !== null) this.sysLogger.error("this._tunnelReqTimer "+ this._tunnelReqTimer.size);
 			this.send(knxPacketRequest)
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			try {
-				if (this._options.localEchoInTunneling)
-					this.emit(
-						KNXClientEvents.indication,
-						knxPacketRequest,
-						true,
-					)
-			} catch (error) {}
+			if (this._options.localEchoInTunneling)
+				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
 
@@ -589,14 +534,8 @@ export default class KNXClient extends EventEmitter {
 				this._setTimerWaitingForACK(knxPacketRequest)
 			this.send(knxPacketRequest)
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			try {
-				if (this._options.localEchoInTunneling)
-					this.emit(
-						KNXClientEvents.indication,
-						knxPacketRequest,
-						true,
-					)
-			} catch (error) {}
+			if (this._options.localEchoInTunneling)
+				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
 
@@ -655,14 +594,8 @@ export default class KNXClient extends EventEmitter {
 				this._setTimerWaitingForACK(knxPacketRequest)
 			this.send(knxPacketRequest)
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			try {
-				if (this._options.localEchoInTunneling)
-					this.emit(
-						KNXClientEvents.indication,
-						knxPacketRequest,
-						true,
-					)
-			} catch (error) {}
+			if (this._options.localEchoInTunneling)
+				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
 
@@ -679,10 +612,9 @@ export default class KNXClient extends EventEmitter {
 			)
 
 		if (!Buffer.isBuffer(_rawDataBuffer)) {
-			if (this.sysLogger !== undefined && this.sysLogger !== null)
-				this.sysLogger.error(
-					'KNXClient: writeRaw: Value must be a buffer! ',
-				)
+			this.sysLogger.error(
+				'KNXClient: writeRaw: Value must be a buffer! ',
+			)
 			return
 		}
 
@@ -751,14 +683,8 @@ export default class KNXClient extends EventEmitter {
 				this._setTimerWaitingForACK(knxPacketRequest)
 			this.send(knxPacketRequest)
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			try {
-				if (this._options.localEchoInTunneling)
-					this.emit(
-						KNXClientEvents.indication,
-						knxPacketRequest,
-						true,
-					)
-			} catch (error) {}
+			if (this._options.localEchoInTunneling)
+				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
 
@@ -840,18 +766,14 @@ export default class KNXClient extends EventEmitter {
 			)
 			this._connectionTimeoutTimer = setTimeout(() => {
 				this._connectionTimeoutTimer = null
-				try {
-					this.emit(KNXClientEvents.error, timeoutError)
-				} catch (error) {}
+				this.emit(KNXClientEvents.error, timeoutError)
 			}, 1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT)
 			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
 			this._clientTunnelSeqNumber = -1
-			try {
-				// 27/06/2023, leave some time to the dgram, do do the bind and read local ip and local port
-				const t = setTimeout(() => {
-					this._sendConnectRequestMessage(new TunnelCRI(knxLayer))
-				}, 2000)
-			} catch (error) {}
+			// 27/06/2023, leave some time to the dgram, do do the bind and read local ip and local port
+			const t = setTimeout(() => {
+				this._sendConnectRequestMessage(new TunnelCRI(knxLayer))
+			}, 2000)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
 			// TCP
 			const timeoutError = new Error(
@@ -878,9 +800,7 @@ export default class KNXClient extends EventEmitter {
 			this._clearToSend = true // 26/12/2021 allow to send
 
 			this._clientTunnelSeqNumber = -1
-			try {
-				this.emit(KNXClientEvents.connected, this._options)
-			} catch (error) {}
+			this.emit(KNXClientEvents.connected, this._options)
 		}
 	}
 
@@ -896,27 +816,20 @@ export default class KNXClient extends EventEmitter {
 		)
 		this._heartbeatTimer = setTimeout(() => {
 			this._heartbeatTimer = null
-			try {
-				if (this.sysLogger !== undefined && this.sysLogger !== null)
-					this.sysLogger.error(
-						`KNXClient: getConnectionStatus Timeout ${this._heartbeatFailures} out of ${this.max_HeartbeatFailures}`,
-					)
-				// this.emit(KNXClientEvents.error, timeoutError);
-			} catch (error) {}
+			this.sysLogger.error(
+				`KNXClient: getConnectionStatus Timeout ${this._heartbeatFailures} out of ${this.max_HeartbeatFailures}`,
+			)
+			// this.emit(KNXClientEvents.error, timeoutError);
 
 			this._heartbeatFailures++
 			if (this._heartbeatFailures >= this.max_HeartbeatFailures) {
 				this._heartbeatFailures = 0
-				try {
-					this.emit(KNXClientEvents.error, deadError)
-				} catch (error) {}
+				this.emit(KNXClientEvents.error, deadError)
 				this._setDisconnected(deadError.message)
 			}
 		}, 1000 * KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT)
 		this._awaitingResponseType = KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
-		try {
-			this._sendConnectionStateRequestMessage(this._channelID)
-		} catch (error) {}
+		this._sendConnectionStateRequestMessage(this._channelID)
 	}
 
 	private async closeSocket() {
@@ -952,19 +865,17 @@ export default class KNXClient extends EventEmitter {
 				// TODO: this should be awaited
 				this.closeSocket()
 			} catch (error) {
-				if (this.sysLogger !== undefined && this.sysLogger !== null)
-					this.sysLogger.debug(
-						`KNXClient: into Disconnect(), this._clientSocket.close(): ${this._options.ipAddr}:${this._options.ipPort} ${error.message}`,
-					)
+				this.sysLogger.debug(
+					`KNXClient: into Disconnect(), this._clientSocket.close(): ${this._options.ipAddr}:${this._options.ipPort} ${error.message}`,
+				)
 			}
+			// TODO: not sure this is correct
 			throw new Error('KNX Socket is already disconnected')
 		}
 		this.stopHeartBeat()
 		this._connectionState = STATE.DISCONNECTING
 		this._awaitingResponseType = KNX_CONSTANTS.DISCONNECT_RESPONSE
-		try {
-			this._sendDisconnectRequestMessage(this._channelID)
-		} catch (error) {}
+		this._sendDisconnectRequestMessage(this._channelID)
 
 		// 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
 		const t = setTimeout(() => {
@@ -981,12 +892,9 @@ export default class KNXClient extends EventEmitter {
 	}
 
 	_setDisconnected(_sReason = '') {
-		try {
-			if (this.sysLogger !== undefined && this.sysLogger !== null)
-				this.sysLogger.debug(
-					`KNXClient: called _setDisconnected ${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
-				)
-		} catch (error) {}
+		this.sysLogger.debug(
+			`KNXClient: called _setDisconnected ${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
+		)
 		this._connectionState = STATE.DISCONNECTED
 		this.stopHeartBeat()
 		this._timerTimeoutSendDisconnectRequestMessage = null
@@ -1003,12 +911,10 @@ export default class KNXClient extends EventEmitter {
 			this.closeSocket()
 		} catch (error) {}
 
-		try {
-			this.emit(
-				KNXClientEvents.disconnected,
-				`${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
-			)
-		} catch (error) {}
+		this.emit(
+			KNXClientEvents.disconnected,
+			`${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
+		)
 		this._clearToSend = true // 26/12/2021 allow to send
 	}
 
@@ -1042,7 +948,7 @@ export default class KNXClient extends EventEmitter {
 	// _keyFromCEMIMessage(cEMIMessage) {
 	//     return cEMIMessage.dstAddress.toString();
 	// }
-	_setTimerWaitingForACK(knxTunnelingRequest) {
+	_setTimerWaitingForACK(knxTunnelingRequest: KNXTunnelingRequest) {
 		this._clearToSend = false // 26/12/2021 stop sending until ACK received
 		const timeoutErr = new errors.RequestTimeoutError(
 			`seqCounter:${knxTunnelingRequest.seqCounter}, DestAddr:${
@@ -1057,38 +963,32 @@ export default class KNXClient extends EventEmitter {
 		if (this._timerWaitingForACK !== null)
 			clearTimeout(this._timerWaitingForACK)
 		this._timerWaitingForACK = setTimeout(() => {
-			try {
-				this._numFailedTelegramACK += 1
-				if (this._numFailedTelegramACK > 2) {
-					this._numFailedTelegramACK = 0
-					// 08/04/2022 Emits the event informing that the last ACK has not been acknowledge.
-					try {
-						this.emit(
-							KNXClientEvents.ackReceived,
-							knxTunnelingRequest,
-							false,
-						)
-					} catch (error) {}
-					this._clearToSend = true
-					this.emit(KNXClientEvents.error, timeoutErr)
-					if (this.sysLogger !== undefined && this.sysLogger !== null)
-						this.sysLogger.error(
-							`KNXClient: _setTimerWaitingForACK: ${
-								timeoutErr.message || 'Undef error'
-							} no ACK received. ABORT sending datagram with seqNumber ${this._getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
-						)
-				} else {
-					// 26/12/2021 // If no ACK received, resend the datagram once with the same sequence number
-					this._setTimerWaitingForACK(knxTunnelingRequest)
-					this.send(knxTunnelingRequest)
-					if (this.sysLogger !== undefined && this.sysLogger !== null)
-						this.sysLogger.error(
-							`KNXClient: _setTimerWaitingForACK: ${
-								timeoutErr.message || 'Undef error'
-							} no ACK received. Retransmit datagram with seqNumber ${this._getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
-						)
-				}
-			} catch (error) {}
+			this._numFailedTelegramACK += 1
+			if (this._numFailedTelegramACK > 2) {
+				this._numFailedTelegramACK = 0
+				// 08/04/2022 Emits the event informing that the last ACK has not been acknowledge.
+				this.emit(
+					KNXClientEvents.ackReceived,
+					knxTunnelingRequest,
+					false,
+				)
+				this._clearToSend = true
+				this.emit(KNXClientEvents.error, timeoutErr)
+				this.sysLogger.error(
+					`KNXClient: _setTimerWaitingForACK: ${
+						timeoutErr.message || 'Undef error'
+					} no ACK received. ABORT sending datagram with seqNumber ${this._getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
+				)
+			} else {
+				// 26/12/2021 // If no ACK received, resend the datagram once with the same sequence number
+				this._setTimerWaitingForACK(knxTunnelingRequest)
+				this.send(knxTunnelingRequest)
+				this.sysLogger.error(
+					`KNXClient: _setTimerWaitingForACK: ${
+						timeoutErr.message || 'Undef error'
+					} no ACK received. Retransmit datagram with seqNumber ${this._getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
+				)
+			}
 		}, KNX_CONSTANTS.TUNNELING_REQUEST_TIMEOUT * 1000)
 	}
 
@@ -1097,20 +997,16 @@ export default class KNXClient extends EventEmitter {
 
 		try {
 			// Composing debug string
+			sProcessInboundLog = '???'
 			try {
-				if (this.sysLogger !== undefined && this.sysLogger !== null) {
-					sProcessInboundLog = '???'
-					try {
-						sProcessInboundLog = `Data received: ${msg.toString('hex')}`
-						sProcessInboundLog += ` srcAddress: ${JSON.stringify(rinfo)}`
-					} catch (error) {}
-					this.sysLogger.trace(
-						`Received KNX packet: _processInboundMessage, ${sProcessInboundLog} ChannelID:${this._channelID}` ||
-							`??` +
-								` Host:${this._options.ipAddr}:${this._options.ipPort}`,
-					)
-				}
+				sProcessInboundLog = `Data received: ${msg.toString('hex')}`
+				sProcessInboundLog += ` srcAddress: ${JSON.stringify(rinfo)}`
 			} catch (error) {}
+			this.sysLogger.trace(
+				`Received KNX packet: _processInboundMessage, ${sProcessInboundLog} ChannelID:${this._channelID}` ||
+					`??` +
+						` Host:${this._options.ipAddr}:${this._options.ipPort}`,
+			)
 
 			// BUGFIXING https://github.com/Supergiovane/node-red-contrib-knx-ultimate/issues/162
 			// msg = Buffer.from("0610053000102900b06011fe11150080","hex");
@@ -1119,20 +1015,16 @@ export default class KNXClient extends EventEmitter {
 
 			// 26/12/2021 ROUTING LOST MESSAGE OR BUSY
 			if (knxHeader.service_type === KNX_CONSTANTS.ROUTING_LOST_MESSAGE) {
-				try {
-					this.emit(
-						KNXClientEvents.error,
-						new Error('ROUTING_LOST_MESSAGE'),
-					)
-					// this._setDisconnected("Routing Lost Message"); // 31/03/2022 Commented, because it doesn't matter. Non need to disconnect.
-				} catch (error) {}
+				this.emit(
+					KNXClientEvents.error,
+					new Error('ROUTING_LOST_MESSAGE'),
+				)
+				// this._setDisconnected("Routing Lost Message"); // 31/03/2022 Commented, because it doesn't matter. Non need to disconnect.
 				return
 			}
 			if (knxHeader.service_type === KNX_CONSTANTS.ROUTING_BUSY) {
-				try {
-					this.emit(KNXClientEvents.error, new Error('ROUTING_BUSY'))
-					// this._setDisconnected("Routing Busy"); // 31/03/2022 Commented, because it doesn't matter. Non need to disconnect.
-				} catch (error) {}
+				this.emit(KNXClientEvents.error, new Error('ROUTING_BUSY'))
+				// this._setDisconnected("Routing Busy"); // 31/03/2022 Commented, because it doesn't matter. Non need to disconnect.
 				return
 			}
 
@@ -1140,14 +1032,12 @@ export default class KNXClient extends EventEmitter {
 				if (this._discovery_timer == null) {
 					return
 				}
-				try {
-					this.emit(
-						KNXClientEvents.discover,
-						`${rinfo.address}:${rinfo.port}`,
-						knxHeader,
-						knxMessage,
-					)
-				} catch (error) {}
+				this.emit(
+					KNXClientEvents.discover,
+					`${rinfo.address}:${rinfo.port}`,
+					knxHeader,
+					knxMessage,
+				)
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.CONNECT_RESPONSE
 			) {
@@ -1160,14 +1050,12 @@ export default class KNXClient extends EventEmitter {
 						knxConnectResponse.status !==
 						ConnectionStatus.E_NO_ERROR
 					) {
-						try {
-							this.emit(
-								KNXClientEvents.error,
-								KNXConnectResponse.statusToString(
-									knxConnectResponse.status,
-								),
-							)
-						} catch (error) {}
+						this.emit(
+							KNXClientEvents.error,
+							KNXConnectResponse.statusToString(
+								knxConnectResponse.status,
+							),
+						)
 						this._setDisconnected(
 							`Connect response error ${knxConnectResponse.status}`,
 						)
@@ -1183,37 +1071,25 @@ export default class KNXClient extends EventEmitter {
 					this._numFailedTelegramACK = 0 // 16/03/2022 Reset the failed ACK counter
 					this._clearToSend = true // 16/03/2022 allow to send
 
-					try {
-						if (
-							this.sysLogger !== undefined &&
-							this.sysLogger !== null
-						)
-							this.sysLogger.debug(
-								`Received KNX packet: CONNECT_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-							)
-					} catch (error) {}
-					try {
-						this.emit(KNXClientEvents.connected, this._options)
-					} catch (error) {}
+					this.sysLogger.debug(
+						`Received KNX packet: CONNECT_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+					)
+
+					this.emit(KNXClientEvents.connected, this._options)
 					this.startHeartBeat()
 				}
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.DISCONNECT_RESPONSE
 			) {
-				try {
-					if (this.sysLogger !== undefined && this.sysLogger !== null)
-						this.sysLogger.debug(
-							`Received KNX packet: DISCONNECT_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-						)
-				} catch (error) {}
+				this.sysLogger.debug(
+					`Received KNX packet: DISCONNECT_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+				)
 
 				if (this._connectionState !== STATE.DISCONNECTING) {
-					try {
-						this.emit(
-							KNXClientEvents.error,
-							new Error('Unexpected Disconnect Response.'),
-						)
-					} catch (error) {}
+					this.emit(
+						KNXClientEvents.error,
+						new Error('Unexpected Disconnect Response.'),
+					)
 				}
 				this._setDisconnected(
 					'Received DISCONNECT_RESPONSE from the KNX interface.',
@@ -1226,19 +1102,14 @@ export default class KNXClient extends EventEmitter {
 					return
 				}
 
-				try {
-					if (this.sysLogger !== undefined && this.sysLogger !== null)
-						this.sysLogger.error(
-							`Received KNX packet: DISCONNECT_REQUEST, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-						)
-				} catch (error) {}
+				this.sysLogger.error(
+					`Received KNX packet: DISCONNECT_REQUEST, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+				)
 
 				this._connectionState = STATE.DISCONNECTING
-				try {
-					this._sendDisconnectResponseMessage(
-						knxDisconnectRequest.channelID,
-					)
-				} catch (error) {}
+				this._sendDisconnectResponseMessage(
+					knxDisconnectRequest.channelID,
+				)
 
 				// 12/03/2021 Added 1 sec delay.
 				const t = setTimeout(() => {
@@ -1252,11 +1123,9 @@ export default class KNXClient extends EventEmitter {
 			) {
 				const knxTunnelingRequest = knxMessage
 				if (knxTunnelingRequest.channelID !== this._channelID) {
-					try {
-						this.sysLogger.debug(
-							`Received KNX packet: TUNNELING: L_DATA_IND, NOT FOR ME: MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnelingRequest.channelID} ReceivedPacketseqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-						)
-					} catch (error) {}
+					this.sysLogger.debug(
+						`Received KNX packet: TUNNELING: L_DATA_IND, NOT FOR ME: MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnelingRequest.channelID} ReceivedPacketseqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+					)
 					return
 				}
 				// 26/12/2021 send the ACK if the server requestet that
@@ -1285,45 +1154,30 @@ export default class KNXClient extends EventEmitter {
 					CEMIConstants.L_DATA_IND
 				) {
 					// Composing debug string
+					let sDebugString = '???'
 					try {
-						if (
-							this.sysLogger !== undefined &&
-							this.sysLogger !== null
-						) {
-							let sDebugString = '???'
-							try {
-								sDebugString = `Data: ${JSON.stringify(
-									knxTunnelingRequest.cEMIMessage.npdu,
-								)}`
-								sDebugString += ` srcAddress: ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()}`
-								sDebugString += ` dstAddress: ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`
-							} catch (error) {}
-							this.sysLogger.debug(
-								`Received KNX packet: TUNNELING: L_DATA_IND, ${sDebugString} ChannelID:${this._channelID} seqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-							)
-						}
+						sDebugString = `Data: ${JSON.stringify(
+							knxTunnelingRequest.cEMIMessage.npdu,
+						)}`
+						sDebugString += ` srcAddress: ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()}`
+						sDebugString += ` dstAddress: ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`
 					} catch (error) {}
+					this.sysLogger.debug(
+						`Received KNX packet: TUNNELING: L_DATA_IND, ${sDebugString} ChannelID:${this._channelID} seqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+					)
 
-					try {
-						this.emit(
-							KNXClientEvents.indication,
-							knxTunnelingRequest,
-							false,
-						)
-					} catch (error) {}
+					this.emit(
+						KNXClientEvents.indication,
+						knxTunnelingRequest,
+						false,
+					)
 				} else if (
 					knxTunnelingRequest.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_CON
 				) {
-					try {
-						if (
-							this.sysLogger !== undefined &&
-							this.sysLogger !== null
-						)
-							this.sysLogger.debug(
-								`Received KNX packet: TUNNELING: L_DATA_CON, ChannelID:${this._channelID} seqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-							)
-					} catch (error) {}
+					this.sysLogger.debug(
+						`Received KNX packet: TUNNELING: L_DATA_CON, ChannelID:${this._channelID} seqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+					)
 				}
 			} else if (knxHeader.service_type === KNX_CONSTANTS.TUNNELING_ACK) {
 				const knxTunnelingAck = knxMessage
@@ -1331,12 +1185,9 @@ export default class KNXClient extends EventEmitter {
 					return
 				}
 
-				try {
-					if (this.sysLogger !== undefined && this.sysLogger !== null)
-						this.sysLogger.debug(
-							`Received KNX packet: TUNNELING: TUNNELING_ACK, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-						)
-				} catch (error) {}
+				this.sysLogger.debug(
+					`Received KNX packet: TUNNELING: TUNNELING_ACK, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+				)
 
 				// Check the received ACK sequence number
 				if (!this._options.suppress_ack_ldatareq) {
@@ -1346,33 +1197,17 @@ export default class KNXClient extends EventEmitter {
 						this._numFailedTelegramACK = 0 // 25/12/2021 clear the current ACK failed telegram number
 						this._clearToSend = true // I'm ready to send a new datagram now
 						// 08/04/2022 Emits the event informing that the last ACK has been acknowledge.
-						try {
-							this.emit(
-								KNXClientEvents.ackReceived,
-								knxMessage,
-								true,
-							)
-						} catch (error) {}
-						try {
-							if (
-								this.sysLogger !== undefined &&
-								this.sysLogger !== null
-							)
-								this.sysLogger.debug(
-									`Received KNX packet: TUNNELING: DELETED_TUNNELING_ACK FROM PENDING ACK's, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-								)
-						} catch (error) {}
+						this.emit(KNXClientEvents.ackReceived, knxMessage, true)
+
+						this.sysLogger.debug(
+							`Received KNX packet: TUNNELING: DELETED_TUNNELING_ACK FROM PENDING ACK's, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+						)
 					} else {
 						// Inform that i received an ACK with an unexpected sequence number
-						try {
-							if (
-								this.sysLogger !== undefined &&
-								this.sysLogger !== null
-							)
-								this.sysLogger.error(
-									`Received KNX packet: TUNNELING: Unexpected Tunnel Ack with seqCounter = ${knxTunnelingAck.seqCounter}`,
-								)
-						} catch (error) {}
+
+						this.sysLogger.error(
+							`Received KNX packet: TUNNELING: Unexpected Tunnel Ack with seqCounter = ${knxTunnelingAck.seqCounter}`,
+						)
 						// this.emit(KNXClientEvents.error, `Unexpected Tunnel Ack ${knxTunnelingAck.seqCounter}`);
 					}
 				}
@@ -1386,45 +1221,27 @@ export default class KNXClient extends EventEmitter {
 					CEMIConstants.L_DATA_IND
 				) {
 					// Composing debug string
-					try {
-						if (
-							this.sysLogger !== undefined &&
-							this.sysLogger !== null
-						) {
-							let sDebugString = '???'
-							try {
-								sDebugString = `Data: ${JSON.stringify(
-									knxRoutingInd.cEMIMessage.npdu,
-								)}`
-								sDebugString += ` srcAddress: ${knxRoutingInd.cEMIMessage.srcAddress.toString()}`
-								sDebugString += ` dstAddress: ${knxRoutingInd.cEMIMessage.dstAddress.toString()}`
-							} catch (error) {}
-							this.sysLogger.debug(
-								`Received KNX packet: ROUTING: L_DATA_IND, ${sDebugString} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-							)
-						}
-					} catch (error) {}
 
+					let sDebugString = '???'
 					try {
-						this.emit(
-							KNXClientEvents.indication,
-							knxRoutingInd,
-							false,
-						)
+						sDebugString = `Data: ${JSON.stringify(
+							knxRoutingInd.cEMIMessage.npdu,
+						)}`
+						sDebugString += ` srcAddress: ${knxRoutingInd.cEMIMessage.srcAddress.toString()}`
+						sDebugString += ` dstAddress: ${knxRoutingInd.cEMIMessage.dstAddress.toString()}`
 					} catch (error) {}
+					this.sysLogger.debug(
+						`Received KNX packet: ROUTING: L_DATA_IND, ${sDebugString} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+					)
+
+					this.emit(KNXClientEvents.indication, knxRoutingInd, false)
 				} else if (
 					knxRoutingInd.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_CON
 				) {
-					try {
-						if (
-							this.sysLogger !== undefined &&
-							this.sysLogger !== null
-						)
-							this.sysLogger.debug(
-								`Received KNX packet: ROUTING: L_DATA_CON, Host:${this._options.ipAddr}:${this._options.ipPort}`,
-							)
-					} catch (error) {}
+					this.sysLogger.debug(
+						`Received KNX packet: ROUTING: L_DATA_CON, Host:${this._options.ipAddr}:${this._options.ipPort}`,
+					)
 				}
 			} else {
 				if (knxHeader.service_type === this._awaitingResponseType) {
@@ -1432,29 +1249,21 @@ export default class KNXClient extends EventEmitter {
 						this._awaitingResponseType ===
 						KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
 					) {
-						try {
-							if (
-								this.sysLogger !== undefined &&
-								this.sysLogger !== null
-							)
-								this.sysLogger.debug(
-									`Received KNX packet: CONNECTIONSTATE_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-								)
-						} catch (error) {}
+						this.sysLogger.debug(
+							`Received KNX packet: CONNECTIONSTATE_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+						)
 
 						const knxConnectionStateResponse = knxMessage
 						if (
 							knxConnectionStateResponse.status !==
 							KNX_CONSTANTS.E_NO_ERROR
 						) {
-							try {
-								this.emit(
-									KNXClientEvents.error,
-									KNXConnectionStateResponse.statusToString(
-										knxConnectionStateResponse.status,
-									),
-								)
-							} catch (error) {}
+							this.emit(
+								KNXClientEvents.error,
+								KNXConnectionStateResponse.statusToString(
+									knxConnectionStateResponse.status,
+								),
+							)
 							this._setDisconnected(
 								`Awaiting response ${this._awaitingResponseType}, received connection state response  with status ${knxConnectionStateResponse.status}`,
 							)
@@ -1466,27 +1275,22 @@ export default class KNXClient extends EventEmitter {
 					} else if (this._connectionTimeoutTimer !== null)
 						clearTimeout(this._connectionTimeoutTimer)
 				}
-				try {
-					this.emit(
-						KNXClientEvents.response,
-						`${rinfo.address}:${rinfo.port}`,
-						knxHeader,
-						knxMessage,
-					)
-				} catch (error) {}
+				this.emit(
+					KNXClientEvents.response,
+					`${rinfo.address}:${rinfo.port}`,
+					knxHeader,
+					knxMessage,
+				)
 			}
 		} catch (e) {
-			try {
-				if (this.sysLogger !== undefined && this.sysLogger !== null)
-					this.sysLogger.error(
-						`Received KNX packet: Error processing inbound message: ${e.message} ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}. This means that KNX-Ultimate received a malformed Header or CEMI message from your KNX Gateway.`,
-					)
-			} catch (error) {}
-			try {
-				// 05/01/2022 Avoid disconnecting, because there are many bugged knx gateways out there!
-				// this.emit(KNXClientEvents.error, e);
-				// this._setDisconnected();
-			} catch (error) {}
+			this.sysLogger.error(
+				`Received KNX packet: Error processing inbound message: ${e.message} ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}. This means that KNX-Ultimate received a malformed Header or CEMI message from your KNX Gateway.`,
+			)
+			// try {
+			// 05/01/2022 Avoid disconnecting, because there are many bugged knx gateways out there!
+			// this.emit(KNXClientEvents.error, e);
+			// this._setDisconnected();
+			// } catch (error) {}
 		}
 	}
 
