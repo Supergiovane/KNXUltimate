@@ -48,10 +48,10 @@ const config: DatapointConfig = {
 			)
 			return null
 		}
-		const comfort = dpt9.fromBuffer(buf.slice(0, 2))
-		const standby = dpt9.fromBuffer(buf.slice(2, 4))
-		const economy = dpt9.fromBuffer(buf.slice(4, 6))
-		const buildingProtection = dpt9.fromBuffer(buf.slice(6, 8))
+		const comfort = dpt9.fromBuffer(buf.subarray(0, 2))
+		const standby = dpt9.fromBuffer(buf.subarray(2, 4))
+		const economy = dpt9.fromBuffer(buf.subarray(4, 6))
+		const buildingProtection = dpt9.fromBuffer(buf.subarray(6, 8))
 		return {
 			comfort,
 			standby,

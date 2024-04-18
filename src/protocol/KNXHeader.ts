@@ -27,31 +27,27 @@ export default class KNXHeader {
 	}
 
 	static createFromBuffer(buffer: Buffer, offset: number = 0): KNXHeader {
+		// 08/04/2021 new logger to adhere to the loglevel selected in the config-window
+		const sysLogger = KnxLog.get()
 		if (buffer.length < KNX_CONSTANTS.HEADER_SIZE_10) {
-			const sysLogger = KnxLog.get() // 08/04/2021 new logger to adhere to the loglevel selected in the config-window
-			if (sysLogger !== undefined && sysLogger !== null)
-				sysLogger.error(
-					`KNXHeader: createFromBuffer: incomplete buffer. Buffer length: ${buffer.length} expected HEADER_SIZE_10 equals to ${KNX_CONSTANTS.HEADER_SIZE_10}`,
-				)
+			sysLogger.error(
+				`KNXHeader: createFromBuffer: incomplete buffer. Buffer length: ${buffer.length} expected HEADER_SIZE_10 equals to ${KNX_CONSTANTS.HEADER_SIZE_10}`,
+			)
 			throw new Error('Incomplete buffer')
 		}
 		const header_length = buffer.readUInt8(offset)
 		if (header_length !== KNX_CONSTANTS.HEADER_SIZE_10) {
-			const sysLogger = KnxLog.get() // 08/04/2021 new logger to adhere to the loglevel selected in the config-window
-			if (sysLogger !== undefined && sysLogger !== null)
-				sysLogger.error(
-					`KNXHeader: createFromBuffer: invalid header_length. header_length: ${header_length} expected HEADER_SIZE_10 equals to ${KNX_CONSTANTS.HEADER_SIZE_10}`,
-				)
+			sysLogger.error(
+				`KNXHeader: createFromBuffer: invalid header_length. header_length: ${header_length} expected HEADER_SIZE_10 equals to ${KNX_CONSTANTS.HEADER_SIZE_10}`,
+			)
 			throw new Error(`Invalid buffer length ${header_length}`)
 		}
 		offset += 1
 		const version = buffer.readUInt8(offset)
 		if (version !== KNX_CONSTANTS.KNXNETIP_VERSION_10) {
-			const sysLogger = KnxLog.get() // 08/04/2021 new logger to adhere to the loglevel selected in the config-window
-			if (sysLogger !== undefined && sysLogger !== null)
-				sysLogger.error(
-					`KNXHeader: createFromBuffer: Unknown header version. Version: ${version} expected KNXNETIP_VERSION_10 to ${KNX_CONSTANTS.KNXNETIP_VERSION_10}`,
-				)
+			sysLogger.error(
+				`KNXHeader: createFromBuffer: Unknown header version. Version: ${version} expected KNXNETIP_VERSION_10 to ${KNX_CONSTANTS.KNXNETIP_VERSION_10}`,
+			)
 			throw new Error(`Unknown version ${version}`)
 		}
 		offset += 1
@@ -59,13 +55,9 @@ export default class KNXHeader {
 		offset += 2
 		const length = buffer.readUInt16BE(offset)
 		if (length !== buffer.length) {
-			try {
-				const sysLogger = KnxLog.get() // 08/04/2021 new logger to adhere to the loglevel selected in the config-window
-				if (sysLogger !== undefined && sysLogger !== null)
-					sysLogger.error(
-						`Received KNX packet: KNXHeader: createFromBuffer: Message length mismatch ${length}/${buffer.length} Data processed: ${buffer.toString('hex') || '??'}`,
-					)
-			} catch (error) {}
+			sysLogger.error(
+				`Received KNX packet: KNXHeader: createFromBuffer: Message length mismatch ${length}/${buffer.length} Data processed: ${buffer.toString('hex') || '??'}`,
+			)
 			// throw new Error(`Message length mismatch ${length}/${buffer.length} Data processed: ${buffer.toString("hex") || "??"}`);
 		}
 		return new KNXHeader(type, length - header_length)

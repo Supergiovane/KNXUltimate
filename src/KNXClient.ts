@@ -338,14 +338,9 @@ export default class KNXClient extends EventEmitter {
 				sTPCI = 'Write'
 			}
 
-			let sDebugString = '???'
-			try {
-				sDebugString = `Data: ${JSON.stringify(
-					knxPacket.cEMIMessage.npdu,
-				)}`
-				sDebugString += ` srcAddress: ${knxPacket.cEMIMessage.srcAddress.toString()}`
-				sDebugString += ` dstAddress: ${knxPacket.cEMIMessage.dstAddress.toString()}`
-			} catch (error) {}
+			let sDebugString = `Data: ${JSON.stringify(knxPacket.cEMIMessage.npdu)}`
+			sDebugString += ` srcAddress: ${knxPacket.cEMIMessage.srcAddress.toString()}`
+			sDebugString += ` dstAddress: ${knxPacket.cEMIMessage.dstAddress.toString()}`
 
 			this.sysLogger.debug(
 				`Sending KNX packet: ${
@@ -906,10 +901,8 @@ export default class KNXClient extends EventEmitter {
 		this._channelID = null
 
 		// 08/12/2021
-		try {
-			// TODO: this should be awaited
-			this.closeSocket()
-		} catch (error) {}
+		// TODO: this should be awaited
+		this.closeSocket()
 
 		this.emit(
 			KNXClientEvents.disconnected,
@@ -997,11 +990,8 @@ export default class KNXClient extends EventEmitter {
 
 		try {
 			// Composing debug string
-			sProcessInboundLog = '???'
-			try {
-				sProcessInboundLog = `Data received: ${msg.toString('hex')}`
-				sProcessInboundLog += ` srcAddress: ${JSON.stringify(rinfo)}`
-			} catch (error) {}
+			sProcessInboundLog = `Data received: ${msg.toString('hex')}`
+			sProcessInboundLog += ` srcAddress: ${JSON.stringify(rinfo)}`
 			this.sysLogger.trace(
 				`Received KNX packet: _processInboundMessage, ${sProcessInboundLog} ChannelID:${this._channelID}` ||
 					`??` +
@@ -1154,14 +1144,11 @@ export default class KNXClient extends EventEmitter {
 					CEMIConstants.L_DATA_IND
 				) {
 					// Composing debug string
-					let sDebugString = '???'
-					try {
-						sDebugString = `Data: ${JSON.stringify(
-							knxTunnelingRequest.cEMIMessage.npdu,
-						)}`
-						sDebugString += ` srcAddress: ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()}`
-						sDebugString += ` dstAddress: ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`
-					} catch (error) {}
+					let sDebugString = `Data: ${JSON.stringify(
+						knxTunnelingRequest.cEMIMessage.npdu,
+					)}`
+					sDebugString += ` srcAddress: ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()}`
+					sDebugString += ` dstAddress: ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`
 					this.sysLogger.debug(
 						`Received KNX packet: TUNNELING: L_DATA_IND, ${sDebugString} ChannelID:${this._channelID} seqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
@@ -1223,13 +1210,11 @@ export default class KNXClient extends EventEmitter {
 					// Composing debug string
 
 					let sDebugString = '???'
-					try {
-						sDebugString = `Data: ${JSON.stringify(
-							knxRoutingInd.cEMIMessage.npdu,
-						)}`
-						sDebugString += ` srcAddress: ${knxRoutingInd.cEMIMessage.srcAddress.toString()}`
-						sDebugString += ` dstAddress: ${knxRoutingInd.cEMIMessage.dstAddress.toString()}`
-					} catch (error) {}
+					sDebugString = `Data: ${JSON.stringify(
+						knxRoutingInd.cEMIMessage.npdu,
+					)}`
+					sDebugString += ` srcAddress: ${knxRoutingInd.cEMIMessage.srcAddress.toString()}`
+					sDebugString += ` dstAddress: ${knxRoutingInd.cEMIMessage.dstAddress.toString()}`
 					this.sysLogger.debug(
 						`Received KNX packet: ROUTING: L_DATA_IND, ${sDebugString} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)

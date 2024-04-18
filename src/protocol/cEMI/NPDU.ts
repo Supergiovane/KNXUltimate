@@ -3,7 +3,6 @@ import CEMIConstants from './CEMIConstants'
 import KnxLog from '../../KnxLog'
 
 // 08/04/2021 new logger to adhere to the loglevel selected in the config-window
-const sysLogger = KnxLog.get()
 
 export default class NPDU {
 	private _tpci: number
@@ -142,11 +141,11 @@ export default class NPDU {
 	}
 
 	static createFromBuffer(buffer: Buffer, offset: number = 0): NPDU {
+		const sysLogger = KnxLog.get()
 		if (offset > buffer.length) {
-			if (sysLogger !== undefined && sysLogger !== null)
-				sysLogger.error(
-					'NPDU: createFromBuffer: offset out of buffer range ',
-				)
+			sysLogger.error(
+				'NPDU: createFromBuffer: offset out of buffer range ',
+			)
 			throw new Error(
 				`offset ${offset}  out of buffer range ${buffer.length}`,
 			)
@@ -159,37 +158,33 @@ export default class NPDU {
 		try {
 			npduLength = buffer.readUInt8(offset++)
 		} catch (error) {
-			if (sysLogger !== undefined && sysLogger !== null)
-				sysLogger.error(
-					`NPDU: createFromBuffer: error npduLength: ${error.message}`,
-				)
+			sysLogger.error(
+				`NPDU: createFromBuffer: error npduLength: ${error.message}`,
+			)
 		}
 		try {
 			tpci = buffer.readUInt8(offset++)
 		} catch (error) {
-			if (sysLogger !== undefined && sysLogger !== null)
-				sysLogger.error(
-					`NPDU: createFromBuffer: error tpci: ${error.message}`,
-				)
+			sysLogger.error(
+				`NPDU: createFromBuffer: error tpci: ${error.message}`,
+			)
 		}
 		try {
 			apci = buffer.readUInt8(offset++)
 		} catch (error) {
-			if (sysLogger !== undefined && sysLogger !== null)
-				sysLogger.error(
-					`NPDU: createFromBuffer: error apci: ${error.message}`,
-				)
+			sysLogger.error(
+				`NPDU: createFromBuffer: error apci: ${error.message}`,
+			)
 		}
 		try {
 			data =
 				npduLength > 1
-					? buffer.slice(offset, offset + npduLength - 1)
+					? buffer.subarray(offset, offset + npduLength - 1)
 					: null
 		} catch (error) {
-			if (sysLogger !== undefined && sysLogger !== null)
-				sysLogger.error(
-					`NPDU: createFromBuffer: error data: ${error.message}`,
-				)
+			sysLogger.error(
+				`NPDU: createFromBuffer: error data: ${error.message}`,
+			)
 		}
 		return new NPDU(
 			tpci,

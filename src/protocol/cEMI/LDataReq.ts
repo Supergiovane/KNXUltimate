@@ -52,7 +52,9 @@ export default class LDataReq extends CEMIMessage {
 		const addLength = buffer.readUInt8(offset++)
 		let additionalInfo = null
 		if (addLength > 0) {
-			additionalInfo = new KNXDataBuffer(buffer.slice(offset, addLength))
+			additionalInfo = new KNXDataBuffer(
+				buffer.subarray(offset, addLength),
+			)
 			offset += addLength
 		}
 		const controlField = ControlField.createFromBuffer(buffer, offset)

@@ -21,7 +21,7 @@ import CEMIMessage from './cEMI/CEMIMessage'
 export default class KNXProtocol {
 	static parseMessage(buffer: Buffer) {
 		const knxHeader: KNXHeader = KNXHeader.createFromBuffer(buffer)
-		const knxData: Buffer = buffer.slice(knxHeader.headerLength)
+		const knxData: Buffer = buffer.subarray(knxHeader.headerLength)
 		// TODO: improve type
 		let knxMessage
 		switch (knxHeader.service_type) {
