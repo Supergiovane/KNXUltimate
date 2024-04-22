@@ -336,3 +336,5 @@ ASALocalRun/
 .localhistory/
 
 build
+
+.vscode
