@@ -1,5 +1,12 @@
 
 
+## [2.1.1](https://github.com/Supergiovane/KNXUltimate/compare/v2.1.0...v2.1.1) (2024-04-23)
+
+
+### Bug Fixes
+
+* better timers management for race conditions and leak prevention ([#17](https://github.com/Supergiovane/KNXUltimate/issues/17)) ([494af28](https://github.com/Supergiovane/KNXUltimate/commit/494af282f06a9db475d4284bd4b0d6ca16a5845f))
+
 # [2.1.0](https://github.com/Supergiovane/KNXUltimate/compare/v2.0.0-beta.0...v2.1.0) (2024-04-23)
 
 
