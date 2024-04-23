@@ -358,6 +358,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return new KNXDataBuffer(adpu.data, datapoint)
 	}
 
+	/** Waits till providden event occurs for at most the providden timeout */
+	private async waitForEvent(event: KNXClientEvents, timeout: number) {
+		return Promise.race<void>([
+			new Promise((resolve) => {
+				this.once(event, resolve)
+			}),
+			wait(timeout),
+		])
+	}
+
 	private runTimer(type: KNXTimer, cb: () => void, delay: number) {
 		if (this.timers.has(type)) {
 			clearTimeout(this.timers.get(type))
@@ -956,12 +966,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._sendDisconnectRequestMessage(this._channelID)
 
 		// wait for disconnect event or at most 2 seconds
-		await Promise.race([
-			new Promise((resolve) => {
-				this.once(KNXClientEvents.disconnected, resolve)
-			}),
-			wait(2000),
-		])
+		await this.waitForEvent(KNXClientEvents.disconnected, 2000)
 
 		// 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
 		if (this._connectionState !== ConncetionState.DISCONNECTED) {
