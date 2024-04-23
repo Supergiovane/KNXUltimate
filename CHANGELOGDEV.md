@@ -1,5 +1,12 @@
 
 
+# [2.1.0](https://github.com/Supergiovane/KNXUltimate/compare/v2.0.0-beta.0...v2.1.0) (2024-04-23)
+
+
+### Features
+
+* discovery ([#15](https://github.com/Supergiovane/KNXUltimate/issues/15)) ([f95836a](https://github.com/Supergiovane/KNXUltimate/commit/f95836ae6cb0e90922945810fd145781046feff2))
+
 # 2.0.0-beta.0 (2024-04-18)
 
 
@@ -43,4 +50,3 @@
 * securwe keyring ([0b1a250](https://github.com/Supergiovane/KNXUltimate/commit/0b1a250aa5ce46c18c6fcee3528b2069d3e06d5e))
 * typed event emitter ([2360e63](https://github.com/Supergiovane/KNXUltimate/commit/2360e632dcadd58acb2aec4fd9785ceae8f7f761))
 * typescript refactor ([ec8e26b](https://github.com/Supergiovane/KNXUltimate/commit/ec8e26b5601a0af96faac8e967ff95a96ed8e605))
-
