@@ -803,7 +803,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/** Returns an array of discovered KNX interfaces in the format "<ip>:<port>" */
-	public static async discover(timeout?: number): Promise<string[]>
 	public static async discover(eth?: string | number, timeout = 5000) {
 		if (typeof eth === 'number') {
 			timeout = eth
