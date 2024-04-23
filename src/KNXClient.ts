@@ -373,8 +373,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private clearAllTimers() {
-		this.timers.forEach((timer) => clearTimeout(timer))
-		this.timers.clear()
+		// use dedicated methods where possible
+		this.stopDiscovery()
+		this.stopHeartBeat()
+
+		// clear all other timers
+		for (const timer of this.timers.keys()) {
+			this.clearTimer(timer)
+		}
 	}
 
 	send(knxPacket: KNXPacket): void {
@@ -915,8 +921,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		// clear active timers
-		this.stopDiscovery()
-		this.stopHeartBeat()
 		this.clearAllTimers()
 
 		this._connectionState = ConncetionState.DISCONNECTING
@@ -955,8 +959,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._connectionState = ConncetionState.DISCONNECTED
 
 		// clear active timers
-		this.stopDiscovery()
-		this.stopHeartBeat()
 		this.clearAllTimers()
 
 		this._clientTunnelSeqNumber = -1
@@ -972,53 +974,58 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	_runHeartbeat() {
-		if (this._heartbeatRunning) {
-			if (this._clientSocket == null) {
-				throw new Error('No client socket defined')
-			}
-			const timeoutError = new Error(
-				`HeartBeat failure with ${this._peerHost}:${this._peerPort}`,
-			)
-			const deadError = new Error(
-				`Connection dead with ${this._peerHost}:${this._peerPort}`,
-			)
-
-			this.runTimer(
-				KNXTimer.CONNECTION_STATE,
-				() => {
-					this.sysLogger.error(
-						`KNXClient: getConnectionStatus Timeout ${this._heartbeatFailures} out of ${this.max_HeartbeatFailures}`,
-					)
-					// this.emit(KNXClientEvents.error, timeoutError)
-
-					this._heartbeatFailures++
-					if (this._heartbeatFailures >= this.max_HeartbeatFailures) {
-						this._heartbeatFailures = 0
-						this.emit(KNXClientEvents.error, deadError)
-						this._setDisconnected(deadError.message)
-					}
-				},
-				1000 * KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT,
-			)
-			this._awaitingResponseType = KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
-			this._sendConnectionStateRequestMessage(this._channelID)
-
-			this.runTimer(
-				KNXTimer.HEARTBEAT,
-				() => {
-					// 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
-					this._runHeartbeat()
-				},
-				1000 * this._options.connectionKeepAliveTimeout,
-			)
+		if (!this._heartbeatRunning) {
+			return
 		}
+
+		if (this._clientSocket == null) {
+			throw new Error('No client socket defined')
+		}
+
+		// const timeoutError = new Error(
+		// 	`HeartBeat failure with ${this._peerHost}:${this._peerPort}`,
+		// )
+
+		const deadError = new Error(
+			`Connection dead with ${this._peerHost}:${this._peerPort}`,
+		)
+
+		// timeout triggered if no connection state response received
+		this.runTimer(
+			KNXTimer.CONNECTION_STATE,
+			() => {
+				this.sysLogger.error(
+					`KNXClient: getConnectionStatus Timeout ${this._heartbeatFailures} out of ${this.max_HeartbeatFailures}`,
+				)
+				// this.emit(KNXClientEvents.error, timeoutError)
+
+				this._heartbeatFailures++
+				if (this._heartbeatFailures >= this.max_HeartbeatFailures) {
+					this._heartbeatFailures = 0
+					this.emit(KNXClientEvents.error, deadError)
+					this._setDisconnected(deadError.message)
+				}
+			},
+			1000 * KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT,
+		)
+		this._awaitingResponseType = KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
+		this._sendConnectionStateRequestMessage(this._channelID)
+
+		// schedule next heartbeat
+		this.runTimer(
+			KNXTimer.HEARTBEAT,
+			() => {
+				this._runHeartbeat()
+			},
+			1000 * this._options.connectionKeepAliveTimeout,
+		)
 	}
 
 	_getSeqNumber() {
 		return this._clientTunnelSeqNumber
 	}
 
-	// 26/12/2021 Handle the busy state, for example while waiting for ACK
+	/** 26/12/2021 Handle the busy state, for example while waiting for ACK */
 	_getClearToSend() {
 		return this._clearToSend !== undefined ? this._clearToSend : true
 	}
@@ -1046,7 +1053,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._options.ipAddr || 'No Peer host detected'
 			}`,
 		)
-		this.clearTimer(KNXTimer.ACK)
 		this.runTimer(
 			KNXTimer.ACK,
 			() => {
@@ -1199,7 +1205,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.runTimer(
 					KNXTimer.DISCONNECT,
 					() => {
-						// 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
 						this._setDisconnected(
 							`Received KNX packet: DISCONNECT_REQUEST, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 						)
@@ -1401,7 +1406,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 	}
 
-	_sendConnectRequestMessage(cri) {
+	_sendConnectRequestMessage(cri: TunnelCRI) {
 		// try {
 		//   const oHPAI = new HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
 		//   this.send(KNXProtocol.newKNXConnectRequest(cri, null, oHPAI))
@@ -1411,7 +1416,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.send(KNXProtocol.newKNXConnectRequest(cri))
 	}
 
-	_sendConnectionStateRequestMessage(channelID) {
+	_sendConnectionStateRequestMessage(channelID: number) {
 		// try {
 		//   const oHPAI = new HPAI.HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
 		//   this.send(KNXProtocol.newKNXConnectionStateRequest(channelID, oHPAI))
@@ -1421,7 +1426,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.send(KNXProtocol.newKNXConnectionStateRequest(channelID))
 	}
 
-	_sendDisconnectRequestMessage(channelID) {
+	_sendDisconnectRequestMessage(channelID: number) {
 		// try {
 		//   const oHPAI = new HPAI.HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
 		//   this.send(KNXProtocol.newKNXDisconnectRequest(channelID, oHPAI))
@@ -1432,13 +1437,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	_sendDisconnectResponseMessage(
-		channelID,
+		channelID: number,
 		status = ConnectionStatus.E_NO_ERROR,
 	) {
 		this.send(KNXProtocol.newKNXDisconnectResponse(channelID, status))
 	}
 
-	_sendSecureSessionRequestMessage(cri) {
+	_sendSecureSessionRequestMessage(cri: TunnelCRI) {
 		const oHPAI = new HPAI(
 			'0.0.0.0',
 			0,
