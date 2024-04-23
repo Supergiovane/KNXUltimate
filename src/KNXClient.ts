@@ -166,6 +166,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _awaitingResponseType: number
 
+	private _awaitingResponsePromise: Promise<void>
+
 	private _clientSocket: UDPSocket | TCPSocket
 
 	private sysLogger: Logger
@@ -878,9 +880,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
 			// TCP
-			const timeoutError = new Error(
-				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
-			)
+			// const timeoutError = new Error(
+			// 	`Connection timeout to ${this._peerHost}:${this._peerPort}`,
+			// )
 			this._clientSocket.connect(this._peerPort, this._peerHost, () => {
 				// this._timer = setTimeout(() => {
 				//     this._timer = null;
@@ -953,8 +955,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._awaitingResponseType = KNX_CONSTANTS.DISCONNECT_RESPONSE
 		this._sendDisconnectRequestMessage(this._channelID)
 
-		// wait for response
-		await wait(2000)
+		// wait for disconnect event or at most 2 seconds
+		await Promise.race([
+			new Promise((resolve) => {
+				this.once(KNXClientEvents.disconnected, resolve)
+			}),
+			wait(2000),
+		])
+
 		// 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
 		if (this._connectionState !== ConncetionState.DISCONNECTED) {
 			this._setDisconnected(
