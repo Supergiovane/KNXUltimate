@@ -15,7 +15,12 @@ const possibleLevels: LogLevel[] = [
 ]
 let logger: Logger
 
-export type KNXLoggerOptions = { loglevel?: LogLevel; debug?: boolean }
+export type KNXLoggerOptions = {
+	/** The log level to use */
+	loglevel?: LogLevel
+	/** Set it to true to enable max log level */
+	debug?: boolean
+}
 
 /*
  * Logger-Level importance levels:
