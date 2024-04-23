@@ -43,7 +43,7 @@ npm run release -- major --preRelease=beta
 To create consecutives beta patches:
 
 ```bash
-npm run release --preRelease=beta
+npm run release -- --preRelease=beta
 ```
 
 ## Testing

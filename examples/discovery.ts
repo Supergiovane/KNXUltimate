@@ -1,4 +1,4 @@
-import { KNXClientEvents, KNXClient, dptlib } from "../src";
+import { KNXClient } from "../src";
 
 async function main() {
     const discovered = await KNXClient.discover();

@@ -126,12 +126,27 @@ export function getDecodedKeyring() {
 	return jKNXSecureKeyring
 }
 
+export enum KNXTimer {
+	/** Triggers when an ACK is not received in time */
+	ACK = 'ack',
+	/** Delay between heartbeats */
+	HEARTBEAT = 'heartbeat',
+	/** Triggers when no connection state response is received  */
+	CONNECTION_STATE = 'connection_state',
+	/** Waiting for a connect response */
+	CONNECTION = 'connection',
+	/** Delay before sending the connect request */
+	CONNECT_REQUEST = 'connect_request',
+	/** Delay after receiving a disconnect request */
+	DISCONNECT = 'disconnect',
+	/** Waits for discovery responses */
+	DISCOVERY = 'discovery',
+}
+
 export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks> {
 	private _channelID: number
 
 	private _connectionState: string
-
-	private _timerWaitingForACK: null | NodeJS.Timeout
 
 	private _numFailedTelegramACK: number
 
@@ -143,19 +158,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _peerPort: number
 
-	private _connectionTimeoutTimer: null | NodeJS.Timeout
-
 	private _heartbeatFailures: number
 
 	private _heartbeatRunning: boolean
 
 	private max_HeartbeatFailures: number
 
-	private _heartbeatTimer: null | NodeJS.Timeout
-
-	private _discovery_timer: null | NodeJS.Timeout
-
 	private _awaitingResponseType: number
+
+	private _awaitingResponsePromise: Promise<void>
 
 	private _clientSocket: UDPSocket | TCPSocket
 
@@ -167,14 +178,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private_clearToSend: boolean
 
-	private _timerTimeoutSendDisconnectRequestMessage: null | NodeJS.Timeout
-
 	private _clearToSend: boolean
+
+	private timers: Map<KNXTimer, NodeJS.Timeout>
 
 	public physAddr: KNXAddress
 
 	constructor(options: KNXClientOptions) {
 		super()
+
+		this.timers = new Map()
 
 		if (options === undefined) {
 			options = optionsDefaults
@@ -192,7 +205,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		this._channelID = null
 		this._connectionState = ConncetionState.DISCONNECTED
-		this._timerWaitingForACK = null
 		this._numFailedTelegramACK = 0
 		this._clientTunnelSeqNumber = -1
 		this._options.connectionKeepAliveTimeout =
@@ -200,11 +212,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._peerHost = this._options.ipAddr
 		this._peerPort = parseInt(this._options.ipPort as string, 10)
 		this._options.localSocketAddress = options.localSocketAddress
-		this._connectionTimeoutTimer = null
 		this._heartbeatFailures = 0
 		this.max_HeartbeatFailures = 3
-		this._heartbeatTimer = null
-		this._discovery_timer = null
 		this._awaitingResponseType = null
 		this._clientSocket = null
 		this.jKNXSecureKeyring = this._options.jKNXSecureKeyring
@@ -347,6 +356,51 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		return new KNXDataBuffer(adpu.data, datapoint)
+	}
+
+	/** Waits till providden event occurs for at most the providden timeout */
+	private async waitForEvent(event: KNXClientEvents, timeout: number) {
+		return Promise.race<void>([
+			new Promise((resolve) => {
+				this.once(event, resolve)
+			}),
+			wait(timeout),
+		])
+	}
+
+	private setTimer(type: KNXTimer, cb: () => void, delay: number) {
+		if (this.timers.has(type)) {
+			clearTimeout(this.timers.get(type))
+			this.timers.delete(type)
+			// TODO: should we throw error?
+			this.sysLogger.warn(`Timer "${type}" was already running`)
+		}
+
+		this.timers.set(
+			type,
+			setTimeout(() => {
+				this.timers.delete(type)
+				cb()
+			}, delay),
+		)
+	}
+
+	private clearTimer(type: KNXTimer) {
+		if (this.timers.has(type)) {
+			clearTimeout(this.timers.get(type))
+			this.timers.delete(type)
+		}
+	}
+
+	private clearAllTimers() {
+		// use dedicated methods where possible
+		this.stopDiscovery()
+		this.stopHeartBeat()
+
+		// clear all other timers
+		for (const timer of this.timers.keys()) {
+			this.clearTimer(timer)
+		}
 	}
 
 	send(knxPacket: KNXPacket): void {
@@ -723,37 +777,41 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	stopHeartBeat(): void {
-		if (this._heartbeatTimer !== null) {
-			this._heartbeatRunning = false
-			clearTimeout(this._heartbeatTimer)
-		}
+		this._heartbeatRunning = false
+		this.clearTimer(KNXTimer.HEARTBEAT)
+		this.clearTimer(KNXTimer.CONNECTION_STATE)
 	}
 
 	isDiscoveryRunning() {
-		return this._discovery_timer != null
+		return this.timers.has(KNXTimer.DISCOVERY)
 	}
 
 	startDiscovery() {
 		if (this.isDiscoveryRunning()) {
 			throw new Error('Discovery already running')
 		}
-		this._discovery_timer = setTimeout(() => {
-			this._discovery_timer = null
-		}, 1000 * KNX_CONSTANTS.SEARCH_TIMEOUT)
+		this.setTimer(
+			KNXTimer.DISCOVERY,
+			() => {},
+			1000 * KNX_CONSTANTS.SEARCH_TIMEOUT,
+		)
 		this._sendSearchRequestMessage()
 	}
 
 	stopDiscovery() {
-		if (!this.isDiscoveryRunning()) {
-			return
-		}
-		if (this._discovery_timer !== null) clearTimeout(this._discovery_timer)
-		this._discovery_timer = null
+		this.clearTimer(KNXTimer.DISCOVERY)
 	}
 
-	public static async discover(eth?: string, timeout = 5000) {
+	/** Returns an array of discovered KNX interfaces in the format "<ip>:<port>" */
+	public static async discover(timeout?: number): Promise<string[]>
+	public static async discover(eth?: string | number, timeout = 5000) {
+		if (typeof eth === 'number') {
+			timeout = eth
+			eth = undefined
+		}
+
 		const client = new KNXClient({
-			interface: eth,
+			interface: eth as string,
 			hostProtocol: 'Multicast',
 		})
 
@@ -766,7 +824,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		client.startDiscovery()
 
 		await wait(timeout)
-		client.stopDiscovery()
 		await client.Disconnect()
 
 		return discovered
@@ -804,8 +861,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
 		this._clearToSend = true // 26/12/2021 allow to send
 
-		if (this._connectionTimeoutTimer !== null)
-			clearTimeout(this._connectionTimeoutTimer)
+		this.clearTimer(KNXTimer.CONNECTION)
 
 		// Emit connecting
 		this.emit(KNXClientEvents.connecting, this._options)
@@ -815,21 +871,28 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const timeoutError = new Error(
 				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
 			)
-			this._connectionTimeoutTimer = setTimeout(() => {
-				this._connectionTimeoutTimer = null
-				this.emit(KNXClientEvents.error, timeoutError)
-			}, 1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT)
+			this.setTimer(
+				KNXTimer.CONNECTION,
+				() => {
+					this.emit(KNXClientEvents.error, timeoutError)
+				},
+				1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
+			)
 			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
 			this._clientTunnelSeqNumber = -1
-			// 27/06/2023, leave some time to the dgram, do do the bind and read local ip and local port
-			const t = setTimeout(() => {
-				this._sendConnectRequestMessage(new TunnelCRI(knxLayer))
-			}, 2000)
+			// 27/06/2023, leave some time to the dgram, to do the bind and read local ip and local port
+			this.setTimer(
+				KNXTimer.CONNECT_REQUEST,
+				() => {
+					this._sendConnectRequestMessage(new TunnelCRI(knxLayer))
+				},
+				2000,
+			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
 			// TCP
-			const timeoutError = new Error(
-				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
-			)
+			// const timeoutError = new Error(
+			// 	`Connection timeout to ${this._peerHost}:${this._peerPort}`,
+			// )
 			this._clientSocket.connect(this._peerPort, this._peerHost, () => {
 				// this._timer = setTimeout(() => {
 				//     this._timer = null;
@@ -853,35 +916,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._clientTunnelSeqNumber = -1
 			this.emit(KNXClientEvents.connected, this._options)
 		}
-	}
-
-	getConnectionStatus() {
-		if (this._clientSocket == null) {
-			throw new Error('No client socket defined')
-		}
-		const timeoutError = new Error(
-			`HeartBeat failure with ${this._peerHost}:${this._peerPort}`,
-		)
-		const deadError = new Error(
-			`Connection dead with ${this._peerHost}:${this._peerPort}`,
-		)
-
-		this._heartbeatTimer = setTimeout(() => {
-			this._heartbeatTimer = null
-			this.sysLogger.error(
-				`KNXClient: getConnectionStatus Timeout ${this._heartbeatFailures} out of ${this.max_HeartbeatFailures}`,
-			)
-			// this.emit(KNXClientEvents.error, timeoutError)
-
-			this._heartbeatFailures++
-			if (this._heartbeatFailures >= this.max_HeartbeatFailures) {
-				this._heartbeatFailures = 0
-				this.emit(KNXClientEvents.error, deadError)
-				this._setDisconnected(deadError.message)
-			}
-		}, 1000 * KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT)
-		this._awaitingResponseType = KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
-		this._sendConnectionStateRequestMessage(this._channelID)
 	}
 
 	private async closeSocket() {
@@ -908,6 +942,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		if (this._clientSocket === null) {
 			throw new Error('No client socket defined')
 		}
+
+		if (this._connectionState === ConncetionState.DISCONNECTING) {
+			throw new Error('Already disconnecting')
+		}
+
+		// clear active timers
+		this.clearAllTimers()
+
+		this._connectionState = ConncetionState.DISCONNECTING
+
 		// 20/04/2022 this._channelID === null can happen when the KNX Gateway is already disconnected
 		if (this._channelID === null) {
 			// 11/10/2022 Close the socket
@@ -917,14 +961,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			await this.closeSocket()
 			return
 		}
-		this.stopHeartBeat()
-		this._connectionState = ConncetionState.DISCONNECTING
 
 		this._awaitingResponseType = KNX_CONSTANTS.DISCONNECT_RESPONSE
 		this._sendDisconnectRequestMessage(this._channelID)
 
-		// wait for response
-		await wait(2000)
+		// wait for disconnect event or at most 2 seconds
+		await this.waitForEvent(KNXClientEvents.disconnected, 2000)
+
 		// 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
 		if (this._connectionState !== ConncetionState.DISCONNECTED) {
 			this._setDisconnected(
@@ -942,12 +985,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			`KNXClient: called _setDisconnected ${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
 		)
 		this._connectionState = ConncetionState.DISCONNECTED
-		this.stopHeartBeat()
-		this._timerTimeoutSendDisconnectRequestMessage = null
-		if (this._connectionTimeoutTimer !== null)
-			clearTimeout(this._connectionTimeoutTimer)
-		if (this._timerWaitingForACK !== null)
-			clearTimeout(this._timerWaitingForACK)
+
+		// clear active timers
+		this.clearAllTimers()
+
 		this._clientTunnelSeqNumber = -1
 		this._channelID = null
 
@@ -961,20 +1002,58 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	_runHeartbeat() {
-		if (this._heartbeatRunning) {
-			this.getConnectionStatus()
-			const t = setTimeout(() => {
-				// 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
-				this._runHeartbeat()
-			}, 1000 * this._options.connectionKeepAliveTimeout)
+		if (!this._heartbeatRunning) {
+			return
 		}
+
+		if (this._clientSocket == null) {
+			throw new Error('No client socket defined')
+		}
+
+		// const timeoutError = new Error(
+		// 	`HeartBeat failure with ${this._peerHost}:${this._peerPort}`,
+		// )
+
+		const deadError = new Error(
+			`Connection dead with ${this._peerHost}:${this._peerPort}`,
+		)
+
+		// timeout triggered if no connection state response received
+		this.setTimer(
+			KNXTimer.CONNECTION_STATE,
+			() => {
+				this.sysLogger.error(
+					`KNXClient: getConnectionStatus Timeout ${this._heartbeatFailures} out of ${this.max_HeartbeatFailures}`,
+				)
+				// this.emit(KNXClientEvents.error, timeoutError)
+
+				this._heartbeatFailures++
+				if (this._heartbeatFailures >= this.max_HeartbeatFailures) {
+					this._heartbeatFailures = 0
+					this.emit(KNXClientEvents.error, deadError)
+					this._setDisconnected(deadError.message)
+				}
+			},
+			1000 * KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT,
+		)
+		this._awaitingResponseType = KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
+		this._sendConnectionStateRequestMessage(this._channelID)
+
+		// schedule next heartbeat
+		this.setTimer(
+			KNXTimer.HEARTBEAT,
+			() => {
+				this._runHeartbeat()
+			},
+			1000 * this._options.connectionKeepAliveTimeout,
+		)
 	}
 
 	_getSeqNumber() {
 		return this._clientTunnelSeqNumber
 	}
 
-	// 26/12/2021 Handle the busy state, for example while waiting for ACK
+	/** 26/12/2021 Handle the busy state, for example while waiting for ACK */
 	_getClearToSend() {
 		return this._clearToSend !== undefined ? this._clearToSend : true
 	}
@@ -1002,36 +1081,38 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._options.ipAddr || 'No Peer host detected'
 			}`,
 		)
-		if (this._timerWaitingForACK !== null)
-			clearTimeout(this._timerWaitingForACK)
-		this._timerWaitingForACK = setTimeout(() => {
-			this._numFailedTelegramACK += 1
-			if (this._numFailedTelegramACK > 2) {
-				this._numFailedTelegramACK = 0
-				// 08/04/2022 Emits the event informing that the last ACK has not been acknowledge.
-				this.emit(
-					KNXClientEvents.ackReceived,
-					knxTunnelingRequest,
-					false,
-				)
-				this._clearToSend = true
-				this.emit(KNXClientEvents.error, timeoutErr)
-				this.sysLogger.error(
-					`KNXClient: _setTimerWaitingForACK: ${
-						timeoutErr.message || 'Undef error'
-					} no ACK received. ABORT sending datagram with seqNumber ${this._getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
-				)
-			} else {
-				// 26/12/2021 // If no ACK received, resend the datagram once with the same sequence number
-				this._setTimerWaitingForACK(knxTunnelingRequest)
-				this.send(knxTunnelingRequest)
-				this.sysLogger.error(
-					`KNXClient: _setTimerWaitingForACK: ${
-						timeoutErr.message || 'Undef error'
-					} no ACK received. Retransmit datagram with seqNumber ${this._getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
-				)
-			}
-		}, KNX_CONSTANTS.TUNNELING_REQUEST_TIMEOUT * 1000)
+		this.setTimer(
+			KNXTimer.ACK,
+			() => {
+				this._numFailedTelegramACK += 1
+				if (this._numFailedTelegramACK > 2) {
+					this._numFailedTelegramACK = 0
+					// 08/04/2022 Emits the event informing that the last ACK has not been acknowledge.
+					this.emit(
+						KNXClientEvents.ackReceived,
+						knxTunnelingRequest,
+						false,
+					)
+					this._clearToSend = true
+					this.emit(KNXClientEvents.error, timeoutErr)
+					this.sysLogger.error(
+						`KNXClient: _setTimerWaitingForACK: ${
+							timeoutErr.message || 'Undef error'
+						} no ACK received. ABORT sending datagram with seqNumber ${this._getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
+					)
+				} else {
+					// 26/12/2021 // If no ACK received, resend the datagram once with the same sequence number
+					this._setTimerWaitingForACK(knxTunnelingRequest)
+					this.send(knxTunnelingRequest)
+					this.sysLogger.error(
+						`KNXClient: _setTimerWaitingForACK: ${
+							timeoutErr.message || 'Undef error'
+						} no ACK received. Retransmit datagram with seqNumber ${this._getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
+					)
+				}
+			},
+			KNX_CONSTANTS.TUNNELING_REQUEST_TIMEOUT * 1000,
+		)
 	}
 
 	_processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
@@ -1068,9 +1149,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			}
 
 			if (knxHeader.service_type === KNX_CONSTANTS.SEARCH_RESPONSE) {
-				if (this._discovery_timer == null) {
-					return
-				}
+				if (!this.isDiscoveryRunning()) return
+
 				this.emit(
 					KNXClientEvents.discover,
 					`${rinfo.address}:${rinfo.port}`,
@@ -1081,9 +1161,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				knxHeader.service_type === KNX_CONSTANTS.CONNECT_RESPONSE
 			) {
 				if (this._connectionState === ConncetionState.CONNECTING) {
-					if (this._connectionTimeoutTimer !== null)
-						clearTimeout(this._connectionTimeoutTimer)
-					this._connectionTimeoutTimer = null
+					this.clearTimer(KNXTimer.CONNECTION)
 					const knxConnectResponse = knxMessage as KNXConnectResponse
 					if (
 						knxConnectResponse.status !==
@@ -1104,8 +1182,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					}
 
 					// 16/03/2022
-					if (this._timerWaitingForACK !== null)
-						clearTimeout(this._timerWaitingForACK)
+					this.clearTimer(KNXTimer.ACK)
 
 					this._channelID = knxConnectResponse.channelID
 					this._connectionState = ConncetionState.CONNECTED
@@ -1153,12 +1230,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 
 				// 12/03/2021 Added 1 sec delay.
-				const t = setTimeout(() => {
-					// 21/03/2022 fixed possible memory leak. Previously was setTimeout without "let t = ".
-					this._setDisconnected(
-						`Received KNX packet: DISCONNECT_REQUEST, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-					)
-				}, 1000)
+				this.setTimer(
+					KNXTimer.DISCONNECT,
+					() => {
+						this._setDisconnected(
+							`Received KNX packet: DISCONNECT_REQUEST, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+						)
+					},
+					1000,
+				)
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.TUNNELING_REQUEST
 			) {
@@ -1230,8 +1310,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				// Check the received ACK sequence number
 				if (!this._options.suppress_ack_ldatareq) {
 					if (knxTunnelingAck.seqCounter === this._getSeqNumber()) {
-						if (this._timerWaitingForACK !== null)
-							clearTimeout(this._timerWaitingForACK)
+						this.clearTimer(KNXTimer.ACK)
 						this._numFailedTelegramACK = 0 // 25/12/2021 clear the current ACK failed telegram number
 						this._clearToSend = true // I'm ready to send a new datagram now
 						// 08/04/2022 Emits the event informing that the last ACK has been acknowledge.
@@ -1311,12 +1390,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 								`Awaiting response ${this._awaitingResponseType}, received connection state response  with status ${knxConnectionStateResponse.status}`,
 							)
 						} else {
-							if (this._heartbeatTimer !== null)
-								clearTimeout(this._heartbeatTimer)
+							this.clearTimer(KNXTimer.CONNECTION_STATE)
 							this._heartbeatFailures = 0
 						}
-					} else if (this._connectionTimeoutTimer !== null)
-						clearTimeout(this._connectionTimeoutTimer)
+					} else {
+						this.clearTimer(KNXTimer.CONNECTION)
+					}
 				}
 				this.emit(
 					KNXClientEvents.response,
@@ -1355,7 +1434,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 	}
 
-	_sendConnectRequestMessage(cri) {
+	_sendConnectRequestMessage(cri: TunnelCRI) {
 		// try {
 		//   const oHPAI = new HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
 		//   this.send(KNXProtocol.newKNXConnectRequest(cri, null, oHPAI))
@@ -1365,7 +1444,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.send(KNXProtocol.newKNXConnectRequest(cri))
 	}
 
-	_sendConnectionStateRequestMessage(channelID) {
+	_sendConnectionStateRequestMessage(channelID: number) {
 		// try {
 		//   const oHPAI = new HPAI.HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
 		//   this.send(KNXProtocol.newKNXConnectionStateRequest(channelID, oHPAI))
@@ -1375,7 +1454,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.send(KNXProtocol.newKNXConnectionStateRequest(channelID))
 	}
 
-	_sendDisconnectRequestMessage(channelID) {
+	_sendDisconnectRequestMessage(channelID: number) {
 		// try {
 		//   const oHPAI = new HPAI.HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
 		//   this.send(KNXProtocol.newKNXDisconnectRequest(channelID, oHPAI))
@@ -1386,13 +1465,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	_sendDisconnectResponseMessage(
-		channelID,
+		channelID: number,
 		status = ConnectionStatus.E_NO_ERROR,
 	) {
 		this.send(KNXProtocol.newKNXDisconnectResponse(channelID, status))
 	}
 
-	_sendSecureSessionRequestMessage(cri) {
+	_sendSecureSessionRequestMessage(cri: TunnelCRI) {
 		const oHPAI = new HPAI(
 			'0.0.0.0',
 			0,
