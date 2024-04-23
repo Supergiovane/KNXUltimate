@@ -81,17 +81,29 @@ export interface KNXClientEventCallbacks {
 const jKNXSecureKeyring: string = ''
 
 export type KNXClientOptions = {
-	physAddr: string
+	/** The physical address to be identified in the KNX bus */
+	physAddr?: string
+	/** Connection keep alive timeout. Time after which the connection is closed if no ping received */
 	connectionKeepAliveTimeout?: number
-	ipAddr: string
-	ipPort: number | string
-	hostProtocol: KNXClientProtocol
+	/** The IP of your KNX router/interface (for Routers, use "224.0.23.12") */
+	ipAddr?: string
+	/** The port, default is "3671" */
+	ipPort?: number | string
+	/** Default: "TunnelUDP". "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces, or "TunnelTCP" for secure KNX Interfaces (not yet implemented) */
+	hostProtocol?: KNXClientProtocol
+	/** True: Enables the secure connection. Leave false until KNX-Secure has been released. */
 	isSecureKNXEnabled?: boolean
+	/** Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true */
 	suppress_ack_ldatareq?: boolean
+	/** Leave true forever. This is used only in Node-Red KNX-Ultimate node */
 	localEchoInTunneling?: boolean
+	/** The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate */
 	localIPAddress?: string
+	/** Specifies the local eth interface to be used to connect to the KNX Bus. */
 	interface?: string
+	/** ETS Keyring JSON file content (leave blank until KNX-Secure has been released) */
 	jKNXSecureKeyring?: any
+	/** Local socket address. Automatically filled by KNXClient */
 	localSocketAddress?: string
 } & KNXLoggerOptions
 
@@ -717,25 +729,28 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 	}
 
-	// isDiscoveryRunning() {
-	//     return this._discovery_timer != null;
-	// }
-	// startDiscovery() {
-	//     if (this.isDiscoveryRunning()) {
-	//         throw new Error('Discovery already running');
-	//     }
-	//     this._discovery_timer = setTimeout(() => {
-	//         this._discovery_timer = null;
-	//     }, 1000 * KNX_CONSTANTS.SEARCH_TIMEOUT);
-	//     this._sendSearchRequestMessage();
-	// }
-	// stopDiscovery() {
-	//     if (!this.isDiscoveryRunning()) {
-	//         return;
-	//     }
-	//     if (this._discovery_timer !== null) clearTimeout(this._discovery_timer);
-	//     this._discovery_timer = null;
-	// }
+	isDiscoveryRunning() {
+		return this._discovery_timer != null
+	}
+
+	startDiscovery() {
+		if (this.isDiscoveryRunning()) {
+			throw new Error('Discovery already running')
+		}
+		this._discovery_timer = setTimeout(() => {
+			this._discovery_timer = null
+		}, 1000 * KNX_CONSTANTS.SEARCH_TIMEOUT)
+		this._sendSearchRequestMessage()
+	}
+
+	stopDiscovery() {
+		if (!this.isDiscoveryRunning()) {
+			return
+		}
+		if (this._discovery_timer !== null) clearTimeout(this._discovery_timer)
+		this._discovery_timer = null
+	}
+
 	// getDescription(host, port) {
 	//     if (this._clientSocket == null) {
 	//         throw new Error('No client socket defined');
@@ -1310,12 +1325,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	_sendSearchRequestMessage() {
-		// this.send(KNXProtocol.newKNXSearchRequest(new HPAI.HPAI(this._options.localIPAddress, this._localPort)), KNX_CONSTANTS.KNX_PORT, KNX_CONSTANTS.KNX_IP);
+		this.send(
+			KNXProtocol.newKNXSearchRequest(
+				new HPAI(this._options.localIPAddress, this._peerPort),
+			),
+			// KNX_CONSTANTS.KNX_PORT,
+			// KNX_CONSTANTS.KNX_IP,
+		)
 	}
 
 	_sendConnectRequestMessage(cri) {
 		// try {
-		//   const oHPAI = new HPAI.HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
+		//   const oHPAI = new HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
 		//   this.send(KNXProtocol.newKNXConnectRequest(cri, null, oHPAI))
 		// } catch (error) {
 		//   this.send(KNXProtocol.newKNXConnectRequest(cri))
