@@ -751,6 +751,27 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._discovery_timer = null
 	}
 
+	public static async discover(eth?: string, timeout = 5000) {
+		const client = new KNXClient({
+			interface: eth,
+			hostProtocol: 'Multicast',
+		})
+
+		const discovered: string[] = []
+
+		client.on(KNXClientEvents.discover, (host) => {
+			discovered.push(host)
+		})
+
+		client.startDiscovery()
+
+		await wait(timeout)
+		client.stopDiscovery()
+		await client.Disconnect()
+
+		return discovered
+	}
+
 	// getDescription(host, port) {
 	//     if (this._clientSocket == null) {
 	//         throw new Error('No client socket defined');

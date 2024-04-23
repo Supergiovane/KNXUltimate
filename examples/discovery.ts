@@ -1,13 +1,9 @@
 import { KNXClientEvents, KNXClient, dptlib } from "../src";
 
-const client = new KNXClient({
-    hostProtocol: 'Multicast',
-})
+async function main() {
+    const discovered = await KNXClient.discover();
 
+    console.log(discovered);
+}
 
-client.on(KNXClientEvents.discover, (host) => {
-    console.log(`Discovered KNX gateway at ${host}`)
-})
-
-
-client.startDiscovery()
+main().catch(console.error);
