@@ -368,7 +368,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		])
 	}
 
-	private runTimer(type: KNXTimer, cb: () => void, delay: number) {
+	private setTimer(type: KNXTimer, cb: () => void, delay: number) {
 		if (this.timers.has(type)) {
 			clearTimeout(this.timers.get(type))
 			this.timers.delete(type)
@@ -790,7 +790,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		if (this.isDiscoveryRunning()) {
 			throw new Error('Discovery already running')
 		}
-		this.runTimer(
+		this.setTimer(
 			KNXTimer.DISCOVERY,
 			() => {},
 			1000 * KNX_CONSTANTS.SEARCH_TIMEOUT,
@@ -871,7 +871,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const timeoutError = new Error(
 				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
 			)
-			this.runTimer(
+			this.setTimer(
 				KNXTimer.CONNECTION,
 				() => {
 					this.emit(KNXClientEvents.error, timeoutError)
@@ -881,7 +881,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
 			this._clientTunnelSeqNumber = -1
 			// 27/06/2023, leave some time to the dgram, to do the bind and read local ip and local port
-			this.runTimer(
+			this.setTimer(
 				KNXTimer.CONNECT_REQUEST,
 				() => {
 					this._sendConnectRequestMessage(new TunnelCRI(knxLayer))
@@ -1019,7 +1019,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 
 		// timeout triggered if no connection state response received
-		this.runTimer(
+		this.setTimer(
 			KNXTimer.CONNECTION_STATE,
 			() => {
 				this.sysLogger.error(
@@ -1040,7 +1040,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._sendConnectionStateRequestMessage(this._channelID)
 
 		// schedule next heartbeat
-		this.runTimer(
+		this.setTimer(
 			KNXTimer.HEARTBEAT,
 			() => {
 				this._runHeartbeat()
@@ -1081,7 +1081,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._options.ipAddr || 'No Peer host detected'
 			}`,
 		)
-		this.runTimer(
+		this.setTimer(
 			KNXTimer.ACK,
 			() => {
 				this._numFailedTelegramACK += 1
@@ -1230,7 +1230,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 
 				// 12/03/2021 Added 1 sec delay.
-				this.runTimer(
+				this.setTimer(
 					KNXTimer.DISCONNECT,
 					() => {
 						this._setDisconnected(
