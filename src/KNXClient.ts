@@ -127,11 +127,19 @@ export function getDecodedKeyring() {
 }
 
 export enum KNXTimer {
+	/** Triggers when an ACK is not received in time */
 	ACK = 'ack',
+	/** Delay between heartbeats */
 	HEARTBEAT = 'heartbeat',
+	/** Triggers when no connection state response is received  */
 	CONNECTION_STATE = 'connection_state',
+	/** Waiting for a connect response */
+	CONNECTION = 'connection',
+	/** Delay before sending the connect request */
 	CONNECT_REQUEST = 'connect_request',
+	/** Delay after receiving a disconnect request */
 	DISCONNECT = 'disconnect',
+	/** Waits for discovery responses */
 	DISCOVERY = 'discovery',
 }
 
@@ -782,9 +790,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.clearTimer(KNXTimer.DISCOVERY)
 	}
 
-	public static async discover(eth?: string, timeout = 5000) {
+	/** Returns an array of discovered KNX interfaces in the format "<ip>:<port>" */
+	public static async discover(timeout?: number): Promise<string[]>
+	public static async discover(eth?: string | number, timeout = 5000) {
+		if (typeof eth === 'number') {
+			timeout = eth
+			eth = undefined
+		}
+
 		const client = new KNXClient({
-			interface: eth,
+			interface: eth as string,
 			hostProtocol: 'Multicast',
 		})
 
@@ -834,7 +849,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
 		this._clearToSend = true // 26/12/2021 allow to send
 
-		this.clearTimer(KNXTimer.CONNECT_REQUEST)
+		this.clearTimer(KNXTimer.CONNECTION)
 
 		// Emit connecting
 		this.emit(KNXClientEvents.connecting, this._options)
@@ -845,7 +860,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
 			)
 			this.runTimer(
-				KNXTimer.CONNECT_REQUEST,
+				KNXTimer.CONNECTION,
 				() => {
 					this.emit(KNXClientEvents.error, timeoutError)
 				},
@@ -853,7 +868,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
 			this._clientTunnelSeqNumber = -1
-			// 27/06/2023, leave some time to the dgram, do do the bind and read local ip and local port
+			// 27/06/2023, leave some time to the dgram, to do the bind and read local ip and local port
 			this.runTimer(
 				KNXTimer.CONNECT_REQUEST,
 				() => {
@@ -1133,7 +1148,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				knxHeader.service_type === KNX_CONSTANTS.CONNECT_RESPONSE
 			) {
 				if (this._connectionState === ConncetionState.CONNECTING) {
-					this.clearTimer(KNXTimer.CONNECT_REQUEST)
+					this.clearTimer(KNXTimer.CONNECTION)
 					const knxConnectResponse = knxMessage as KNXConnectResponse
 					if (
 						knxConnectResponse.status !==
@@ -1366,7 +1381,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							this._heartbeatFailures = 0
 						}
 					} else {
-						this.clearTimer(KNXTimer.CONNECT_REQUEST)
+						this.clearTimer(KNXTimer.CONNECTION)
 					}
 				}
 				this.emit(

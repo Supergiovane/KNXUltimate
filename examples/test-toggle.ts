@@ -10,20 +10,22 @@ const groupAddress = process.argv[2]
 
 let client: KNXClient
 
-function initClient() {
+async function initClient() {
+	const interfaces = await KNXClient.discover(1000)
+
+	console.log('Discovered interfaces:', interfaces)
+
+	const [ip, port] = interfaces[0].split(':')
+
+	console.log('Connecting to', ip, port)
+
 	client = new KNXClient({
-		ipAddr: '192.168.1.116',
-		// ipAddr: '224.0.23.12',
-		ipPort: '3671',
-		physAddr: '15.15.15',
+		ipAddr: ip,
+		ipPort: port,
 		loglevel: 'trace',
-		interface: 'wlp2s0',
 		suppress_ack_ldatareq: false,
-		localEchoInTunneling: true, // Leave true, forever.
-		hostProtocol: 'TunnelUDP', // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
-		//isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
-		//jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
-		localIPAddress: '' // Leave blank, will be automatically filled by KNXUltimate
+		localEchoInTunneling: true,
+		hostProtocol: 'TunnelUDP', 
 	})
 	
 	client.on(KNXClientEvents.connected, info => {
