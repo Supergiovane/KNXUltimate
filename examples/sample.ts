@@ -83,7 +83,7 @@ let knxUltimateClientProperties: KNXClientOptions = {
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
 };
 
-var knxUltimateClient;
+let knxUltimateClient: KNXClient;
 
 // If you're reinstantiating a new knxUltimateClient object, you must remove all listeners.
 // If this is the first time you instantiate tne knxUltimateClient object, this part of code throws an error into the try...catch.
@@ -98,7 +98,47 @@ knxUltimateClient = new KNXClient(knxUltimateClientProperties);
 
 // Setting handlers
 // ######################################
-knxUltimateClient.on(KNXClientEvents.indication, handleBusEvents);
+knxUltimateClient.on(KNXClientEvents.indication, (datagram, echoed) => {
+
+    // This function is called whenever a KNX telegram arrives from BUS
+
+    // Get the event
+    let event = "";
+    let dpt = "";
+    let jsValue: any;
+
+    if (datagram.cEMIMessage.npdu.isGroupRead) event = "GroupValue_Read";
+    if (datagram.cEMIMessage.npdu.isGroupResponse) event = "GroupValue_Response";
+    if (datagram.cEMIMessage.npdu.isGroupWrite) event = "GroupValue_Write";
+    // Get the source Address
+    let src = datagram.cEMIMessage.srcAddress.toString();
+    // Get the destination GA
+    let dst = datagram.cEMIMessage.dstAddress.toString()
+    // Get the RAW Value
+    let rawvalue = datagram.cEMIMessage.npdu.dataValue;
+
+    // Decode the telegram. 
+    if (dst === "0/1/1") {
+        // We know that 0/1/1 is a boolean DPT 1.001
+        const config = dptlib.resolve("1.001");
+        jsValue = dptlib.fromBuffer(rawvalue, config)
+    } else if (dst === "0/1/2") {
+        // We know that 0/1/2 is a boolean DPT 232.600 Color RGB
+        const config = dptlib.resolve("232.600");
+        jsValue = dptlib.fromBuffer(rawvalue, config)
+    } else {
+        // All others... assume they are boolean
+        const config = dptlib.resolve("1.001");
+        jsValue = dptlib.fromBuffer(rawvalue, config)
+        if (jsValue === null) {
+            // Is null, try if it's a numerical value
+            const config = dptlib.resolve("5.001");
+            jsValue = dptlib.fromBuffer(rawvalue, config)
+        }
+    }
+    console.log("src: " + src + " dest: " + dst, " event: " + event, " value: " + jsValue);
+
+});
 knxUltimateClient.on(KNXClientEvents.error, err => {
     // Error event
     console.log("Error", err)
@@ -107,9 +147,9 @@ knxUltimateClient.on(KNXClientEvents.disconnected, info => {
     // The client is disconnected. Here you can handle the reconnection
     console.log("Disconnected", info)
 });
-knxUltimateClient.on(KNXClientEvents.close, info => {
+knxUltimateClient.on(KNXClientEvents.close, () => {
     // The client physical net socket has been closed
-    console.log("Closed", info)
+    console.log("Closed")
 });
 knxUltimateClient.on(KNXClientEvents.ackReceived, (knxMessage, info) => {
     // In -->tunneling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
@@ -124,24 +164,24 @@ knxUltimateClient.on(KNXClientEvents.connected, info => {
     // Check wether knxUltimateClient is clear to send the next telegram.
     // This should be called bevore any .write, .response, and .read request.
     // If not clear to send, retry later because the knxUltimateClient is busy in sending another telegram.
-    console.log("Clear to send: " + knxUltimateClient._getClearToSend())
+    console.log("Clear to send: " + knxUltimateClient.clearToSend)
 
     // // Send a WRITE telegram to the KNX BUS
     // // You need: group address, payload (true/false/or any message), datapoint as string
     let payload: any = false;
-    if (knxUltimateClient._getClearToSend()) knxUltimateClient.write("0/1/1", payload, "1.001");
+    if (knxUltimateClient.clearToSend) knxUltimateClient.write("0/1/1", payload, "1.001");
 
     // Send a color RED to an RGB datapoint
     payload = { red: 125, green: 0, blue: 0 };
-    if (knxUltimateClient._getClearToSend()) knxUltimateClient.write("0/1/2", payload, "232.600");
+    if (knxUltimateClient.clearToSend) knxUltimateClient.write("0/1/2", payload, "232.600");
 
     // // Send a READ request to the KNX BUS
-    if (knxUltimateClient._getClearToSend()) knxUltimateClient.read("0/0/1");
+    if (knxUltimateClient.clearToSend) knxUltimateClient.read("0/0/1");
 
     // Send a RESPONSE telegram to the KNX BUS
     // You need: group address, payload (true/false/or any message), datapoint as string
     payload = false;
-    if (knxUltimateClient._getClearToSend()) knxUltimateClient.respond("0/0/1", payload, "1.001");
+    if (knxUltimateClient.clearToSend) knxUltimateClient.respond("0/0/1", payload, "1.001");
 
 });
 knxUltimateClient.on(KNXClientEvents.connecting, info => {
@@ -151,49 +191,6 @@ knxUltimateClient.on(KNXClientEvents.connecting, info => {
 // ######################################
 
 knxUltimateClient.Connect();
-
-// Handle BUS events
-// ---------------------------------------------------------------------------------------
-function handleBusEvents(_datagram, _echoed) {
-
-    // This function is called whenever a KNX telegram arrives from BUS
-
-    // Get the event
-    let _evt = "";
-    let dpt = "";
-    let jsValue;
-    if (_datagram.cEMIMessage.npdu.isGroupRead) _evt = "GroupValue_Read";
-    if (_datagram.cEMIMessage.npdu.isGroupResponse) _evt = "GroupValue_Response";
-    if (_datagram.cEMIMessage.npdu.isGroupWrite) _evt = "GroupValue_Write";
-    // Get the source Address
-    let _src = _datagram.cEMIMessage.srcAddress.toString();
-    // Get the destination GA
-    let _dst = _datagram.cEMIMessage.dstAddress.toString()
-    // Get the RAW Value
-    let _Rawvalue = _datagram.cEMIMessage.npdu.dataValue;
-
-    // Decode the telegram. 
-    if (_dst === "0/1/1") {
-        // We know that 0/1/1 is a boolean DPT 1.001
-        const config = dptlib.resolve("1.001");
-        jsValue = dptlib.fromBuffer(_Rawvalue, config)
-    } else if (_dst === "0/1/2") {
-        // We know that 0/1/2 is a boolean DPT 232.600 Color RGB
-        const config = dptlib.resolve("232.600");
-        jsValue = dptlib.fromBuffer(_Rawvalue, config)
-    } else {
-        // All others... assume they are boolean
-        const config = dptlib.resolve("1.001");
-        jsValue = dptlib.fromBuffer(_Rawvalue, config)
-        if (jsValue === null) {
-            // Is null, try if it's a numerical value
-            const config = dptlib.resolve("5.001");
-            jsValue = dptlib.fromBuffer(_Rawvalue, config)
-        }
-    }
-    console.log("src: " + _src + " dest: " + _dst, " event: " + _evt, " value: " + jsValue);
-
-}
 
 // Disconnect after 20 secs.
 setTimeout(() => {
