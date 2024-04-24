@@ -1,7 +1,6 @@
 ![Logo](img/logo-big.png)
 
-<br/>
-
+[![CI](https://github.com/Supergiovane/KNXUltimate/actions/workflows/ci.yml/badge.svg)](https://github.com/Supergiovane/KNXUltimate/actions/workflows/ci.yml)
 [![NPM version][npm-version-image]][npm-url]
 [![NPM downloads per month][npm-downloads-month-image]][npm-url]
 [![NPM downloads total][npm-downloads-total-image]][npm-url]
@@ -10,24 +9,16 @@
 [![Youtube][youtube-image]][youtube-url]
 [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square)](https://www.paypal.me/techtoday)
 
-<br/>
-
 Control your KNX intallation via Node.js!
 
 > This is the official engine of Node-Red node KNX-Ultimate (<https://flows.nodered.org/node/node-red-contrib-knx-ultimate>)
 > I had many users asking for a node.js release of that engine, so here is it.
 > The node will be KNX Secure compatible. I'm already working on that.
 
-<br/>
-<br/>
-
 ## CHANGELOG
 
 * [Changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOG.md)
 * [Developer's changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOGDEV.md)
-
-<br/>
-<br/>
 
 **Properties to be passed to the connection(see the knxUltimateClientProperties variable below)**
 
@@ -45,9 +36,6 @@ Control your KNX intallation via Node.js!
 | localIPAddress (string) | The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate |
 | interface (string) | Specifies the local eth interface to be used to connect to the KNX Bus.|
 
-<br/>
-<br/>
-
 **Supported Datapoints**
 
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
@@ -58,9 +46,6 @@ You should see something like this in the console window (the **msg.payload** is
 
 <img src='https://raw.githubusercontent.com/Supergiovane/knxultimate/master/img/dpt.png' width='60%'>
 
-<br/>
-<br/>
-
 ## CONTROL THE CLIENT
 
 |Method|Description|
@@ -68,26 +53,19 @@ You should see something like this in the console window (the **msg.payload** is
 | .Connect() | Connects to the KNX Gateway |
 | .Disconnect() | Gracefully disconnects from the KNX Gateway |
 | .write (GA, payload, datapoint) | Sends a WRITE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
+| .writeRaw (GA, payload, datapoint) | Sends a WRITE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the buffer you want to send, **datapoint** is a string representing the datapoint (for example "5.001") |
 | .respond (GA, payload, datapoint) | Sends a RESPONSE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
 | .read (GA) | Sends a READ telegram to the BUS. **GA** is the group address (for example "0/0/1").|
-
-<br/>
-<br/>
 
 |Properties|Description|
 |--|--|
 | .isConnected() | Returns **true** if you the client is connected to the KNX Gateway Router/Interface, **false** if not connected. |
-| ._getClearToSend() | Returns **true** if you can send a telegram, **false** if the client is still waiting for the last telegram's ACK or whenever the client cannot temporary send the telegram. In tunneling mode, you could also refer to the event **KNXClientEvents.ackReceived**, that is fired everytime a telegram has been succesfully acknowledge or not acknowledge. See the sample.js file. |
-
-<br/>
-<br/>
+| .clearToSend | **true** if you can send a telegram, **false** if the client is still waiting for the last telegram's ACK or whenever the client cannot temporary send the telegram. In tunneling mode, you could also refer to the event **KNXClientEvents.ackReceived**, that is fired everytime a telegram has been succesfully acknowledge or not acknowledge. See the sample.js file. |
+| .channelID | The actual Channel ID. Only defined after a successfull connection |
 
 ## EVENTS
 
 Please see the sample.js file. This sample contains all events triggered by KNXUltimate.
-
-<br/>
-<br/>
 
 ## DECONDING THE TELEGRAMS FROM BUS
 
@@ -100,9 +78,6 @@ let dpt = dptlib.resolve("1.001");
 let jsValue = dptlib.fromBuffer(RAW VALUE (SEE SAMPLES), dpt); // THIS IS THE DECODED VALUE
 ```
 
-<br/>
-<br/>
-
 ## Examples
 
 You can find all examples in the [examples](./examples/) folder:
@@ -112,9 +87,6 @@ You can find all examples in the [examples](./examples/) folder:
 * [discovery](./examples/discovery.ts) - A simple example that shows how to discover KNX devices on the network.
 * [test-toggle](./examples/test-toggle.ts) - An interactive example that shows how to toggle a switch on/off.
 * [sampleSecure](./examples/sampleSecure.ts) - A full featured example that shows how to connect to the KNX bus and send/receive telegrams in secure mode.
-
-<br/>
-<br/>
 
 ## SUGGESTION
 >
