@@ -1,5 +1,13 @@
 
 
+## [2.1.2](https://github.com/Supergiovane/KNXUltimate/compare/v2.1.1...v2.1.2) (2024-04-24)
+
+
+### Bug Fixes
+
+* refactor method names and added js docs ([#19](https://github.com/Supergiovane/KNXUltimate/issues/19)) ([432db89](https://github.com/Supergiovane/KNXUltimate/commit/432db89ac4a43be1a8037c4dbcd3cee8fe311e10))
+* wrong overload of `discovery` method ([a41b65c](https://github.com/Supergiovane/KNXUltimate/commit/a41b65c537890177728708ec6d64282bab9df1ef))
+
 ## [2.1.1](https://github.com/Supergiovane/KNXUltimate/compare/v2.1.0...v2.1.1) (2024-04-23)
 
 
