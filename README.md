@@ -22,6 +22,8 @@ Control your KNX intallation via Node.js!
 
 **Properties to be passed to the connection(see the knxUltimateClientProperties variable below)**
 
+## PLEASE TAKE NOTE THAT KNX SECURE IS STILL UNDER DEVELOPMENT AND IT YET DOES NOT WORK.
+
 |Property|Description|
 |--|--|
 | ipAddr (string) | The IP of your KNX router/interface (for Routers, use "224.0.23.12") |
