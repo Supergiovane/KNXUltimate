@@ -25,7 +25,7 @@ Control your KNX intallation via Node.js!
 | KNX Tunnelling | ![](https://placehold.co/200x20/green/white?text=YES) |
 | KNX Routing | ![](https://placehold.co/200x20/green/white?text=YES) |
 | KNX Secure Tunnelling | ![](https://placehold.co/200x20/orange/white?text=UNDER+DEVELOPMENT) |
-| KNX Secure Routing | ![](https://placehold.co/200x20/red/white?text=no) |
+| KNX Secure Routing | ![](https://placehold.co/200x20/red/white?text=NO) |
 | KNX 3rd PARTY IOT API | ![](https://placehold.co/200x20/orange/white?text=UNDER+DEVELOPMENT) |
 
 
