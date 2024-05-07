@@ -20,21 +20,21 @@ Control your KNX intallation via Node.js!
 * [Changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOG.md)
 * [Developer's changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOGDEV.md)
 
-**Properties to be passed to the connection(see the knxUltimateClientProperties variable below)**
+### PLEASE TAKE NOTE THAT KNX SECURE IS STILL UNDER DEVELOPMENT AND IT CURRENTLY DOES NOT WORK.
 
-## PLEASE TAKE NOTE THAT KNX SECURE IS STILL UNDER DEVELOPMENT AND IT YET DOES NOT WORK.
+**Properties to be passed to the connection(see the knxUltimateClientProperties variable below)**
 
 |Property|Description|
 |--|--|
 | ipAddr (string) | The IP of your KNX router/interface (for Routers, use "224.0.23.12") |
+| hostProtocol (string) | "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces, or "TunnelTCP" for secure KNX Interfaces (**KNX Secure is not yet implemented**)|
 | ipPort (string) | The port, default is "3671" |
 | physAddr (string) | The physical address to be identified in the KNX bus |
 | suppress_ack_ldatareq (bool) | Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true |
 | loglevel (string) | The log level. "info", "error", "debug" or "trace" |
 | localEchoInTunneling (bool) | Leave true forever. This is used only in Node-Red KNX-Ultimate node |
-| hostProtocol (string) | "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces, or "TunnelTCP" for secure KNX Interfaces (not yet implemented)|
-| isSecureKNXEnabled (bool) | True: Enables the secure connection. Leave false until KNX-Secure has been released. |
-| jKNXSecureKeyring (string) | ETS Keyring JSON file content (leave blank until KNX-Secure has been released) |
+| isSecureKNXEnabled (bool) | True: Enables the secure connection. **Leave false until KNX-Secure has been released**. |
+| jKNXSecureKeyring (string) | ETS Keyring JSON file content. **Leave blank until KNX-Secure has been released**. |
 | localIPAddress (string) | The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate |
 | interface (string) | Specifies the local eth interface to be used to connect to the KNX Bus.|
 
