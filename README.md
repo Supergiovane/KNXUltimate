@@ -20,9 +20,17 @@ Control your KNX intallation via Node.js!
 * [Changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOG.md)
 * [Developer's changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOGDEV.md)
 
-### PLEASE TAKE NOTE THAT KNX SECURE IS STILL UNDER DEVELOPMENT AND IT CURRENTLY DOES NOT WORK.
+|Technology|Supported|
+|--|--|
+| KNX Tunnelling | <span style="color:green">yes</span> |
+| KNX Routing | <span style="color:green">yes</span> |
+| KNX Secure Tunnelling | <span style="color:orange">under development</span> |
+| KNX Secure Routing | <span style="color:red">no</span> |
+| KNX 3rd PARTY IOT API | <span style="color:orange">under development</span> |
 
-**Properties to be passed to the connection(see the knxUltimateClientProperties variable below)**
+
+## CONNECTION SETUP
+These are the properties to be passed to the connection as a *JSON object {}* (see the knxUltimateClientProperties variable in the exsamples)
 
 |Property|Description|
 |--|--|
@@ -38,7 +46,8 @@ Control your KNX intallation via Node.js!
 | localIPAddress (string) | The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate |
 | interface (string) | Specifies the local eth interface to be used to connect to the KNX Bus.|
 
-**Supported Datapoints**
+
+## SUPPORTED DATAPOINTS
 
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
 For example, pass a *true* for datapoint "1.001", or *{ red: 125, green: 0, blue: 0 }* for datapoint "232.600".<br/>
@@ -48,7 +57,7 @@ You should see something like this in the console window (the **msg.payload** is
 
 <img src='https://raw.githubusercontent.com/Supergiovane/knxultimate/master/img/dpt.png' width='60%'>
 
-## CONTROL THE CLIENT
+## METHODS/PROPERTIES OF KNXULTIMATE
 
 |Method|Description|
 |--|--|
@@ -59,7 +68,7 @@ You should see something like this in the console window (the **msg.payload** is
 | .respond (GA, payload, datapoint) | Sends a RESPONSE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
 | .read (GA) | Sends a READ telegram to the BUS. **GA** is the group address (for example "0/0/1").|
 
-|Properties|Description|
+|Property|Description|
 |--|--|
 | .isConnected() | Returns **true** if you the client is connected to the KNX Gateway Router/Interface, **false** if not connected. |
 | .clearToSend | **true** if you can send a telegram, **false** if the client is still waiting for the last telegram's ACK or whenever the client cannot temporary send the telegram. In tunneling mode, you could also refer to the event **KNXClientEvents.ackReceived**, that is fired everytime a telegram has been succesfully acknowledge or not acknowledge. See the sample.js file. |
@@ -67,7 +76,17 @@ You should see something like this in the console window (the **msg.payload** is
 
 ## EVENTS
 
-Please see the sample.js file. This sample contains all events triggered by KNXUltimate.
+List of events raised by KNXultimate, in proper order. For the signatures, please see the **examples** folder.
+|Event|Description|
+|--|--|
+| connecting | KNXUltimate is connecting to the KNX/IP Gateway. Please wait for the *connected* event to start sending KNX telegrams.|
+| connected | KNXUltimate has successfully connected with the KNX/IP Gateway. |
+| indication | KNXUltimate has received a KNX telegram, that's avaiable in te the **datagram** variable. Please see the examples. |
+| ackReceived | Ack telegram from KNX/IP Gateway has been received. This confirms that the telegram sent by KNXUltimate has reached the KNX/IP Gateway successfully. |
+| disconnected | The KNX connection has been disconnected. |
+| close | The main KNXUltimate socket has been closed. |
+| error | KNXUltimate has raised an error. The error description is provided as well. |
+
 
 ## DECONDING THE TELEGRAMS FROM BUS
 
@@ -80,7 +99,7 @@ let dpt = dptlib.resolve("1.001");
 let jsValue = dptlib.fromBuffer(RAW VALUE (SEE SAMPLES), dpt); // THIS IS THE DECODED VALUE
 ```
 
-## Examples
+## EXAMPLES
 
 You can find all examples in the [examples](./examples/) folder:
 
@@ -89,6 +108,8 @@ You can find all examples in the [examples](./examples/) folder:
 * [discovery](./examples/discovery.ts) - A simple example that shows how to discover KNX devices on the network.
 * [test-toggle](./examples/test-toggle.ts) - An interactive example that shows how to toggle a switch on/off.
 * [sampleSecure](./examples/sampleSecure.ts) - A full featured example that shows how to connect to the KNX bus and send/receive telegrams in secure mode.
+
+## <span style="color:orange">Let me give a big thank you to [robertsLando](https://github.com/robertsLando) that joined the devs and translated the package from JS to Typescrypt.</span>
 
 ## SUGGESTION
 >
