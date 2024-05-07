@@ -22,11 +22,11 @@ Control your KNX intallation via Node.js!
 
 |Technology|Supported|
 |--|--|
-| KNX Tunnelling | <span style="color:green">yes</span> |
-| KNX Routing | <span style="color:green">yes</span> |
-| KNX Secure Tunnelling | <span style="color:orange">under development</span> |
-| KNX Secure Routing | <span style="color:red">no</span> |
-| KNX 3rd PARTY IOT API | <span style="color:orange">under development</span> |
+| KNX Tunnelling | ![](https://placehold.co/200x20/green/white?text=YES) |
+| KNX Routing | ![](https://placehold.co/200x20/green/white?text=YES) |
+| KNX Secure Tunnelling | ![](https://placehold.co/200x20/orange/white?text=UNDER+DEVELOPMENT) |
+| KNX Secure Routing | ![](https://placehold.co/200x20/red/white?text=no) |
+| KNX 3rd PARTY IOT API | ![](https://placehold.co/200x20/orange/white?text=UNDER+DEVELOPMENT) |
 
 
 ## CONNECTION SETUP
@@ -109,6 +109,10 @@ You can find all examples in the [examples](./examples/) folder:
 * [test-toggle](./examples/test-toggle.ts) - An interactive example that shows how to toggle a switch on/off.
 * [sampleSecure](./examples/sampleSecure.ts) - A full featured example that shows how to connect to the KNX bus and send/receive telegrams in secure mode.
 
+  
+<br/><br/><br/>
+
+![](https://placehold.co/800x30/orange/white?text=Thanks+to+robertsLando,+that+joined+the+devs)
 ## <span style="color:orange">Let me give a big thank you to [robertsLando](https://github.com/robertsLando) that joined the devs and translated the package from JS to Typescrypt.</span>
 
 ## SUGGESTION
