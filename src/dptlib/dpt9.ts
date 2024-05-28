@@ -12,7 +12,7 @@ import { frexp, hasProp, ldexp } from '../utils'
 //
 
 const config: DatapointConfig = {
-	id: 'DPT2',
+	id: 'DPT9',
 	formatAPDU: (value) => {
 		const apdu_data = Buffer.alloc(2)
 		if (!isFinite(value)) {
