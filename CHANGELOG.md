@@ -10,6 +10,13 @@
 # CHANGELOG
 
 <p>
+<b>Version 2.1.3</b> - May 2024<br/>
+- FIX: fixed datapoint 9 issue.<br/>
+</p>
+
+# CHANGELOG
+
+<p>
 <b>Version 1.0.47</b> - January 2024<br/>
 - NEW: added DPT 275.100.<br/>
 </p>
