@@ -13,7 +13,6 @@ Control your KNX intallation via Node.js!
 
 > This is the official engine of Node-Red node KNX-Ultimate (<https://flows.nodered.org/node/node-red-contrib-knx-ultimate>)
 > I had many users asking for a node.js release of that engine, so here is it.
-> The node will be KNX Secure compatible. I'm already working on that.
 
 ## CHANGELOG
 
@@ -26,7 +25,8 @@ Control your KNX intallation via Node.js!
 | KNX Routing | ![](https://placehold.co/200x20/green/white?text=YES) |
 | KNX Secure Tunnelling | ![](https://placehold.co/200x20/orange/white?text=UNDER+DEVELOPMENT) |
 | KNX Secure Routing | ![](https://placehold.co/200x20/red/white?text=NO) |
-| KNX 3rd PARTY IOT API | ![](https://placehold.co/200x20/orange/white?text=UNDER+DEVELOPMENT) |
+| KNX 3rd PARTY IOT API | ![](https://placehold.co/200x20/dimgrey/white?text=INVESTIGATING) |
+| KNX MATTER | ![](https://placehold.co/200x20/dimgrey/white?text=INVESTIGATING) |
 
 
 ## CONNECTION SETUP
@@ -110,10 +110,16 @@ You can find all examples in the [examples](./examples/) folder:
 * [sampleSecure](./examples/sampleSecure.ts) - A full featured example that shows how to connect to the KNX bus and send/receive telegrams in secure mode.
 
   
-<br/><br/><br/>
+<br/>
 
-![](https://placehold.co/800x30/orange/white?text=Thanks+to+robertsLando,+that+joined+the+devs)
-## <span style="color:orange">Let me give a big thank you to [robertsLando](https://github.com/robertsLando) that joined the devs and translated the package from JS to Typescrypt.</span>
+## HOW TO COLLABORATE
+
+If you want to help us in this project, you're wellcome!  
+Please refer to the development page.
+
+* [Development's page](https://github.com/Supergiovane/knxultimate/blob/master/DEVELOPMENT.md)
+
+<br/>
 
 ## SUGGESTION
 >
