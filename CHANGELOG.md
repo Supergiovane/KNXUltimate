@@ -10,11 +10,14 @@
 # CHANGELOG
 
 <p>
-<b>Version 2.1.3</b> - May 2024<br/>
+<b>Version 2.1.4</b> - May 2024<br/>
 - FIX: fixed datapoint 9 issue.<br/>
 </p>
 
-# CHANGELOG
+<p>
+<b>Version 2.1.3</b> - May 2024<br/>
+- (NOT FIXED, USE THE 2.1.4) FIX: fixed datapoint 9 issue.<br/>
+</p>
 
 <p>
 <b>Version 1.0.47</b> - January 2024<br/>
