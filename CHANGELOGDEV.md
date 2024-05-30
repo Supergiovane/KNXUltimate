@@ -1,4 +1,16 @@
 
+
+## [2.1.4](https://github.com/Supergiovane/KNXUltimate/compare/v2.1.2...v2.1.4) (2024-05-30)
+
+
+
+## [2.1.3](https://github.com/Supergiovane/KNXUltimate/compare/v2.1.2...v2.1.4) (2024-05-28)
+
+
+### Bug Fixes
+
+* issue where DPT9 was giving error ([#21](https://github.com/Supergiovane/KNXUltimate/issues/21)) ([2ac791e](https://github.com/Supergiovane/KNXUltimate/commit/2ac791e2a438ee37492f8109b5989ef6130244e5))
+
 ## [2.1.3](https://github.com/Supergiovane/KNXUltimate/compare/v2.1.2...2.1.3) (2024-05-28)
 
 ### Bug Fixes
