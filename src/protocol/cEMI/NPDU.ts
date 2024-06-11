@@ -67,7 +67,7 @@ export default class NPDU {
 		if (
 			data.sixBits() &&
 			data.length === 1 &&
-			data.value.readUInt8(0) < 0x3f
+			data.value.readUInt8(0) <= 0x3f
 		) {
 			this.apci = (this.apci & 0xc0) | data.value.readUInt8(0)
 			this._data = null
