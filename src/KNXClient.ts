@@ -349,7 +349,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.sysLogger.trace(
 			`isSixBits:${isSixBits} Includes (should be = isSixBits):${[
 				1, 2, 3, 5, 9, 10, 11, 14, 18,
-			].includes(iDatapointType)} ADPU BitLenght:${adpu.bitlength}`,
+			].includes(iDatapointType)} ADPU BitLength:${adpu.bitlength}`,
 		)
 
 		const datapoint: IDataPoint = {
@@ -747,10 +747,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			write: null,
 		}
 		// Get the KNDDataBuffer
-		const baseBufferFromBitLenght: Buffer = Buffer.alloc(bitlength / 8) // The buffer lenght must be like specified by bitlenght
-		rawDataBuffer.copy(baseBufferFromBitLenght, 0)
+		const baseBufferFromBitLength: Buffer = Buffer.alloc(
+			Math.ceil(bitlength / 8),
+		) // The buffer length must be like specified by bitlength
+		rawDataBuffer.copy(baseBufferFromBitLength, 0)
 		const data: KNXDataBuffer = new KNXDataBuffer(
-			baseBufferFromBitLenght,
+			baseBufferFromBitLength,
 			datapoint,
 		)
 
