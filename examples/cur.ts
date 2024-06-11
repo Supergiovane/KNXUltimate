@@ -119,11 +119,11 @@ setTimeout(() => {
 
 setTimeout(() => {
   let writeraw = Buffer.from("01", "hex");
-  let bitlenght = 1;
+  let bitlength = 1;
 
   try {
     console.log("RAWEO", writeraw);
-    knxClient.writeRaw("0/1/1", writeraw, bitlenght);
+    knxClient.writeRaw("0/1/1", writeraw, bitlength);
   } catch (error) {
     console.log("ORRORE", error);
   }
