@@ -1,5 +1,17 @@
 
 
+# [2.2.0](https://github.com/Supergiovane/KNXUltimate/compare/v2.1.4...v2.2.0) (2024-06-12)
+
+
+### Bug Fixes
+
+* [#23](https://github.com/Supergiovane/KNXUltimate/issues/23) writeRaw broken with length <= 6bits ([#24](https://github.com/Supergiovane/KNXUltimate/issues/24)) ([1d30e81](https://github.com/Supergiovane/KNXUltimate/commit/1d30e8108b50877eb920aed8120c9c872d822545))
+
+
+### Features
+
+* Turn unknown error 0x25 to E_NO_MORE_UNIQUE_CONNECTIONS ([67f5dd8](https://github.com/Supergiovane/KNXUltimate/commit/67f5dd86e2688131c54c0a17cf5f2cbaf0bf9eb5))
+
 ## [2.1.4](https://github.com/Supergiovane/KNXUltimate/compare/v2.1.2...v2.1.4) (2024-05-30)
 
 
