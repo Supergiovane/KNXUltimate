@@ -17,7 +17,7 @@ Control your KNX intallation via Node.js!
 ## CHANGELOG
 
 * [Changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOG.md)
-* [Developer's changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOGDEV.md)
+
 
 |Technology|Supported|
 |--|--|
