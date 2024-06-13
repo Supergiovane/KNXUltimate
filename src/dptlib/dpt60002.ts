@@ -1,10 +1,10 @@
 import Log from '../KnxLog'
+import type { DatapointConfig } from '.'
 
 interface ShutterValue {
 	mode: string
 	position: string
 }
-
 function bitsToShutterPosition(bits: number): string {
 	switch (bits) {
 		case 0b00:
@@ -68,56 +68,57 @@ function operationModeToBits(mode: string): number {
 			return null
 	}
 }
+const config: DatapointConfig = {
+	id: 'DPT60002',
+	formatAPDU(value: ShutterValue): Buffer {
+		if (!value) {
+			Log.get().error('DPT60002: cannot write null value')
+			return null
+		}
 
-export function formatAPDU(value: ShutterValue): Buffer {
-	if (!value) {
-		Log.get().error('DPT60002: cannot write null value')
-		return null
-	}
+		let apduData
+		if (
+			typeof value === 'object' &&
+			Object.prototype.hasOwnProperty.call(value, 'mode') &&
+			Object.prototype.hasOwnProperty.call(value, 'position')
+		) {
+			const mode = operationModeToBits(value.mode)
+			const position = shutterPositionToBits(value.position)
+			apduData = (mode << 2) + position
+		} else {
+			Log.get().error(
+				'DPT60002: Must supply a value {mode: "normal"|"priority"|"wind|alarm"|"rain|alarm"|"disabled", position: "intermediate"|"top"|"bottom"}',
+			)
+		}
+		return Buffer.from([apduData])
+	},
 
-	let apduData
-	if (
-		typeof value === 'object' &&
-		Object.prototype.hasOwnProperty.call(value, 'mode') &&
-		Object.prototype.hasOwnProperty.call(value, 'position')
-	) {
-		const mode = operationModeToBits(value.mode)
-		const position = shutterPositionToBits(value.position)
-		apduData = (mode << 2) + position
-	} else {
-		Log.get().error(
-			'DPT60002: Must supply a value {mode: "normal"|"priority"|"wind|alarm"|"rain|alarm"|"disabled", position: "intermediate"|"top"|"bottom"}',
-		)
-	}
-	return Buffer.from([apduData])
-}
+	fromBuffer(buf: Buffer): ShutterValue {
+		if (buf.length !== 1) {
+			Log.get().error(
+				`DPT60002: Buffer should be 1 byte long, got ${buf.length}`,
+			)
+			return null
+		}
 
-export function fromBuffer(buf: Buffer): ShutterValue {
-	if (buf.length !== 1) {
-		Log.get().error(
-			`DPT60002: Buffer should be 1 byte long, got ${buf.length}`,
-		)
-		return null
-	}
-
-	return {
-		mode: bitsToOperationMode((buf[0] >> 2) & 0b111),
-		position: bitsToShutterPosition(buf[0] & 0b11),
-	}
-}
-
-export const basetype = {
-	bitlength: 2,
-	valuetype: 'composite',
-	desc: 'Status object for Hager TXA223/225',
-	help: `// This would usually only be received.
+		return {
+			mode: bitsToOperationMode((buf[0] >> 2) & 0b111),
+			position: bitsToShutterPosition(buf[0] & 0b11),
+		}
+	},
+	basetype: {
+		bitlength: 2,
+		valuetype: 'composite',
+		desc: 'Status object for Hager TXA223/225',
+		help: `// This would usually only be received.
 msg.payload = {position: "top", mode: "normal"};
 return msg;`,
-}
-
-export const subtypes = {
-	'001': {
-		name: 'Shutter state',
-		desc: 'Status object for Hager TXA223/225',
+	},
+	subtypes: {
+		'001': {
+			name: 'Shutter state (Hager TXA223/225)',
+			desc: 'Status object for Hager TXA223/225',
+		},
 	},
 }
+export default config
