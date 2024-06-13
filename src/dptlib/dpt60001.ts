@@ -1,8 +1,3 @@
-/**
- * knx.js - a KNX protocol stack in pure Javascript
- * (C) 2016-2018 Elias Karakoulakis
- */
-
 import Log from '../KnxLog'
 import type { DatapointConfig } from '.'
 
