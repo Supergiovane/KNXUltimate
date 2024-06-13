@@ -20,7 +20,7 @@ import KNXTunnelingRequest from './KNXTunnelingRequest'
 import KNXTunnelingAck from './KNXTunnelingAck'
 import KNXRoutingIndication from './KNXRoutingIndication'
 import KNXSecureSessionRequest from './KNXSecureSessionRequest'
-
+import {validateKNXAddress} from './KNXUtils'
 export {
 	KNXAddress,
 	DeviceInfo,
@@ -42,4 +42,5 @@ export {
 	KNXTunnelingAck,
 	KNXRoutingIndication,
 	KNXSecureSessionRequest,
+	validateKNXAddress,
 }
