@@ -1,5 +1,12 @@
 
 
+## [2.3.1](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.0...v2.3.1) (2024-06-13)
+
+
+### Bug Fixes
+
+* fixed DPT6002 not showing up ([593e548](https://github.com/Supergiovane/KNXUltimate/commit/593e548f74aebbb4c15cd48f98eb67aa93383391))
+
 # [2.3.0](https://github.com/Supergiovane/KNXUltimate/compare/v2.2.0...v2.3.0) (2024-06-13)
 
 
