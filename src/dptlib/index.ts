@@ -42,7 +42,8 @@ import DPT249 from './dpt249'
 import DPT251 from './dpt251'
 import DPT275 from './dpt275'
 import DPT999 from './dpt999'
-import DPT6001 from './dpt60001'
+import DPT60001 from './dpt60001'
+import DPT60002 from './dpt60002'
 
 type Range = [number, number] | [undefined]
 
@@ -112,7 +113,8 @@ export const dpts: Record<string, DatapointConfig> = {
 	[DPT251.id]: DPT251,
 	[DPT275.id]: DPT275,
 	[DPT999.id]: DPT999,
-	[DPT6001.id]: DPT6001,
+	[DPT60001.id]: DPT60001,
+	[DPT60002.id]: DPT60002,
 }
 
 // a generic DPT resolution function
