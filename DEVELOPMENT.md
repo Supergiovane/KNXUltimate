@@ -5,7 +5,7 @@
 
 # Development
 
-This guide aims to provide a quick overview of the development process for this project.
+This guide aims to provide a quick overview of the development process for this project.  
 
 ## PRs and Commits
 
@@ -13,6 +13,7 @@ General rules for PRs and commits:
 
 - Use conventional commit standard: <https://www.conventionalcommits.org/en/v1.0.0/>
 - Always use "Squash and Merge" for clean commit history on `main` branch.
+- Before commit changes, please execute `npm run lint-fix`. This avoids CI issues.
 - CI workflow must pass before merging PRs.
 
 ## Releases
