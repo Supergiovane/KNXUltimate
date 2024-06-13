@@ -1,5 +1,17 @@
 
 
+# [2.3.0](https://github.com/Supergiovane/KNXUltimate/compare/v2.2.0...v2.3.0) (2024-06-13)
+
+
+### Bug Fixes
+
+* fixed lint issues in new DPT 6002 ([529d392](https://github.com/Supergiovane/KNXUltimate/commit/529d3924f90189214d50b3be24e9a451c260010a))
+
+
+### Features
+
+* Add Hager TXA223/225 custom status DPT 60002 ([c61f576](https://github.com/Supergiovane/KNXUltimate/commit/c61f57647ea97b7201a9c01dae3c0e5a1ce3c23a))
+
 # [2.2.0](https://github.com/Supergiovane/KNXUltimate/compare/v2.1.4...v2.2.0) (2024-06-12)
 
 
