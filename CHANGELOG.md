@@ -1,5 +1,12 @@
 
 
+## [2.3.3](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.2...v2.3.3) (2024-06-14)
+
+
+### Bug Fixes
+
+* vscode default fomatter ([82ce441](https://github.com/Supergiovane/KNXUltimate/commit/82ce441955f714cc79b26ee85429333200b9cab3))
+
 ## [2.3.2](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.1...v2.3.2) (2024-06-14)
 
 
