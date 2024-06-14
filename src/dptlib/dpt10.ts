@@ -9,8 +9,8 @@ import type { DatapointConfig } from '.'
 //
 // DPT10.*: time (3 bytes)
 //
-const timeRegexp = /((\d)\/)?(\d{1,2}):(\d{1,2}):(\d{1,2})/
-
+// const timeRegexp = /((\d)\/)?(\d{1,2}):(\d{1,2}):(\d{1,2})/
+const timeRegexp = /(\d{1,2}):(\d{1,2}):(\d{1,2})/
 // DPTFrame to parse a DPT10 frame.
 // Always 8-bit aligned.
 
