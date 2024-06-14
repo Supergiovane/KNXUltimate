@@ -7,6 +7,6 @@
         "source.fixAll.markdownlint": "explicit"
     },
     "[typescript]": {
-        "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+        "editor.defaultFormatter": "vscode.typescript-language-features"
     },
 }
