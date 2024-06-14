@@ -130,13 +130,16 @@ export function resolve(dptid: string | number): DatapointConfig {
 	const dpt = dpts[dptkey]
 	if (!dpt) throw Error(`Unsupported DPT: ${dptid}`)
 
-	const cloned_dpt = cloneDpt(dpt)
-	if (m[3]) {
-		cloned_dpt.subtypeid = m[3]
-		cloned_dpt.subtype = cloned_dpt.subtypes[m[3]]
+	try {
+		const cloned_dpt = cloneDpt(dpt)
+		if (m[3]) {
+			cloned_dpt.subtypeid = m[3]
+			cloned_dpt.subtype = cloned_dpt.subtypes[m[3]]
+			return cloned_dpt
+		}
+	} catch (error) {
+		throw Error(`clone DPT: ${error.trace}`)
 	}
-
-	return cloned_dpt
 }
 /* POPULATE an APDU object from a given Javascript value for the given DPT
  * - either by a custom DPT formatAPDU function
