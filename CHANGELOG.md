@@ -1,5 +1,12 @@
 
 
+## [2.3.2](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.1...v2.3.2) (2024-06-14)
+
+
+### Bug Fixes
+
+* fix DPT10.001 Time error when time passed as string ([23a27ab](https://github.com/Supergiovane/KNXUltimate/commit/23a27ab40176af11bdc047cb09c2fe31ae4b22fd))
+
 ## [2.3.1](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.0...v2.3.1) (2024-06-13)
 
 
