@@ -50,7 +50,7 @@ These are the properties to be passed to the connection as a *JSON object {}* (s
 
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
 For example, pass a *true* for datapoint "1.001", or *{ red: 125, green: 0, blue: 0 }* for datapoint "232.600".<br/>
-It support a massive number of Datapoints. Please run the **sample.js** file to view all datapoints in the console window.<br/>
+It support a massive number of Datapoints. Please run the <code>examples/nodeshowDatapoints.ts</code> file to view all datapoints in the output console.<br/>
 Be aware, that the descriptions you'll see, are taken from Node-Red KNX-Ultimate node, so there is more code than you need here. Please take only the *msg.payload* part in consideration.<br/>
 You should see something like this in the console window (the **msg.payload** is what you need to pass as payload):
 
@@ -102,11 +102,12 @@ let jsValue = dptlib.fromBuffer(RAW VALUE (SEE SAMPLES), dpt); // THIS IS THE DE
 
 You can find all examples in the [examples](./examples/) folder:
 
-* [sample](./examples/sample.ts) - A full featured example that shows how to connect to the KNX bus and send/receive telegrams.
-* [simpleSample](./examples/simpleSample.ts) - A simple example that shows how to connect to the KNX bus and send a telegram.
+* [sample](./examples/sample.ts) - A full featured example that shows how to connect to the KNX bus and send/receive telegrams. **WARNING** this sends data to your KNX BUS!
+* [showDatapoints](./examples/showDatapoints.ts) - List all supported Datapoints in the output console, as well as the help code on how the payload's value is constructed, for each datapoint type. This writes nothing to the KNX BUS, you can run it safely.
+* [simpleSample](./examples/simpleSample.ts) - A simple example that shows how to connect to the KNX bus and send a telegram. **WARNING** this sends data to your KNX BUS!
 * [discovery](./examples/discovery.ts) - A simple example that shows how to discover KNX devices on the network.
-* [test-toggle](./examples/test-toggle.ts) - An interactive example that shows how to toggle a switch on/off.
-* [sampleSecure](./examples/sampleSecure.ts) - A full featured example that shows how to connect to the KNX bus and send/receive telegrams in secure mode.
+* [test-toggle](./examples/test-toggle.ts) - An interactive example that shows how to toggle a switch on/off. **WARNING** this sends data to your KNX BUS!
+* [sampleSecure](./examples/sampleSecure.ts) - A full featured example that shows how to connect to the KNX bus and send/receive telegrams in secure mode. **WARNING** this sends data to your KNX BUS!
 
   
 <br/>
