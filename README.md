@@ -50,7 +50,7 @@ These are the properties to be passed to the connection as a *JSON object {}* (s
 
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
 For example, pass a *true* for datapoint "1.001", or *{ red: 125, green: 0, blue: 0 }* for datapoint "232.600".<br/>
-It support a massive number of Datapoints. Please run the <code>examples/nodeshowDatapoints.ts</code> file to view all datapoints in the output console.<br/>
+It support a massive number of Datapoints. Please run the <code>examples/showDatapoints.ts</code> file to view all datapoints in the output console.<br/>
 Be aware, that the descriptions you'll see, are taken from Node-Red KNX-Ultimate node, so there is more code than you need here. Please take only the *msg.payload* part in consideration.<br/>
 You should see something like this in the console window (the **msg.payload** is what you need to pass as payload):
 
