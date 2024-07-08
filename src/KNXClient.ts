@@ -993,6 +993,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					;(this._clientSocket as UDPSocket).close(cb)
 				}
 			} catch (error) {
+				this.sysLogger.error(
+					`KNXClient: into async closeSocket(): ${error.stack}`,
+				)
 				resolve()
 			}
 		})
