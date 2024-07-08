@@ -1,5 +1,12 @@
 
 
+## [2.3.4](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.3...v2.3.4) (2024-07-08)
+
+
+### Bug Fixes
+
+* async closeSocket thtows an error if the socket is already closed. ([31baf39](https://github.com/Supergiovane/KNXUltimate/commit/31baf39ade13d6d329284342a7bc3a6c13cf4aa0))
+
 ## [2.3.3](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.2...v2.3.3) (2024-06-14)
 
 
