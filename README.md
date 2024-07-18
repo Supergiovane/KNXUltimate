@@ -9,11 +9,11 @@
 [![Youtube][youtube-image]][youtube-url]
 [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square)](https://www.paypal.me/techtoday)
 
-Control your KNX intallation via Node.js!
-
-> This is the official engine of Node-Red node KNX-Ultimate (<https://flows.nodered.org/node/node-red-contrib-knx-ultimate>)
-> I had many users asking for a node.js release of that engine, so here is it.
-  
+Control your KNX intallation via Node.js!  
+This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](https://flows.nodered.org/node/node-red-contrib-knx-ultimate)  
+Many of you asked for a node.js release of that engine, so i decided to create this package.  
+If you enjoy my work developing this package, do today a kind thing for someone too. This will be the reward for my work.  
+<br/>
 
 
 ![Logo](img/readmemain.png)
