@@ -10,7 +10,7 @@ let knxUltimateClientProperties: KNXClientOptions = {
     suppress_ack_ldatareq: false,
     loglevel: "error", // or "debug" is the default
     localEchoInTunneling: true, // Leave true, forever.
-    hostProtocol: "Multicast", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
+    hostProtocol: "Multicast", // in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
     isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
     jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
@@ -73,4 +73,9 @@ try {
 } catch (error) {
 }
 knxUltimateClient.Connect();
+
+setTimeout(() => {
+    knxUltimateClient.Disconnect();
+    process.exit
+}, 20000);
 

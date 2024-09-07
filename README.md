@@ -49,7 +49,7 @@ These are the properties to be passed to the connection as a *JSON object {}* (s
 | jKNXSecureKeyring (string) | ETS Keyring JSON file content. **Leave blank until KNX-Secure has been released**. |
 | localIPAddress (string) | The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate |
 | interface (string) | Specifies the local eth interface to be used to connect to the KNX Bus.|
-
+| KNXQueueSendIntervalMilliseconds | The KNX standard has a maximum transmit rate to the BUS, of about 1 telegram each 25ms (to stay safe). In case you've a lot of traffic on the BUS, you can increase this value, expressed in milliseconds. Be careful, because if you set it too high, the KNX engine could send a telegram with flag 'repeat', because the ACK from the device is coming too late.| 
 
 ## SUPPORTED DATAPOINTS
 
