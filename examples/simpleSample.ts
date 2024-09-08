@@ -14,6 +14,7 @@ let knxUltimateClientProperties: KNXClientOptions = {
     isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
     jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
+    KNXQueueSendIntervalMilliseconds:25 // Optrional. Queue interval between each KNX telegram. Default is 1 telegram each 25ms
 };
 
 // Instantiate the client
