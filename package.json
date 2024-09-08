@@ -1,7 +1,7 @@
 {
   "name": "knxultimate",
   "description": "KNX IP protocol implementation for Node. This is the ENGINE of Node-Red KNX-Ultimate node.",
-  "version": "2.3.5",
+  "version": "2.4.0",
   "main": "./build/index.js",
   "engines": {
     "node": ">=14"
@@ -17,7 +17,8 @@
     "lint-fix": "eslint --fix --ext .ts .",
     "test": "",
     "test-connection": "",
-    "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it"
+    "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it",
+    "betarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it major --preRelease=beta"
   },
   "release-it": {
     "github": {
