@@ -1,5 +1,12 @@
 
 
+# [3.0.0-beta.0](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.5...v3.0.0-beta.0) (2024-09-08)
+
+
+### Features
+
+* transparent KNX queue. The sent telegrams are now queued and transmitted to the bus by obeying the time interval specified by the new property "KNXQueueSendIntervalMilliseconds" ([93a65c9](https://github.com/Supergiovane/KNXUltimate/commit/93a65c97c426977b69b8c4f3044755229ad89b3a))
+
 ## [2.3.5](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.4...v2.3.5) (2024-07-08)
 
 ## [2.3.4](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.3...v2.3.4) (2024-07-08)
