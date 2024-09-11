@@ -1,6 +1,6 @@
-import { KNXClientEvents, KNXClient } from "../src";
 import { resolve, fromBuffer } from "../src/dptlib";
 import { KNXClientOptions } from "../src/KNXClient";
+import { KNXClientEvents, KNXClient, dptlib } from "../src";
 
 // Set the properties
 let knxUltimateClientProperties: KNXClientOptions = {
@@ -10,7 +10,7 @@ let knxUltimateClientProperties: KNXClientOptions = {
     suppress_ack_ldatareq: false,
     loglevel: "error", // or "debug" is the default
     localEchoInTunneling: true, // Leave true, forever.
-    hostProtocol: "Multicast", // in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
+    hostProtocol: "Multicast", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
     isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
     jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
@@ -21,7 +21,7 @@ let knxUltimateClientProperties: KNXClientOptions = {
 const knxUltimateClient = new KNXClient(knxUltimateClientProperties);
 
 // Setting handlers
-knxUltimateClient.on(KNXClientEvents.indication, function (_datagram, _echoed) {
+knxUltimateClient.on(KNXClientEvents.indication, (datagram, echoed) => {
 
     // This function is called whenever a KNX telegram arrives from BUS
 
@@ -29,15 +29,15 @@ knxUltimateClient.on(KNXClientEvents.indication, function (_datagram, _echoed) {
     let _evt = "";
     let dpt = "";
     let jsValue;
-    if (_datagram.cEMIMessage.npdu.isGroupRead) _evt = "GroupValue_Read";
-    if (_datagram.cEMIMessage.npdu.isGroupResponse) _evt = "GroupValue_Response";
-    if (_datagram.cEMIMessage.npdu.isGroupWrite) _evt = "GroupValue_Write";
+    if (datagram.cEMIMessage.npdu.isGroupRead) _evt = "GroupValue_Read";
+    if (datagram.cEMIMessage.npdu.isGroupResponse) _evt = "GroupValue_Response";
+    if (datagram.cEMIMessage.npdu.isGroupWrite) _evt = "GroupValue_Write";
     // Get the source Address
-    let _src = _datagram.cEMIMessage.srcAddress.toString();
+    let _src = datagram.cEMIMessage.srcAddress.toString();
     // Get the destination GA
-    let _dst = _datagram.cEMIMessage.dstAddress.toString()
+    let _dst = datagram.cEMIMessage.dstAddress.toString()
     // Get the RAW Value
-    let _Rawvalue = _datagram.cEMIMessage.npdu.dataValue;
+    let _Rawvalue = datagram.cEMIMessage.npdu.dataValue;
 
     // Decode the telegram. 
     if (_dst === "0/1/1") {
@@ -68,11 +68,7 @@ knxUltimateClient.on(KNXClientEvents.connected, info => {
     knxUltimateClient.write("0/1/1", false, "1.001");
 });
 
-// Connect
-try {
-    knxUltimateClient.removeAllListeners();
-} catch (error) {
-}
+
 knxUltimateClient.Connect();
 
 setTimeout(() => {
