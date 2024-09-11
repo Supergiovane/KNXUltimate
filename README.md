@@ -112,7 +112,7 @@ You can find all examples in the [examples](./examples/) folder:
 * [simpleSample](./examples/simpleSample.ts) - A simple example that shows how to connect to the KNX bus and send a telegram. **WARNING** this sends data to your KNX BUS!
 * [discovery](./examples/discovery.ts) - A simple example that shows how to discover KNX devices on the network.
 * [test-toggle](./examples/test-toggle.ts) - An interactive example that shows how to toggle a switch on/off. **WARNING** this sends data to your KNX BUS!
-* [sampleSecure](./examples/sampleSecure.ts) - A full featured example that shows how to connect to the KNX bus and send/receive telegrams in secure mode. **WARNING** this sends data to your KNX BUS!
+
 
   
 <br/>
