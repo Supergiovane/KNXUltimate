@@ -1,5 +1,12 @@
 
 
+# [3.0.0-beta.1](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.0-beta.0...v3.0.0-beta.1) (2024-09-12)
+
+
+### Bug Fixes
+
+* Fixed import issue ([e232fc7](https://github.com/Supergiovane/KNXUltimate/commit/e232fc7d1262fe8605f86eb7fc8782a1efe61c47))
+
 # [3.0.0-beta.0](https://github.com/Supergiovane/KNXUltimate/compare/v2.3.5...v3.0.0-beta.0) (2024-09-08)
 
 
