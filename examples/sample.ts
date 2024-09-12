@@ -76,7 +76,6 @@ let knxUltimateClientProperties: KNXClientOptions = {
     physAddr: "1.1.100",
     suppress_ack_ldatareq: false,
     loglevel: "error", // 'disable', 'error', 'warn', 'info', 'debug'
-    localEchoInTunneling: true, // Leave true, forever.
     hostProtocol: "Multicast", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
     isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
     jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
