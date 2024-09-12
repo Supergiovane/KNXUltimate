@@ -4,22 +4,19 @@
 
 import util from 'util'
 // import factory, { Logger, LogLevel, LogDriverOptions } from 'log-driver'
-let clog = require('node-color-log')
+// let clog = require('node-color-log')
+import logger from 'node-color-log'
 
+let clog = logger
 const possibleLevels: string[] = ['disable', 'error', 'warn', 'info', 'debug']
 
 export type KNXLoggerOptions = {
 	/** The log level to use */
-	loglevel?: string
+	loglevel?: any
 	/** Set it to true to enable max log level */
 	debug?: boolean
 	setPrefix?: string
 }
-
-/*
- * Logger-Level importance levels:
- *  trace < info < warn < error
- */
 
 const determineLogLevel = (options: KNXLoggerOptions): string => {
 	let level: string
