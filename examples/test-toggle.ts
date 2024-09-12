@@ -24,7 +24,6 @@ async function initClient() {
 		ipPort: port,
 		loglevel: 'trace',
 		suppress_ack_ldatareq: false,
-		localEchoInTunneling: true,
 		hostProtocol: 'TunnelUDP', 
 	})
 	
