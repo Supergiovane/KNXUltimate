@@ -69,7 +69,6 @@ const config: DatapointConfig = {
 		}
 
 		const bufTotale = buf.toString('hex')
-		// console.log(bufTotale)
 		const MSB = hex2bin(bufTotale.substring(0, 2)) // Get Binary
 		const LSB = hex2bin(bufTotale.substring(2, 4)) // Get Binary
 

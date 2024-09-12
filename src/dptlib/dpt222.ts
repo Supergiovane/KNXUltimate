@@ -45,7 +45,6 @@ const config: DatapointConfig = {
 			const ArrEconomy = getHex(value.Economy)
 			apdu_data[4] = ArrEconomy[0]
 			apdu_data[5] = ArrEconomy[1]
-			// console.log(apdu_data);
 			return apdu_data
 		}
 		Log.get().error(

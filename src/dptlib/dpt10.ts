@@ -71,7 +71,6 @@ const config: DatapointConfig = {
 				'DPT10: Buffer should be 3 bytes long, got',
 				buf.length,
 			)
-			// console.log("BANANA","DPT10: Buffer should be 3 bytes long, got", buf.length)
 			return null
 		}
 		const d = new Date()
