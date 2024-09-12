@@ -154,7 +154,6 @@ export type APDU = {
 }
 
 export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
-	// console.log ("BANANA " + dptid)
 	const dpt = resolve(dptid || 'DPT1')
 	const nbytes = Math.ceil(dpt.basetype.bitlength / 8)
 	// apdu.data = new Buffer(nbytes); // 14/09/2020 Supregiovane: Deprecated. Replaced with below.

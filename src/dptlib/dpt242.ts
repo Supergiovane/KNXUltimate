@@ -78,7 +78,6 @@ const config: DatapointConfig = {
 			return null
 		}
 		const bufTotale = buf.toString('hex')
-		// console.log("bufTotale STRINGA: " + bufTotale);
 		const x = bufTotale.substring(0, 4)
 		const y = bufTotale.substring(4, 8)
 		const brightness = bufTotale.substring(8, 10) // these are Colour and Brighness validities (2 bit) //00000011

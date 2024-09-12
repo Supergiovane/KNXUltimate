@@ -47,7 +47,6 @@ const config: DatapointConfig = {
 					const sVal = `${
 						value.save_recall
 					}0${sSceneNumberbinary.padStart(6, '0')}`
-					// console.log("BANANA SEND HEX " + sVal.toString("hex").toUpperCase())
 					apdu_data[0] = parseInt(sVal, 2) // 0b10111111;
 				}
 			} else {
@@ -60,7 +59,6 @@ const config: DatapointConfig = {
 	},
 
 	fromBuffer: (buf) => {
-		// console.log("BANANA BUFF RECEIVE HEX " + buf.toString("hex").toUpperCase())
 		if (buf.length !== 1) {
 			Log.get().error(
 				'DP18: Buffer should be 1 byte long, got',
@@ -71,7 +69,6 @@ const config: DatapointConfig = {
 		const sBit = parseInt(buf.toString('hex').toUpperCase(), 16)
 			.toString(2)
 			.padStart(8, '0') // Get bit from hex
-		// console.log("BANANA BUFF RECEIVE BIT " + sBit)
 		return {
 			save_recall: Number(sBit.substring(0, 1)),
 			scenenumber: parseInt(sBit.substring(2), 2) + 1,

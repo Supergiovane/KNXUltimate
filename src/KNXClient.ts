@@ -293,7 +293,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._clientSocket = new net.Socket()
 			// this._clientSocket.removeAllListeners()
 			this._clientSocket.on(SocketEvents.data, (data) => {
-				console.log('Received message', data)
+				this.sysLogger?.debug('Received message', data)
 			})
 			this._clientSocket.on(SocketEvents.error, (error) =>
 				this.emit(KNXClientEvents.error, error),

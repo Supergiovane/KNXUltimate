@@ -52,7 +52,6 @@ const config: DatapointConfig = {
 			const ArrBuildingProtection = getHex(value.BuildingProtection)
 			apdu_data[6] = ArrBuildingProtection[0]
 			apdu_data[7] = ArrBuildingProtection[1]
-			// console.log(apdu_data);
 			return apdu_data
 		}
 		Log.get().error(
