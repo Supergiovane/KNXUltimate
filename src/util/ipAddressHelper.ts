@@ -20,14 +20,14 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 						(intf as any).family === 4) &&
 					!intf.internal
 				) {
-					KnxLog.get().trace(
+					KnxLog.get().debug(
 						'ipAddressHelper.js: Found suitable interface: %s (%j)',
 						iface,
 						intf,
 					)
 					candidateInterfaces[iface] = intf
 				} else {
-					KnxLog.get().trace(
+					KnxLog.get().debug(
 						'ipAddressHelper.js: Found NOT suitable interface: %s (%j)',
 						iface,
 						intf,
@@ -47,7 +47,7 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 }
 
 export function getLocalAddress(_interface = ''): string {
-	KnxLog.get().trace(
+	KnxLog.get().debug(
 		'ipAddressHelper.js: getLocalAddress: getting interfaces',
 	)
 	const candidateInterfaces = getIPv4Interfaces()

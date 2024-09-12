@@ -32,7 +32,7 @@ let knxUltimateClientProperties: KNXClientOptions = {
     ipPort: 3671,
     physAddr: "1.1.100",
     suppress_ack_ldatareq: false,
-    loglevel: "debug", // or "debug" is the default
+    loglevel: "debug", // 'disable', 'error', 'warn', 'info', 'debug'
     localEchoInTunneling: true, // Leave true, forever.
     hostProtocol: "TunnelTCP", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
     isSecureKNXEnabled: true, // Leave "false" until KNX-Secure has been released

@@ -43,7 +43,7 @@ These are the properties to be passed to the connection as a *JSON object {}* (s
 | ipPort (string) | The port, default is "3671" |
 | physAddr (string) | The physical address to be identified in the KNX bus |
 | suppress_ack_ldatareq (bool) | Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true |
-| loglevel (string) | The log level. "info", "error", "debug" or "trace" |
+| loglevel (string) | The log level 'disable', 'error', 'warn', 'info', 'debug' |
 | localEchoInTunneling (bool) | Leave true forever. This is used only in Node-Red KNX-Ultimate node |
 | isSecureKNXEnabled (bool) | True: Enables the secure connection. **Leave false until KNX-Secure has been released**. |
 | jKNXSecureKeyring (string) | ETS Keyring JSON file content. **Leave blank until KNX-Secure has been released**. |
