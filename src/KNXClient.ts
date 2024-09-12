@@ -237,7 +237,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		})
 		// add an empty error listener, without this
 		// every "error" emitted would throw an unhandled exception
-		this.on('error', (error) => {})
+		this.on('error', (error) => {
+			this.sysLogger.error(error.stack)
+		})
 
 		if (typeof this._options.physAddr === 'string') {
 			this.physAddr = KNXAddress.createFromString(this._options.physAddr)
