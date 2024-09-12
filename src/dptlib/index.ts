@@ -164,10 +164,10 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
 	// get the raw APDU data for the given JS value
 	if (typeof dpt.formatAPDU === 'function') {
 		// nothing to do here, DPT-specific formatAPDU implementation will handle everything
-		// knxLog.get().trace('>>> custom formatAPDU(%s): %j', dptid, value);
+		// knxLog.get().debug('>>> custom formatAPDU(%s): %j', dptid, value);
 		// TODO: this could return void, what to do in that case?
 		apdu.data = dpt.formatAPDU(value) as Buffer
-		// knxLog.get().trace('<<< custom formatAPDU(%s): %j', dptid, apdu.data);
+		// knxLog.get().debug('<<< custom formatAPDU(%s): %j', dptid, apdu.data);
 	} else {
 		if (!isFinite(value)) {
 			throw new Error(
@@ -182,7 +182,7 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
 		if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 'scalar_range')) {
 			const scalar = dpt.subtype.scalar_range
 			if (value < scalar[0] || value > scalar[1]) {
-				KnxLog.get().trace(
+				KnxLog.get().debug(
 					'Value %j(%s) out of scalar range(%j) for %s',
 					value,
 					typeof value,
@@ -200,7 +200,7 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
 			// just a plain numeric value, only check if within bounds
 			// eslint-disable-next-line no-lonely-if
 			if (value < range[0] || value > range[1]) {
-				KnxLog.get().trace(
+				KnxLog.get().debug(
 					'Value %j(%s) out of bounds(%j) for %s.%s',
 					value,
 					typeof value,
@@ -220,7 +220,7 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
 			apdu.data.writeUIntBE(tgtvalue, 0, nbytes)
 		}
 	}
-	// knxLog.get().trace('generic populateAPDU tgtvalue=%j(%s) nbytes=%d => apdu=%j', tgtvalue, typeof tgtvalue, nbytes, apdu);
+	// knxLog.get().debug('generic populateAPDU tgtvalue=%j(%s) nbytes=%d => apdu=%j', tgtvalue, typeof tgtvalue, nbytes, apdu);
 	return apdu
 }
 
@@ -238,7 +238,7 @@ export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
 		// nothing to do here, DPT-specific fromBuffer implementation will handle everything
 		value = dpt.fromBuffer(buf)
 	} else {
-		// knxLog.get().trace('%s buflength == %d => %j', typeof buf, buf.length, JSON.stringify(buf) );
+		// knxLog.get().debug('%s buflength == %d => %j', typeof buf, buf.length, JSON.stringify(buf) );
 		// get a raw unsigned integer from the buffer
 		if (buf.length > 6) {
 			throw Error(
@@ -253,7 +253,7 @@ export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
 		} else {
 			value = buf.readUIntBE(0, buf.length)
 		}
-		// knxLog.get().trace(' ../knx/src/index.js : DPT : ' + JSON.stringify(dpt));   // for exploring dpt and implementing description
+		// knxLog.get().debug(' ../knx/src/index.js : DPT : ' + JSON.stringify(dpt));   // for exploring dpt and implementing description
 		if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 'scalar_range')) {
 			const range = hasProp(dpt.basetype, 'range')
 				? dpt.basetype.range
@@ -264,10 +264,10 @@ export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
 			const a = (scalar[1] - scalar[0]) / (range[1] - range[0])
 			const b = scalar[0] - range[0]
 			value = Math.round(a * value + b)
-			// knxLog.get().trace('fromBuffer scalar a=%j b=%j %j', a,b, value);
+			// knxLog.get().debug('fromBuffer scalar a=%j b=%j %j', a,b, value);
 		}
 	}
-	//  knxLog.get().trace('generic fromBuffer buf=%j, value=%j', buf, value);
+	//  knxLog.get().debug('generic fromBuffer buf=%j, value=%j', buf, value);
 	return value
 }
 

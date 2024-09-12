@@ -15,7 +15,6 @@ import KNXAddress from './protocol/KNXAddress'
 import KNXDataBuffer, { IDataPoint } from './protocol/KNXDataBuffer'
 import * as DPTLib from './dptlib'
 import KnxLog, { KNXLoggerOptions } from './KnxLog'
-import { Logger } from 'log-driver'
 import { KNXPacket } from './protocol'
 import KNXRoutingIndication from './protocol/KNXRoutingIndication'
 import KNXConnectRequest from './protocol/KNXConnectRequest'
@@ -178,7 +177,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _clientSocket: UDPSocket | TCPSocket
 
-	private sysLogger: Logger
+	private sysLogger: any
 
 	private jKNXSecureKeyring: any
 
@@ -370,7 +369,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 		const isSixBits: boolean = adpu.bitlength <= 6
 
-		this.sysLogger?.trace(
+		this.sysLogger?.debug(
 			`isSixBits:${isSixBits} Includes (should be = isSixBits):${[
 				1, 2, 3, 5, 9, 10, 11, 14, 18,
 			].includes(iDatapointType)} ADPU BitLength:${adpu.bitlength}`,
@@ -1316,7 +1315,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// Composing debug string
 			sProcessInboundLog = `Data received: ${msg.toString('hex')}`
 			sProcessInboundLog += ` srcAddress: ${JSON.stringify(rinfo)}`
-			this.sysLogger?.trace(
+			this.sysLogger?.debug(
 				`Received KNX packet: _processInboundMessage, ${sProcessInboundLog} ChannelID:${this._channelID}` ||
 					`??` +
 						` Host:${this._options.ipAddr}:${this._options.ipPort}`,
