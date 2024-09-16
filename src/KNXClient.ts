@@ -543,14 +543,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// Limiter: limits max telegrams per second
 			const remainingRequests = await this.limiter.removeTokens(1)
 			if (this.commandQueue.length > 0 && this._clearToSend) {
-				this.sysLogger?.debug(`\n\nKNXClient: START.`)
+				this.sysLogger?.debug(`KNXClient: START.`)
 				const item = this.commandQueue.pop()
 				this.currentItemHandledByTheQueue = item
+				await this.processKnxPacketQueueItem(item.knxPacket)
 				if (item.ACK !== undefined) {
-					await this.processKnxPacketQueueItem(item.knxPacket)
 					this.setTimerWaitingForACK(item.ACK)
-				} else {
-					await this.processKnxPacketQueueItem(item.knxPacket)
 				}
 				this.sysLogger?.debug(`KNXClient: END.`)
 			} // else if (!this.clearToSend) {
@@ -651,13 +649,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				seqNum,
 				cEMIMessage,
 			)
-			if (!this._options.suppress_ack_ldatareq)
+			if (!this._options.suppress_ack_ldatareq) {
 				this.send(
 					knxPacketRequest,
 					knxPacketRequest,
 					false,
 					this.getSeqNumber(),
 				)
+			} else {
+				this.send(
+					knxPacketRequest,
+					undefined,
+					false,
+					this.getSeqNumber(),
+				)
+			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
 			if (this._options.localEchoInTunneling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
@@ -727,13 +733,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				seqNum,
 				cEMIMessage,
 			)
-			if (!this._options.suppress_ack_ldatareq)
+			if (!this._options.suppress_ack_ldatareq) {
 				this.send(
 					knxPacketRequest,
 					knxPacketRequest,
 					false,
 					this.getSeqNumber(),
 				)
+			} else {
+				this.send(
+					knxPacketRequest,
+					undefined,
+					false,
+					this.getSeqNumber(),
+				)
+			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
 			if (this._options.localEchoInTunneling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
@@ -793,13 +807,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				seqNum,
 				cEMIMessage,
 			)
-			if (!this._options.suppress_ack_ldatareq)
+			if (!this._options.suppress_ack_ldatareq) {
 				this.send(
 					knxPacketRequest,
 					knxPacketRequest,
 					false,
 					this.getSeqNumber(),
 				)
+			} else {
+				this.send(
+					knxPacketRequest,
+					undefined,
+					false,
+					this.getSeqNumber(),
+				)
+			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
 			if (this._options.localEchoInTunneling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
@@ -894,13 +916,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				seqNum,
 				cEMIMessage,
 			)
-			if (!this._options.suppress_ack_ldatareq)
+			if (!this._options.suppress_ack_ldatareq) {
 				this.send(
 					knxPacketRequest,
 					knxPacketRequest,
 					false,
 					this.getSeqNumber(),
 				)
+			} else {
+				this.send(
+					knxPacketRequest,
+					undefined,
+					false,
+					this.getSeqNumber(),
+				)
+			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
 			if (this._options.localEchoInTunneling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
