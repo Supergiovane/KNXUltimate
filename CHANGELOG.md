@@ -1,5 +1,12 @@
 
 
+## [3.0.2](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.1...v3.0.2) (2024-09-16)
+
+
+### Bug Fixes
+
+* fixed queue ACK issue. Now, the replies from request coming from the KNX Gateway, are put as priority item in the kNX output queue. ([93ca4cc](https://github.com/Supergiovane/KNXUltimate/commit/93ca4ccdd4b49c832016ff4cf33e7a7c8ea35ba2))
+
 ## [3.0.1](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.0...v3.0.1) (2024-09-16)
 
 
