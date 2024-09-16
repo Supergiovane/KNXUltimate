@@ -543,14 +543,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// Limiter: limits max telegrams per second
 			const remainingRequests = await this.limiter.removeTokens(1)
 			if (this.commandQueue.length > 0 && this._clearToSend) {
-				this.sysLogger?.debug(`KNXClient: START.`)
 				const item = this.commandQueue.pop()
 				this.currentItemHandledByTheQueue = item
-				await this.processKnxPacketQueueItem(item.knxPacket)
 				if (item.ACK !== undefined) {
 					this.setTimerWaitingForACK(item.ACK)
 				}
-				this.sysLogger?.debug(`KNXClient: END.`)
+				await this.processKnxPacketQueueItem(item.knxPacket)
 			} // else if (!this.clearToSend) {
 			// this.sysLogger?.warn(`KNXClient: NOT CLEAR TO SEND!`)
 			// }
@@ -823,8 +821,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			if (this._options.localEchoInTunneling)
+			if (this._options.localEchoInTunneling) {
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
+			}
 		}
 	}
 
@@ -1022,7 +1021,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Connect to the KNX bus
 	 */
 	Connect(knxLayer = TunnelTypes.TUNNEL_LINKLAYER) {
-		if (this._clientSocket == null) {
+		if (this._clientSocket === null) {
 			throw new Error('No client socket defined')
 		}
 		if (this._connectionState === ConncetionState.DISCONNECTING) {
@@ -1039,16 +1038,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			throw new Error('Socket is already connected. Disconnect first.')
 		}
 
-		this.handleKNXQueue() // Start the KNX queue processing loop
 		this._connectionState = ConncetionState.CONNECTING
 		this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
 		this._clearToSend = true // 26/12/2021 allow to send
-
 		this.clearTimer(KNXTimer.CONNECTION)
-
 		// Emit connecting
 		this.emit(KNXClientEvents.connecting, this._options)
-
+		this.handleKNXQueue() // Start the KNX queue processing loop
 		if (this._options.hostProtocol === 'TunnelUDP') {
 			// Unicast, need to explicitly create the connection
 			const timeoutError = new Error(
@@ -1477,7 +1473,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				// 26/12/2021 send the ACK if the server requestet that
 				// Then REMOVED, because some interfaces sets the "ack request" always to 0 even if it needs ack.
 				// if (knxMessage.cEMIMessage.control.ack){
-				// setTimeout(() => {
 				try {
 					const knxTunnelAck = KNXProtocol.newKNXTunnelingACK(
 						knxTunnelingRequest.channelID,
@@ -1487,7 +1482,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.send(
 						knxTunnelAck,
 						undefined,
-						false,
+						true,
 						this.getSeqNumber(),
 					)
 				} catch (error) {
@@ -1495,10 +1490,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						`Received KNX packet: TUNNELING: L_DATA_IND, ERROR BUOLDING THE TUNNELINK ACK: ${error.message} MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnelingRequest.channelID} ReceivedPacketseqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 				}
-
-				// }, 20);
-
-				// }
 
 				if (
 					knxTunnelingRequest.cEMIMessage.msgCode ===
@@ -1683,7 +1674,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.send(
 			KNXProtocol.newKNXConnectRequest(cri),
 			undefined,
-			false,
+			true,
 			this.getSeqNumber(),
 		)
 	}
@@ -1698,7 +1689,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.send(
 			KNXProtocol.newKNXConnectionStateRequest(channelID),
 			undefined,
-			false,
+			true,
 			this.getSeqNumber(),
 		)
 	}
@@ -1713,7 +1704,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.send(
 			KNXProtocol.newKNXDisconnectRequest(channelID),
 			undefined,
-			false,
+			true,
 			this.getSeqNumber(),
 		)
 	}
@@ -1725,7 +1716,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.send(
 			KNXProtocol.newKNXDisconnectResponse(channelID, status),
 			undefined,
-			false,
+			true,
 			this.getSeqNumber(),
 		)
 	}
@@ -1741,7 +1732,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.send(
 			KNXProtocol.newKNXSecureSessionRequest(cri, oHPAI),
 			undefined,
-			false,
+			true,
 			this.getSeqNumber(),
 		)
 	}
