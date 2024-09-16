@@ -230,7 +230,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._awaitingResponseType = null
 		this._clientSocket = null
 		this.jKNXSecureKeyring = this._options.jKNXSecureKeyring
-		// Reionfigura il rate limiter per coda KNX
+		// Configure the limiter
+		try {
+			if (Number(this._options.KNXQueueSendIntervalMilliseconds) < 20) {
+				this._options.KNXQueueSendIntervalMilliseconds = 20 // Protection avoiding handleKNXQueue hangs
+			}
+		} catch (error) {
+			this._options.KNXQueueSendIntervalMilliseconds = 25
+			this.sysLogger?.error(
+				`KNXQueueSendIntervalMilliseconds:${error.message}. Defaulting to 25`,
+			)
+		}
 		this.limiter = new RateLimiter({
 			tokensPerInterval: 1,
 			interval: this._options.KNXQueueSendIntervalMilliseconds,
@@ -574,14 +584,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			expectedSeqNumberForACK: _expectedSeqNumberForACK,
 		}
 		if (_priority) {
-			this.commandQueue.push(toBeAdded)
+			this.commandQueue.push(toBeAdded) // Put the item as first to be sent.
 			this._clearToSend = true
 		} else {
-			this.commandQueue.unshift(toBeAdded) // Put the item as last to be sent
+			this.commandQueue.unshift(toBeAdded) // Put the item as last to be sent.
 		}
 
 		this.sysLogger?.debug(
-			`KNXClient: ADDED TELEGRAM TO COMMANDQUEUE. Len: ${this.commandQueue.length}`,
+			`KNXClient: ADDED TELEGRAM TO COMMANDQUEUE. Len: ${this.commandQueue.length}, Priority: ${_priority}`,
+			toBeAdded,
 		)
 	}
 
