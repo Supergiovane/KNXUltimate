@@ -1,5 +1,12 @@
 
 
+## [3.0.1](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.0...v3.0.1) (2024-09-16)
+
+
+### Bug Fixes
+
+* fixed an issue when "suppress ACK request" was set to true. ([83a5f5d](https://github.com/Supergiovane/KNXUltimate/commit/83a5f5dd77751d547976ab6a45c27e9701135b07))
+
 # [3.0.0](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.0-beta.1...v3.0.0) (2024-09-15)
 
 # [3.0.0-beta.1](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.0-beta.0...v3.0.0-beta.1) (2024-09-12)
