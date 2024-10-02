@@ -1,17 +1,11 @@
 ![Logo](img/logo-big.png)
 
 [![CI](https://github.com/Supergiovane/KNXUltimate/actions/workflows/ci.yml/badge.svg)](https://github.com/Supergiovane/KNXUltimate/actions/workflows/ci.yml)
-
 [![NPM version][npm-version-image]][npm-url]
-
 [![NPM downloads per month][npm-downloads-month-image]][npm-url]
-
 [![NPM downloads total][npm-downloads-total-image]][npm-url]
-
 [![MIT License][license-image]][license-url]
-
 [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
-
 [![Youtube][youtube-image]][youtube-url]
 
 Control your KNX intallation via Node.js!  
