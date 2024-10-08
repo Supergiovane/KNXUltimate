@@ -15,6 +15,7 @@ const config: DatapointConfig = {
 	id: 'DPT9',
 	formatAPDU: (value) => {
 		const apdu_data = Buffer.alloc(2)
+		value = Number(value) // Expect a number
 		if (!isFinite(value)) {
 			Log.get().warn('DPT9: cannot write non-numeric or undefined value')
 		} else {
