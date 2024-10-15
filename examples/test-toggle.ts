@@ -13,6 +13,10 @@ let client: KNXClient
 async function initClient() {
 	const interfaces = await KNXClient.discover(1000)
 
+	if(interfaces.length === 0) {
+		console.log('No interfaces found')
+		return
+	}
 	console.log('Discovered interfaces:', interfaces)
 
 	const [ip, port] = interfaces[0].split(':')
