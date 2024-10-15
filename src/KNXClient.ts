@@ -180,7 +180,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private jKNXSecureKeyring: any
 
-	private _clearToSend = false
+	private _clearToSend = true
 
 	private timers: Map<KNXTimer, NodeJS.Timeout>
 
