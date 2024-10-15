@@ -1,5 +1,12 @@
 
 
+# [4.0.0-beta.0](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.4...v4.0.0-beta.0) (2024-10-15)
+
+
+### Bug Fixes
+
+* limiter improvements ([#28](https://github.com/Supergiovane/KNXUltimate/issues/28)) ([e78a8c8](https://github.com/Supergiovane/KNXUltimate/commit/e78a8c844c79a5a959f1c05f9320b7d4bceec669))
+
 ## [3.0.4](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.3...v3.0.4) (2024-10-08)
 
 ## [3.0.3](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.2...v3.0.3) (2024-09-16)
