@@ -70,9 +70,8 @@
   "dependencies": {
     "binary-parser": "2.2.1",
     "crypto-js": "4.2.0",
-    "limiter": "2.1.0",
-    "node-color-log": "12.0.1",
     "mkdirp": "3.0.1",
+    "node-color-log": "12.0.1",
     "xml2js": "0.6.0"
   },
   "devDependencies": {
