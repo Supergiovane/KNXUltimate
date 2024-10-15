@@ -25,7 +25,6 @@ import KNXTunnelingAck from './protocol/KNXTunnelingAck'
 import KNXSearchResponse from './protocol/KNXSearchResponse'
 import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
 import { wait } from './utils'
-import { RateLimiter } from 'limiter'
 
 export enum ConncetionState {
 	STARTED = 'STARTED',
@@ -181,19 +180,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private jKNXSecureKeyring: any
 
-	private _clearToSend: boolean
+	private _clearToSend = false
 
 	private timers: Map<KNXTimer, NodeJS.Timeout>
 
 	public physAddr: KNXAddress
-
-	private limiter: RateLimiter
 
 	private commandQueue: Array<KNXQueueItem> = []
 
 	private exitProcessingKNXQueueLoop: boolean
 
 	private currentItemHandledByTheQueue: KNXQueueItem
+
+	private queueLock = false
 
 	constructor(options: KNXClientOptions) {
 		super()
@@ -237,14 +236,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			}
 		} catch (error) {
 			this._options.KNXQueueSendIntervalMilliseconds = 25
-			this.sysLogger?.error(
+			this.sysLogger.error(
 				`KNXQueueSendIntervalMilliseconds:${error.message}. Defaulting to 25`,
 			)
 		}
-		this.limiter = new RateLimiter({
-			tokensPerInterval: 1,
-			interval: this._options.KNXQueueSendIntervalMilliseconds,
-		})
+
 		// add an empty error listener, without this
 		// every "error" emitted would throw an unhandled exception
 		this.on('error', (error) => {
@@ -260,7 +256,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._options.interface,
 			)
 		} catch (error) {
-			this.sysLogger?.error(
+			this.sysLogger.error(
 				`ipAddressHelper.getLocalAddress:${error.message}`,
 			)
 			throw error
@@ -283,7 +279,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							).address().address
 						}
 					} catch (error) {
-						this.sysLogger?.error(
+						this.sysLogger.error(
 							`UDP:  Error setting SetTTL ${error.message}` || '',
 						)
 					}
@@ -303,7 +299,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._clientSocket = new net.Socket()
 			// this._clientSocket.removeAllListeners()
 			this._clientSocket.on(SocketEvents.data, (data) => {
-				this.sysLogger?.debug('Received message', data)
+				this.sysLogger.debug('Received message', data)
 			})
 			this._clientSocket.on(SocketEvents.error, (error) =>
 				this.emit(KNXClientEvents.error, error),
@@ -334,7 +330,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					client.setMulticastTTL(250)
 					client.setMulticastInterface(this._options.localIPAddress)
 				} catch (error) {
-					this.sysLogger?.error(
+					this.sysLogger.error(
 						`Multicast: Error setting SetTTL ${error.message}` ||
 							'',
 					)
@@ -345,7 +341,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this._options.localIPAddress,
 					)
 				} catch (err) {
-					this.sysLogger?.error(
+					this.sysLogger.error(
 						'Multicast: cannot add membership (%s)',
 						err,
 					)
@@ -366,7 +362,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Handle the busy state, for example while waiting for ACK. When true means we can send new telegrams to bus
 	 */
 	get clearToSend(): boolean {
-		return this._clearToSend !== undefined ? this._clearToSend : true
+		return this._clearToSend
+	}
+
+	set clearToSend(val: boolean) {
+		this._clearToSend = val
+		if (val) {
+			this.handleKNXQueue()
+		}
 	}
 
 	private getKNXDataBuffer(data: Buffer, dptid: string | number) {
@@ -381,7 +384,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 		const isSixBits: boolean = adpu.bitlength <= 6
 
-		this.sysLogger?.debug(
+		this.sysLogger.debug(
 			`isSixBits:${isSixBits} Includes (should be = isSixBits):${[
 				1, 2, 3, 5, 9, 10, 11, 14, 18,
 			].includes(iDatapointType)} ADPU BitLength:${adpu.bitlength}`,
@@ -418,7 +421,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			clearTimeout(this.timers.get(type))
 			this.timers.delete(type)
 			// TODO: should we throw error?
-			this.sysLogger?.warn(`Timer "${type}" was already running`)
+			this.sysLogger.warn(`Timer "${type}" was already running`)
 		}
 
 		this.timers.set(
@@ -448,15 +451,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 	}
 
-	processKnxPacketQueueItem = async (_knxPacket: KNXPacket) => {
+	private processKnxPacketQueueItem(_knxPacket: KNXPacket) {
 		// await new Promise((f) => {
 		// 	setTimeout(f, 2000)
 		// }) // For debugging
-		this.sysLogger?.debug(
+		this.sysLogger.debug(
 			`KNXClient: processKnxPacketQueueItem: Processing queued KNX. commandQueue.length: ${this.commandQueue.length} ${_knxPacket.header.service_type}`,
 		)
 		if (_knxPacket instanceof KNXConnectRequest) {
-			this.sysLogger?.debug(
+			this.sysLogger.debug(
 				`Sending KNX packet: ${_knxPacket.constructor.name} Host:${this._peerHost}:${this._peerPort}`,
 			)
 		}
@@ -479,7 +482,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			sDebugString += ` srcAddress: ${_knxPacket.cEMIMessage.srcAddress.toString()}`
 			sDebugString += ` dstAddress: ${_knxPacket.cEMIMessage.dstAddress.toString()}`
 
-			this.sysLogger?.debug(
+			this.sysLogger.debug(
 				`Sending KNX packet: ${
 					_knxPacket.constructor.name
 				} ${sDebugString} Host:${this._peerHost}:${
@@ -504,7 +507,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this._peerHost,
 					(err) => {
 						if (err) {
-							this.sysLogger?.error(
+							this.sysLogger.error(
 								`Sending KNX packet: Send UDP sending error: ${err.message}`,
 							)
 							this.emit(KNXClientEvents.error, err)
@@ -512,7 +515,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					},
 				)
 			} catch (error) {
-				this.sysLogger?.error(
+				this.sysLogger.error(
 					`Sending KNX packet: Send UDP Catch error: ${
 						error.message
 					} ${typeof _knxPacket} seqCounter:${
@@ -527,7 +530,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					_knxPacket.toBuffer(),
 					(err) => {
 						if (err) {
-							this.sysLogger?.error(
+							this.sysLogger.error(
 								`Sending KNX packet: Send TCP sending error: ${err.message}` ||
 									'Undef error',
 							)
@@ -536,7 +539,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					},
 				)
 			} catch (error) {
-				this.sysLogger?.error(
+				this.sysLogger.error(
 					`Sending KNX packet: Send TCP Catch error: ${error.message}` ||
 						'Undef error',
 				)
@@ -545,26 +548,36 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 	}
 
-	handleKNXQueue = async () => {
-		this.sysLogger?.debug(
+	private async handleKNXQueue() {
+		if (this.queueLock) return
+
+		this.sysLogger.debug(
 			`KNXClient: handleKNXQueue: Start Processing queued KNX.`,
 		)
-		do {
-			// Limiter: limits max telegrams per second
-			const remainingRequests = await this.limiter.removeTokens(1)
-			if (this.commandQueue.length > 0 && this._clearToSend) {
-				const item = this.commandQueue.pop()
-				this.currentItemHandledByTheQueue = item
-				if (item.ACK !== undefined) {
-					this.setTimerWaitingForACK(item.ACK)
-				}
-				await this.processKnxPacketQueueItem(item.knxPacket)
-			} // else if (!this.clearToSend) {
-			// this.sysLogger?.warn(`KNXClient: NOT CLEAR TO SEND!`)
-			// }
-			if (this.exitProcessingKNXQueueLoop) return
-		} while (this.exitProcessingKNXQueueLoop === false)
-		this.sysLogger?.debug(
+
+		// lock the queue
+		this.queueLock = true
+
+		// Limiter: limits max telegrams per second
+		while (this.commandQueue.length > 0) {
+			if (!this.clearToSend) {
+				this.sysLogger.debug(
+					`KNXClient: handleKNXQueue: Clear to send is false. Stop processing queue.`,
+				)
+				break
+			}
+			const item = this.commandQueue.pop()
+			this.currentItemHandledByTheQueue = item
+			if (item.ACK !== undefined) {
+				this.setTimerWaitingForACK(item.ACK)
+			}
+			this.processKnxPacketQueueItem(item.knxPacket)
+			await wait(this._options.KNXQueueSendIntervalMilliseconds)
+		}
+
+		this.queueLock = false
+
+		this.sysLogger.debug(
 			`KNXClient: handleKNXQueue: Stop Processing queued KNX.`,
 		)
 	}
@@ -585,12 +598,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 		if (_priority) {
 			this.commandQueue.push(toBeAdded) // Put the item as first to be sent.
-			this._clearToSend = true
+			this.clearToSend = true
 		} else {
 			this.commandQueue.unshift(toBeAdded) // Put the item as last to be sent.
 		}
 
-		this.sysLogger?.debug(
+		this.handleKNXQueue()
+
+		this.sysLogger.debug(
 			`KNXClient: ADDED TELEGRAM TO COMMANDQUEUE. Len: ${this.commandQueue.length}, Priority: ${_priority}`,
 			toBeAdded,
 		)
@@ -857,7 +872,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 
 		if (!Buffer.isBuffer(rawDataBuffer)) {
-			this.sysLogger?.error(
+			this.sysLogger.error(
 				'KNXClient: writeRaw: Value must be a buffer! ',
 			)
 			return
@@ -1051,11 +1066,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		this._connectionState = ConncetionState.CONNECTING
 		this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
-		this._clearToSend = true // 26/12/2021 allow to send
+		this.clearToSend = true // 26/12/2021 allow to send
 		this.clearTimer(KNXTimer.CONNECTION)
 		// Emit connecting
 		this.emit(KNXClientEvents.connecting, this._options)
-		this.handleKNXQueue() // Start the KNX queue processing loop
 		if (this._options.hostProtocol === 'TunnelUDP') {
 			// Unicast, need to explicitly create the connection
 			const timeoutError = new Error(
@@ -1101,7 +1115,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 			// 16/03/2022 These two are referring to tunneling connection, but i set it here as well. Non si sa mai.
 			this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
-			this._clearToSend = true // 26/12/2021 allow to send
+			this.clearToSend = true // 26/12/2021 allow to send
 
 			this._clientTunnelSeqNumber = -1
 			this.emit(KNXClientEvents.connected, this._options)
@@ -1130,7 +1144,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					;(this._clientSocket as UDPSocket).close(cb)
 				}
 			} catch (error) {
-				this.sysLogger?.error(
+				this.sysLogger.error(
 					`KNXClient: into async closeSocket(): ${error.stack}`,
 				)
 				resolve()
@@ -1159,7 +1173,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// 20/04/2022 this._channelID === null can happen when the KNX Gateway is already disconnected
 		if (this._channelID === null) {
 			// 11/10/2022 Close the socket
-			this.sysLogger?.debug(
+			this.sysLogger.debug(
 				`KNXClient: into Disconnect(), channel id is not defined so skip disconnect packet and close socket`,
 			)
 			await this.closeSocket()
@@ -1191,7 +1205,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Close the socket connection without sending a disconnect request
 	 */
 	private async setDisconnected(_sReason = '') {
-		this.sysLogger?.debug(
+		this.sysLogger.debug(
 			`KNXClient: called _setDisconnected ${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
 		)
 		this._connectionState = ConncetionState.DISCONNECTED
@@ -1208,7 +1222,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			KNXClientEvents.disconnected,
 			`${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
 		)
-		this._clearToSend = true // 26/12/2021 allow to send
+		this.clearToSend = true // 26/12/2021 allow to send
 	}
 
 	/**
@@ -1235,7 +1249,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.setTimer(
 			KNXTimer.CONNECTION_STATE,
 			() => {
-				this.sysLogger?.error(
+				this.sysLogger.error(
 					`KNXClient: getConnectionStatus Timeout ${this._heartbeatFailures} out of ${this.max_HeartbeatFailures}`,
 				)
 				// this.emit(KNXClientEvents.error, timeoutError)
@@ -1291,7 +1305,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Setup a timer while waiting for an ACK of `knxTunnelingRequest`
 	 */
 	private setTimerWaitingForACK(knxTunnelingRequest: KNXTunnelingRequest) {
-		this._clearToSend = false // 26/12/2021 stop sending until ACK received
+		this.clearToSend = false // 26/12/2021 stop sending until ACK received
 		const timeoutErr = new errors.RequestTimeoutError(
 			`seqCounter:${knxTunnelingRequest.seqCounter}, DestAddr:${
 				knxTunnelingRequest.cEMIMessage.dstAddress.toString() ||
@@ -1314,16 +1328,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						knxTunnelingRequest,
 						false,
 					)
-					this._clearToSend = true
+					this.clearToSend = true
 					this.emit(KNXClientEvents.error, timeoutErr)
-					this.sysLogger?.error(
+					this.sysLogger.error(
 						`KNXClient: _setTimerWaitingForACK: ${
 							timeoutErr.message || 'Undef error'
 						} no ACK received. ABORT sending datagram with seqNumber ${this.getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
 					)
 				} else {
 					// 26/12/2021 // If no ACK received, resend the datagram once with the same sequence number
-					this.sysLogger?.error(
+					this.sysLogger.error(
 						`KNXClient: _setTimerWaitingForACK: ${
 							timeoutErr.message || 'Undef error'
 						} no ACK received. Retransmit datagram with seqNumber ${
@@ -1354,7 +1368,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// Composing debug string
 			sProcessInboundLog = `Data received: ${msg.toString('hex')}`
 			sProcessInboundLog += ` srcAddress: ${JSON.stringify(rinfo)}`
-			this.sysLogger?.debug(
+			this.sysLogger.debug(
 				`Received KNX packet: _processInboundMessage, ${sProcessInboundLog} ChannelID:${this._channelID}` ||
 					`??` +
 						` Host:${this._options.ipAddr}:${this._options.ipPort}`,
@@ -1419,9 +1433,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this._channelID = knxConnectResponse.channelID
 					this._connectionState = ConncetionState.CONNECTED
 					this._numFailedTelegramACK = 0 // 16/03/2022 Reset the failed ACK counter
-					this._clearToSend = true // 16/03/2022 allow to send
+					this.clearToSend = true // 16/03/2022 allow to send
 
-					this.sysLogger?.debug(
+					this.sysLogger.debug(
 						`Received KNX packet: CONNECT_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 
@@ -1431,7 +1445,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.DISCONNECT_RESPONSE
 			) {
-				this.sysLogger?.debug(
+				this.sysLogger.debug(
 					`Received KNX packet: DISCONNECT_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 				)
 
@@ -1452,7 +1466,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					return
 				}
 
-				this.sysLogger?.error(
+				this.sysLogger.error(
 					`Received KNX packet: DISCONNECT_REQUEST, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 				)
 
@@ -1476,7 +1490,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			) {
 				const knxTunnelingRequest = knxMessage as KNXTunnelingRequest
 				if (knxTunnelingRequest.channelID !== this._channelID) {
-					this.sysLogger?.debug(
+					this.sysLogger.debug(
 						`Received KNX packet: TUNNELING: L_DATA_IND, NOT FOR ME: MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnelingRequest.channelID} ReceivedPacketseqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 					return
@@ -1497,7 +1511,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this.getSeqNumber(),
 					)
 				} catch (error) {
-					this.sysLogger?.error(
+					this.sysLogger.error(
 						`Received KNX packet: TUNNELING: L_DATA_IND, ERROR BUOLDING THE TUNNELINK ACK: ${error.message} MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnelingRequest.channelID} ReceivedPacketseqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 				}
@@ -1512,7 +1526,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)}`
 					sDebugString += ` srcAddress: ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()}`
 					sDebugString += ` dstAddress: ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`
-					this.sysLogger?.debug(
+					this.sysLogger.debug(
 						`Received KNX packet: TUNNELING: L_DATA_IND, ${sDebugString} ChannelID:${this._channelID} seqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 
@@ -1525,7 +1539,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					knxTunnelingRequest.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_CON
 				) {
-					this.sysLogger?.debug(
+					this.sysLogger.debug(
 						`Received KNX packet: TUNNELING: L_DATA_CON, ChannelID:${this._channelID} seqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 				}
@@ -1535,7 +1549,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					return
 				}
 
-				this.sysLogger?.debug(
+				this.sysLogger.debug(
 					`Received KNX packet: TUNNELING: TUNNELING_ACK, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 				)
 
@@ -1547,7 +1561,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					) {
 						this.clearTimer(KNXTimer.ACK)
 						this._numFailedTelegramACK = 0 // 25/12/2021 clear the current ACK failed telegram number
-						this._clearToSend = true // I'm ready to send a new datagram now
+						this.clearToSend = true // I'm ready to send a new datagram now
 						// 08/04/2022 Emits the event informing that the last ACK has been acknowledge.
 						this.emit(
 							KNXClientEvents.ackReceived,
@@ -1555,13 +1569,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							true,
 						)
 
-						this.sysLogger?.debug(
+						this.sysLogger.debug(
 							`Received KNX packet: TUNNELING: DELETED_TUNNELING_ACK FROM PENDING ACK's, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 						)
 					} else {
 						// Inform that i received an ACK with an unexpected sequence number
 
-						this.sysLogger?.error(
+						this.sysLogger.error(
 							`Received KNX packet: TUNNELING: Unexpected Tunnel Ack with seqCounter = ${knxTunnelingAck.seqCounter}, expecting ${this.getSeqNumber()}`,
 						)
 						// this.emit(KNXClientEvents.error, `Unexpected Tunnel Ack ${knxTunnelingAck.seqCounter}`);
@@ -1584,7 +1598,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)}`
 					sDebugString += ` srcAddress: ${knxRoutingInd.cEMIMessage.srcAddress.toString()}`
 					sDebugString += ` dstAddress: ${knxRoutingInd.cEMIMessage.dstAddress.toString()}`
-					this.sysLogger?.debug(
+					this.sysLogger.debug(
 						`Received KNX packet: ROUTING: L_DATA_IND, ${sDebugString} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 
@@ -1593,7 +1607,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					knxRoutingInd.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_CON
 				) {
-					this.sysLogger?.debug(
+					this.sysLogger.debug(
 						`Received KNX packet: ROUTING: L_DATA_CON, Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 				}
@@ -1603,7 +1617,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this._awaitingResponseType ===
 						KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
 					) {
-						this.sysLogger?.debug(
+						this.sysLogger.debug(
 							`Received KNX packet: CONNECTIONSTATE_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 						)
 
@@ -1640,7 +1654,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 			}
 		} catch (e) {
-			this.sysLogger?.error(
+			this.sysLogger.error(
 				`Received KNX packet: Error processing inbound message: ${e.message} ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}. This means that KNX-Ultimate received a malformed Header or CEMI message from your KNX Gateway.`,
 			)
 			// try {
