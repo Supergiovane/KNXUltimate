@@ -180,7 +180,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private jKNXSecureKeyring: any
 
-	private _clearToSend = true
+	private _clearToSend = false
 
 	private timers: Map<KNXTimer, NodeJS.Timeout>
 
@@ -984,8 +984,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	/**
 	 * Send a search request message to the KNX bus and wait for responses
+	 * Set _clearToSend to true to allow the discovery packet to process. Initially set to false to prevent premature sends.
 	 */
 	startDiscovery() {
+		this._clearToSend = true
 		if (this.isDiscoveryRunning()) {
 			throw new Error('Discovery already running')
 		}
