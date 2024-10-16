@@ -5,7 +5,7 @@
 
 import Log from '../KnxLog'
 import type { DatapointConfig } from '.'
-import { frexp, hasProp, ldexp } from '../utils'
+import { frexp, ldexp, round } from '../utils'
 
 //
 // DPT9.*: 2-byte floating point value
@@ -19,7 +19,7 @@ const config: DatapointConfig = {
 		if (!isFinite(value)) {
 			Log.get().warn('DPT9: cannot write non-numeric or undefined value')
 		} else {
-			value = value.toFixed(2) // Fix issue with float having too many decimals.
+			value = round(value, 2) // Fix issue with float having too many decimals.
 			const arr = frexp(value)
 			const mantissa = arr[0]
 			const exponent = arr[1]

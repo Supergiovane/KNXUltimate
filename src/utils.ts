@@ -18,7 +18,10 @@ export function hexToDec(hex: string) {
 	return result
 }
 
-// kudos to http://croquetweak.blogspot.gr/2014/08/deconstructing-floats-frexp-and-ldexp.html
+/**
+ * Convert `mantissa` and `exponent` into a float32 number
+ *kudos to http://croquetweak.blogspot.gr/2014/08/deconstructing-floats-frexp-and-ldexp.html
+ */
 export function ldexp(mantissa: number, exponent: number) {
 	// eslint-disable-next-line no-nested-ternary
 	return exponent > 1023 // avoid multiplying by infinity
@@ -28,6 +31,9 @@ export function ldexp(mantissa: number, exponent: number) {
 			: mantissa * 2 ** exponent
 }
 
+/**
+ * Decompose a float32 number into [mantissa, exponent]
+ */
 export function frexp(value: number) {
 	if (value === 0) return [value, 0]
 	const data = new DataView(new ArrayBuffer(8))
@@ -42,6 +48,9 @@ export function frexp(value: number) {
 	return [mantissa, exponent]
 }
 
+/**
+ * Convert a float32 number into a 2-byte array
+ */
 export function getHex(_value: number) {
 	try {
 		const arr = frexp(_value)
@@ -63,7 +72,9 @@ export function getHex(_value: number) {
 		// noop
 	}
 }
-
+/**
+ * Convert a 2-byte array into a float32 number
+ */
 export function getFloat(_value0: number, _value1: number) {
 	const sign = _value0 >> 7
 	const exponent = (_value0 & 0b01111000) >> 3
@@ -76,4 +87,11 @@ export function wait(ms: number) {
 	return new Promise<void>((r) => {
 		setTimeout(r, ms)
 	})
+}
+
+/**
+ * Round a number to a given number of decimals
+ */
+export function round(value: number, decimals: number) {
+	return Number(`${Math.round(Number(`${value}e${decimals}`))}e-${decimals}`)
 }
