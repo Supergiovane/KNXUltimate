@@ -11,6 +11,10 @@ export default class KNXAddresses {
 		this._addresses = new Set<KNXAddress>()
 	}
 
+	getAddressCount(): number {
+		return this._addresses.size
+	}
+
 	get length(): number {
 		return 2 + this._addresses.size * 2
 	}

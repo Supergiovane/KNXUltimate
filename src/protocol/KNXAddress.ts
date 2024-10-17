@@ -60,7 +60,7 @@ export default class KNXAddress {
 		offset: number = 0,
 		type: KNXAddressType = KNXAddressType.TYPE_INDIVIDUAL,
 	): KNXAddress {
-		if (offset + 2 >= buffer.length) {
+		if (offset + 2 > buffer.length) {
 			throw new Error(
 				`offset ${offset} out of buffer range ${buffer.length}`,
 			)
