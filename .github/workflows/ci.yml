@@ -34,9 +34,11 @@ jobs:
       run: |
         npm run lint
 
-    # - name: Test NodeJS
-    #   run: npm run test
-    #   timeout-minutes: 5
+    - name: Test NodeJS
+      run: npm run test
+      timeout-minutes: 5
+
+
   
 
 
