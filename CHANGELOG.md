@@ -1,5 +1,14 @@
 
 
+# [4.0.0-beta.1](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.0...v4.0.0-beta.1) (2024-10-17)
+
+
+### Bug Fixes
+
+* [#30](https://github.com/Supergiovane/KNXUltimate/issues/30) short value 0x3f decoding ([#29](https://github.com/Supergiovane/KNXUltimate/issues/29)) ([d103ff2](https://github.com/Supergiovane/KNXUltimate/commit/d103ff2aec5c77fb5b0182b2859f7f6e0a0ef399))
+* better rounding on dpt 9.001 ([#33](https://github.com/Supergiovane/KNXUltimate/issues/33)) ([4d706bd](https://github.com/Supergiovane/KNXUltimate/commit/4d706bdca939ce6498d6523cf7560e171c7a4469)), closes [#32](https://github.com/Supergiovane/KNXUltimate/issues/32)
+* ensure _clearToSend is correctly set during discovery ([#34](https://github.com/Supergiovane/KNXUltimate/issues/34)) ([7640855](https://github.com/Supergiovane/KNXUltimate/commit/7640855e8ed663bc4cd8eeb1e79597680acb96db))
+
 # [4.0.0-beta.0](https://github.com/Supergiovane/KNXUltimate/compare/v3.0.4...v4.0.0-beta.0) (2024-10-15)
 
 
