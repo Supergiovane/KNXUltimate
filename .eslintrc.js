@@ -11,7 +11,7 @@ module.exports = {
 		'plugin:@typescript-eslint/recommended'
 	],
 	parserOptions: {
-		project: 'tsconfig.json',
+		project: ["./tsconfig.json", "./tsconfig.test.json"],
 		sourceType: 'module',
 		tsconfigRootDir: __dirname
 	},
