@@ -195,5 +195,19 @@ describe('utils', () => {
 		it('should handle zero', () => {
 			assert.strictEqual(round(0, 2), 0)
 		})
+		it('should correctly round numbers like 1.255', () => {
+			assert.strictEqual(round(1.255 + Number.EPSILON, 2), 1.26)
+		})
+
+		it('should correctly round results of multiplication involving 1.255', () => {
+			assert.strictEqual(
+				round((1.255 * 100 + Number.EPSILON) / 100, 2),
+				1.26,
+			)
+		})
+
+		it('should correctly round results of division involving 1.255', () => {
+			assert.strictEqual(round(1.255 / 2 + Number.EPSILON, 3), 0.628)
+		})
 	})
 })
