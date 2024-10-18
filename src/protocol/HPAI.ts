@@ -102,7 +102,7 @@ export default class HPAI {
 			ip.push(buffer.readUInt8(offset))
 			offset += 1
 		}
-		const port = buffer.readUInt8(offset)
+		const port = buffer.readUInt16BE(offset)
 		const host = ip.join('.')
 		return new HPAI(host, port, protocol)
 	}
