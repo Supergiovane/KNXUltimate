@@ -25,7 +25,7 @@ describe('KNXConnectionStateResponse', () => {
 	})
 
 	it('should throw an error if buffer is too short', () => {
-		const buffer = Buffer.alloc(0) // buffer vuoto
+		const buffer = Buffer.alloc(0)
 		assert.throws(() => {
 			KNXConnectionStateResponse.createFromBuffer(buffer)
 		}, /Buffer too short/)
