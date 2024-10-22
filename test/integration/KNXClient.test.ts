@@ -7,6 +7,30 @@ import { wait } from 'src/utils'
 const TEST_TIMEOUT = 30000
 const TEST_GROUP_ADDRESS = '0/1'
 
+// Helper function to get expected response based on environment
+function getDiscoveryResponses() {
+	if (process.env.CI) {
+		return [
+			{
+				request: '06100201000e08017f0000010e57',
+				response:
+					'06100202004e08017f0000010e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
+				deltaReq: 0,
+				deltaRes: 10,
+			},
+		]
+	}
+	return [
+		{
+			request: '06100201000e0801c0a8013a0e57',
+			response:
+				'06100202004e0801c0a8013a0e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
+			deltaReq: 0,
+			deltaRes: 10,
+		},
+	]
+}
+
 describe('KNXClient Tests', () => {
 	test(
 		'should discover KNX interfaces',
@@ -34,14 +58,7 @@ describe('KNXClient Tests', () => {
 			client.on(KNXClientEvents.socketCreated, (socket) => {
 				console.log('[TEST] Socket created, initializing mock server')
 				const mockServer = new MockKNXServer(
-					[
-						{
-							request: '06100201000e0801c0a8013a0e57',
-							response: '06100201000e0801c0a8013a0e57',
-							deltaReq: 0,
-							deltaRes: 10,
-						},
-					],
+					getDiscoveryResponses(),
 					socket,
 				)
 			})
@@ -50,18 +67,17 @@ describe('KNXClient Tests', () => {
 			client.startDiscovery()
 
 			console.log('[TEST] Waiting 500ms...')
-			await wait(1000) // FIX: replace using Sinon fake timers
+			await wait(500)
 
 			console.log('Discovered hosts:', discovered)
 
 			await client.Disconnect()
 			console.log('[TEST] Client disconnected')
 
-			assert.equal(
-				discovered[0],
-				'192.168.1.116:3671',
-				'Discovery should work',
-			)
+			const expectedHost = process.env.CI
+				? '127.0.0.1:3671'
+				: '192.168.1.116:3671'
+			assert.equal(discovered[0], expectedHost, 'Discovery should work')
 		},
 	)
 
