@@ -50,6 +50,9 @@ export function getLocalAddress(_interface = ''): string {
 	KnxLog.get().debug(
 		'ipAddressHelper.js: getLocalAddress: getting interfaces',
 	)
+	if (process.env.CI) {
+		return '127.0.0.1'
+	}
 	const candidateInterfaces = getIPv4Interfaces()
 	if (_interface !== '') {
 		if (!hasProp(candidateInterfaces, _interface)) {

@@ -35,6 +35,8 @@ jobs:
         npm run lint
 
     - name: Test NodeJS
+      env: 
+        CI: true
       run: npm run test
       timeout-minutes: 5
 
