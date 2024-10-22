@@ -1,4 +1,3 @@
-// Made with love by Supergiovane
 import dgram, { RemoteInfo, Socket as UDPSocket } from 'dgram'
 import net, { Socket as TCPSocket } from 'net'
 import { ConnectionStatus, KNX_CONSTANTS } from './protocol/KNXConstants'
@@ -55,6 +54,7 @@ export enum KNXClientEvents {
 	connecting = 'connecting',
 	ackReceived = 'ackReceived',
 	close = 'close',
+	socketCreated = 'socketCreated',
 }
 
 export interface KNXClientEventCallbacks {
@@ -75,6 +75,7 @@ export interface KNXClientEventCallbacks {
 		ack: boolean,
 	) => void
 	close: () => void
+	socketCreated: (socket: UDPSocket | TCPSocket) => void
 }
 
 const jKNXSecureKeyring: string = ''
@@ -106,6 +107,8 @@ export type KNXClientOptions = {
 	localSocketAddress?: string
 	// ** Local queue interval between each KNX telegram. Default is 1 telegram each 25ms
 	KNXQueueSendIntervalMilliseconds?: number
+	/** Enables sniffing mode to monitor KNX */
+	sniffingMode?: boolean
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
@@ -143,6 +146,15 @@ export enum KNXTimer {
 	DISCONNECT = 'disconnect',
 	/** Waits for discovery responses */
 	DISCOVERY = 'discovery',
+}
+
+export type SnifferPacket = {
+	request: string
+	response?: string
+	/** Time in ms between this request and the previous */
+	deltaReq: number
+	/** Time in ms between the request and the response */
+	deltaRes?: number
 }
 
 interface KNXQueueItem {
@@ -194,6 +206,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private queueLock = false
 
+	private sniffingBuffers: SnifferPacket[]
+
+	private lastSnifferRequest: number
+
 	constructor(options: KNXClientOptions) {
 		super()
 		this.timers = new Map()
@@ -210,6 +226,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			}
 		}
 		this._options = options
+
+		this.sniffingBuffers = []
 
 		this.sysLogger = KnxLog.get({
 			loglevel: this._options.loglevel,
@@ -349,6 +367,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 			})
 		}
+
+		// allow to catch this event after the constructor
+		process.nextTick(() => {
+			this.emit(KNXClientEvents.socketCreated, this._clientSocket)
+		})
 	}
 
 	/**
@@ -452,9 +475,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private processKnxPacketQueueItem(_knxPacket: KNXPacket) {
-		// await new Promise((f) => {
-		// 	setTimeout(f, 2000)
-		// }) // For debugging
 		this.sysLogger.debug(
 			`KNXClient: processKnxPacketQueueItem: Processing queued KNX. commandQueue.length: ${this.commandQueue.length} ${_knxPacket.header.service_type}`,
 		)
@@ -596,6 +616,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			ACK: _ACK,
 			expectedSeqNumberForACK: _expectedSeqNumberForACK,
 		}
+
+		if (this._options.sniffingMode) {
+			const buffer = _knxPacket.toBuffer()
+			this.sniffingBuffers.push({
+				request: buffer.toString('hex'),
+				deltaReq: this.lastSnifferRequest
+					? Date.now() - this.lastSnifferRequest
+					: 0,
+			})
+
+			this.lastSnifferRequest = Date.now()
+		}
+
 		if (_priority) {
 			this.commandQueue.push(toBeAdded) // Put the item as first to be sent.
 			this.clearToSend = true
@@ -609,6 +642,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			`KNXClient: ADDED TELEGRAM TO COMMANDQUEUE. Len: ${this.commandQueue.length}, Priority: ${_priority}`,
 			toBeAdded,
 		)
+	}
+
+	public getSniffingBuffers() {
+		return this.sniffingBuffers
+	}
+
+	public clearSniffingBuffers(): void {
+		this.sniffingBuffers = []
 	}
 
 	/** Sends a WRITE telegram to the BUS.
@@ -1034,17 +1075,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return discovered
 	}
 
-	// getDescription(host, port) {
-	//     if (this._clientSocket == null) {
-	//         throw new Error('No client socket defined');
-	//     }
-	//     this._connectionTimeoutTimer = setTimeout(() => {
-	//         this._connectionTimeoutTimer = null;
-	//     }, 1000 * KNX_CONSTANTS.DEVICE_CONFIGURATION_REQUEST_TIMEOUT);
-	//     this._awaitingResponseType = KNX_CONSTANTS.DESCRIPTION_RESPONSE;
-	//     this._sendDescriptionRequestMessage(host, port);
-	// }
-
 	/**
 	 * Connect to the KNX bus
 	 */
@@ -1095,15 +1125,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				2000,
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			// TCP
-			// const timeoutError = new Error(
-			// 	`Connection timeout to ${this._peerHost}:${this._peerPort}`,
-			// )
 			this._clientSocket.connect(this._peerPort, this._peerHost, () => {
-				// this._timer = setTimeout(() => {
-				//     this._timer = null;
-				//     this.emit(KNXClientEvents.error, timeoutError);
-				// }, 1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT);
 				this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
 				this._clientTunnelSeqNumber = 0
 				if (this._options.isSecureKNXEnabled)
@@ -1239,10 +1261,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			throw new Error('No client socket defined')
 		}
 
-		// const timeoutError = new Error(
-		// 	`HeartBeat failure with ${this._peerHost}:${this._peerPort}`,
-		// )
-
 		const deadError = new Error(
 			`Connection dead with ${this._peerHost}:${this._peerPort}`,
 		)
@@ -1300,9 +1318,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return this._clientTunnelSeqNumber
 	}
 
-	// _keyFromCEMIMessage(cEMIMessage) {
-	//     return cEMIMessage.dstAddress.toString();
-	// }
 	/**
 	 * Setup a timer while waiting for an ACK of `knxTunnelingRequest`
 	 */
@@ -1365,6 +1380,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
 		let sProcessInboundLog = ''
+
+		if (this._options.sniffingMode) {
+			const lastEntry =
+				this.sniffingBuffers[this.sniffingBuffers.length - 1]
+			if (lastEntry && !lastEntry.response) {
+				lastEntry.response = msg.toString('hex')
+				lastEntry.deltaRes = Date.now() - this.lastSnifferRequest
+			}
+		}
 
 		try {
 			// Composing debug string
@@ -1497,9 +1521,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)
 					return
 				}
-				// 26/12/2021 send the ACK if the server requestet that
-				// Then REMOVED, because some interfaces sets the "ack request" always to 0 even if it needs ack.
-				// if (knxMessage.cEMIMessage.control.ack){
 				try {
 					const knxTunnelAck = KNXProtocol.newKNXTunnelingACK(
 						knxTunnelingRequest.channelID,
@@ -1659,11 +1680,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.sysLogger.error(
 				`Received KNX packet: Error processing inbound message: ${e.message} ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}. This means that KNX-Ultimate received a malformed Header or CEMI message from your KNX Gateway.`,
 			)
-			// try {
-			// 05/01/2022 Avoid disconnecting, because there are many bugged knx gateways out there!
-			// this.emit(KNXClientEvents.error, e);
-			// this._setDisconnected();
-			// } catch (error) {}
 		}
 	}
 
@@ -1692,12 +1708,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendConnectRequestMessage(cri: TunnelCRI) {
-		// try {
-		//   const oHPAI = new HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
-		//   this.send(KNXProtocol.newKNXConnectRequest(cri, null, oHPAI))
-		// } catch (error) {
-		//   this.send(KNXProtocol.newKNXConnectRequest(cri))
-		// }
 		this.send(
 			KNXProtocol.newKNXConnectRequest(cri),
 			undefined,
@@ -1707,12 +1717,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendConnectionStateRequestMessage(channelID: number) {
-		// try {
-		//   const oHPAI = new HPAI.HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
-		//   this.send(KNXProtocol.newKNXConnectionStateRequest(channelID, oHPAI))
-		// } catch (error) {
-		//   this.send(KNXProtocol.newKNXConnectionStateRequest(channelID))
-		// }
 		this.send(
 			KNXProtocol.newKNXConnectionStateRequest(channelID),
 			undefined,
@@ -1722,12 +1726,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendDisconnectRequestMessage(channelID: number) {
-		// try {
-		//   const oHPAI = new HPAI.HPAI(this._options.localSocketAddress.address, this._options.localSocketAddress.port, this._options.hostProtocol === 'TunnelTCP' ? KNX_CONSTANTS.IPV4_TCP : KNX_CONSTANTS.IPV4_UDP)
-		//   this.send(KNXProtocol.newKNXDisconnectRequest(channelID, oHPAI))
-		// } catch (error) {
-		//   this.send(KNXProtocol.newKNXDisconnectRequest(channelID))
-		// }
 		this.send(
 			KNXProtocol.newKNXDisconnectRequest(channelID),
 			undefined,
