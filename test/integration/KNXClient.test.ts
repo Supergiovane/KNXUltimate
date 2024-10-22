@@ -7,6 +7,17 @@ import { wait } from 'src/utils'
 const TEST_TIMEOUT = 30000
 const TEST_GROUP_ADDRESS = '0/1'
 
+// Mock response templates based on environment
+const getMockResponses = () => [
+	{
+		request: '06100201000e08017f0000010e57',
+		response:
+			'06100202004e08017f0000010e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
+		deltaReq: 0,
+		deltaRes: 10,
+	},
+]
+
 describe('KNXClient Tests', () => {
 	test(
 		'should discover KNX interfaces',
@@ -15,93 +26,78 @@ describe('KNXClient Tests', () => {
 			console.log('[TEST] Starting discovery test')
 			console.log('[TEST] Running in CI:', process.env.CI === 'true')
 
-			return new Promise<void>((resolve, reject) => {
-				const client = new KNXClient({
-					loglevel: 'trace',
-					hostProtocol: 'Multicast',
-				})
-				console.log('[TEST] KNXClient initialized')
-
-				const discovered: string[] = []
-				let mockServer: MockKNXServer
-
-				const cleanup = async () => {
-					console.log('[TEST] Cleaning up...')
-					try {
-						await client.Disconnect()
-						console.log('[TEST] Client disconnected')
-					} catch (err) {
-						console.error('[TEST] Error during cleanup:', err)
-					}
-				}
-
-				client.on(KNXClientEvents.error, (error) => {
-					console.error('[TEST] Client error:', error)
-					cleanup().then(() => reject(error))
-				})
-
-				client.on(KNXClientEvents.discover, (host) => {
-					console.log('[TEST] Host discovered:', host)
-					discovered.push(host)
-				})
-
-				client.on(KNXClientEvents.socketCreated, (socket) => {
-					console.log(
-						'[TEST] Socket created, initializing mock server',
-					)
-					const responses = [
-						{
-							request: '06100201000e08017f0000010e57',
-							response:
-								'06100202004e08017f0000010e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
-							deltaReq: 0,
-							deltaRes: 10,
-						},
-					]
-					console.log(
-						'[TEST] Mock responses:',
-						JSON.stringify(responses, null, 2),
-					)
-					mockServer = new MockKNXServer(responses, socket)
-				})
-
-				// Set a timeout for the entire test
-				const testTimeout = setTimeout(() => {
-					cleanup().then(() => {
-						reject(
-							new Error(
-								'Test timeout - no discovery response received',
-							),
-						)
-					})
-				}, TEST_TIMEOUT - 1000)
-
-				// Wait for discovery or timeout
-				setTimeout(async () => {
-					clearTimeout(testTimeout)
-					console.log('Discovered hosts:', discovered)
-
-					await cleanup()
-
-					try {
-						const expectedHost =
-							process.env.CI === 'true'
-								? '127.0.0.1:3671'
-								: '192.168.1.116:3671'
-						assert.equal(
-							discovered[0],
-							expectedHost,
-							'Discovery should work',
-						)
-						resolve()
-					} catch (err) {
-						reject(err)
-					}
-				}, 2000)
-
-				console.log('[TEST] Starting discovery')
-				client.startDiscovery()
+			const client = new KNXClient({
+				loglevel: 'trace',
+				hostProtocol: 'Multicast',
 			})
+			console.log('[TEST] KNXClient initialized')
+
+			const discovered: string[] = []
+			let mockServer: MockKNXServer
+
+			try {
+				// Set up discovery promise
+				const discoveryPromise = new Promise<void>(
+					(resolve, reject) => {
+						// Handle client errors
+						client.on(KNXClientEvents.error, (error) => {
+							console.error('[TEST] Client error:', error)
+							reject(error)
+						})
+
+						// Handle successful discoveries
+						client.on(KNXClientEvents.discover, (host) => {
+							console.log('[TEST] Host discovered:', host)
+							discovered.push(host)
+							resolve()
+						})
+
+						// Initialize mock server when socket is ready
+						client.on(KNXClientEvents.socketCreated, (socket) => {
+							console.log(
+								'[TEST] Socket created, initializing mock server',
+							)
+							const responses = getMockResponses()
+							console.log(
+								'[TEST] Mock responses:',
+								JSON.stringify(responses, null, 2),
+							)
+							mockServer = new MockKNXServer(responses, socket)
+						})
+
+						// Start discovery process
+						console.log('[TEST] Starting discovery')
+						client.startDiscovery()
+					},
+				)
+
+				// Wait for discovery to complete
+				await discoveryPromise
+
+				// Verify discovery results
+				console.log('[TEST] Verifying discovered hosts:', discovered)
+				const expectedHost =
+					process.env.CI === 'true'
+						? '127.0.0.1:3671'
+						: '192.168.1.116:3671'
+				assert.equal(
+					discovered[0],
+					expectedHost,
+					'Discovery should work',
+				)
+			} catch (error) {
+				console.error('[TEST] Test failed:', error)
+				throw error
+			} finally {
+				// Ensure cleanup happens regardless of test outcome
+				console.log('[TEST] Cleaning up...')
+				try {
+					await client.Disconnect()
+					console.log('[TEST] Client disconnected successfully')
+				} catch (error) {
+					console.error('[TEST] Error during cleanup:', error)
+				}
+			}
 		},
 	)
 
