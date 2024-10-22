@@ -15,6 +15,7 @@ describe('KNXClient Tests', () => {
 			console.log('[TEST] Starting discovery test')
 
 			const client = new KNXClient({
+				loglevel: 'trace',
 				hostProtocol: 'Multicast',
 			})
 			console.log('[TEST] KNXClient initialized')
@@ -49,7 +50,7 @@ describe('KNXClient Tests', () => {
 			client.startDiscovery()
 
 			console.log('[TEST] Waiting 500ms...')
-			await wait(30000) // FIX: replace using Sinon fake timers
+			await wait(1000) // FIX: replace using Sinon fake timers
 
 			console.log('Discovered hosts:', discovered)
 
