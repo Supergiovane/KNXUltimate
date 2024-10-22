@@ -37,14 +37,9 @@ describe('KNXClient Tests', () => {
 				const mockServer = new MockKNXServer(
 					[
 						{
-							request:
-								socket.address().address === '127.0.0.1'
-									? '06100201000e08017f0000010e57' // localhost
-									: '06100201000e0801c0a8013a0e57', // real IP
+							request: '06100201000e0801c0a8013a0e57',
 							response:
-								socket.address().address === '127.0.0.1'
-									? '06100202004e08017f000010e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501'
-									: '06100202004e0801c0a801740e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
+								'06100202004e0801c0a801740e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
 							deltaReq: 0,
 							deltaRes: 10,
 						},
@@ -64,25 +59,11 @@ describe('KNXClient Tests', () => {
 			await client.Disconnect()
 			console.log('[TEST] Client disconnected')
 
-			assert.notEqual(
-				discovered.length,
-				0,
-				'Should discover at least one host',
+			assert.equal(
+				discovered[0],
+				'192.168.1.116:3671',
+				'Discovery should work',
 			)
-
-			if (process.env.CI) {
-				assert.equal(
-					discovered[0],
-					'127.0.0.1:3671',
-					'Should discover localhost in CI',
-				)
-			} else {
-				assert.equal(
-					discovered[0],
-					'192.168.1.116:3671',
-					'Should discover network host',
-				)
-			}
 		},
 	)
 
