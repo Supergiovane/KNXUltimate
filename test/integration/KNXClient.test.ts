@@ -38,7 +38,10 @@ describe('KNXClient Tests', () => {
 
 			client.startDiscovery()
 
-			await wait(5000) // FIX: replace using Sinon fake timers
+			await wait(500) // FIX: replace using Sinon fake timers
+
+			console.log('Discovered hosts:', discovered)
+
 			await client.Disconnect()
 
 			assert.equal(
