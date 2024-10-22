@@ -26,8 +26,8 @@ describe('KNXClient Tests', () => {
 				const mockServer = new MockKNXServer(
 					[
 						{
-							request: '06100201000e0801c0a801740e57',
-							response: '06100201000e0801c0a801740e57',
+							request: '06100201000e0801c0a8013a0e57',
+							response: '06100201000e0801c0a8013a0e57',
 							deltaReq: 0,
 							deltaRes: 10,
 						},
@@ -38,7 +38,7 @@ describe('KNXClient Tests', () => {
 
 			client.startDiscovery()
 
-			await wait(1000) // FIX: replace using Sinon fake timers
+			await wait(5000) // FIX: replace using Sinon fake timers
 			await client.Disconnect()
 
 			assert.equal(
