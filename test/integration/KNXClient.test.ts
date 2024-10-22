@@ -15,7 +15,6 @@ describe('KNXClient Tests', () => {
 			console.log('[TEST] Starting discovery test')
 
 			const client = new KNXClient({
-				loglevel: 'trace',
 				hostProtocol: 'Multicast',
 			})
 			console.log('[TEST] KNXClient initialized')
@@ -34,12 +33,17 @@ describe('KNXClient Tests', () => {
 			client.on(KNXClientEvents.socketCreated, (socket) => {
 				console.log('[TEST] Socket created, initializing mock server')
 
+				const expectedResponse = process.env.CI
+					? '06100202004e08017f000010e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501'
+					: '06100202004e0801c0a801740e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501'
+
 				const mockServer = new MockKNXServer(
 					[
 						{
-							request: '06100201000e0801c0a8013a0e57',
-							response:
-								'06100202004e0801c0a801740e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
+							request: process.env.CI
+								? '06100201000e08017f0000010e57' // localhost
+								: '06100201000e0801c0a8013a0e57', // real IP
+							response: expectedResponse,
 							deltaReq: 0,
 							deltaRes: 10,
 						},
@@ -59,11 +63,19 @@ describe('KNXClient Tests', () => {
 			await client.Disconnect()
 			console.log('[TEST] Client disconnected')
 
-			assert.equal(
-				discovered[0],
-				'192.168.1.116:3671',
-				'Discovery should work',
-			)
+			if (process.env.CI) {
+				assert.equal(
+					discovered[0],
+					'127.0.0.1:3671',
+					'CI environment should discover localhost',
+				)
+			} else {
+				assert.equal(
+					discovered[0],
+					'192.168.1.116:3671',
+					'Local environment should discover real IP',
+				)
+			}
 		},
 	)
 
