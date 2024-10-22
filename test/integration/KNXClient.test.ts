@@ -4,7 +4,7 @@ import { KNXClient, KNXClientEvents, KNXAddress } from '../../src'
 import MockKNXServer from 'test/utils/MockKNXServer'
 import { wait } from 'src/utils'
 
-const TEST_TIMEOUT = 30000
+const TEST_TIMEOUT = 3000
 const TEST_GROUP_ADDRESS = '0/1'
 
 // Mock response templates based on environment
