@@ -12,13 +12,11 @@ export type ServerOptions = {
 export default class MockKNXServer {
 	private socket: UDPSocket | TCPSocket
 
-	private port: number
-
-	private host: string
-
 	private expectedTelegrams: SnifferPacket[]
 
 	private lastIndex = 0
+
+	private rinfo: { address: string; port: number } | null = null
 
 	constructor(
 		capturedTelegrams: SnifferPacket[],
@@ -28,20 +26,31 @@ export default class MockKNXServer {
 		this.expectedTelegrams = capturedTelegrams
 		this.socket = socket
 
-		// intercept write method to capture outgoing data
-		if (socket instanceof TCPSocket) {
-			console.log('[MOCK] TCP socket detected')
-			const originalWrite = socket.write
-			socket.write = (data: Buffer) => {
-				this.onRequest(data)
-				return originalWrite.call(socket, data)
-			}
-		} else {
+		// Track the remote info from the first request
+		if (socket instanceof UDPSocket) {
 			console.log('[MOCK] UDP socket detected')
-			const originalSend = socket.send
+			const originalOn = socket.on.bind(socket)
+			socket.on = (event: string, listener: any) => {
+				if (event === 'message') {
+					return originalOn(event, (msg: Buffer, rinfo: any) => {
+						this.rinfo = rinfo
+						return listener(msg, rinfo)
+					})
+				}
+				return originalOn(event, listener)
+			}
+
+			const originalSend = socket.send.bind(socket)
 			socket.send = (data: Buffer, ...args: any[]) => {
 				this.onRequest(data)
-				return originalSend.call(socket, data, ...args)
+				return originalSend(data, ...args)
+			}
+		} else {
+			console.log('[MOCK] TCP socket detected')
+			const originalWrite = socket.write.bind(socket)
+			socket.write = (data: Buffer) => {
+				this.onRequest(data)
+				return originalWrite(data)
 			}
 		}
 		console.log('[MOCK] MockKNXServer initialized')
@@ -49,7 +58,7 @@ export default class MockKNXServer {
 
 	// Handles incoming connections and data
 	private async onRequest(data: Buffer) {
-		const requestHex = data.toString('hex') // Convert data to hex string
+		const requestHex = data.toString('hex')
 		console.log(`[MOCK] Received request: ${requestHex}`)
 
 		// Look up the captured response
@@ -67,14 +76,39 @@ export default class MockKNXServer {
 			this.lastIndex = resIndex
 			console.log(`[MOCK] Sending response: ${res.response}`)
 			const responseBuffer = Buffer.from(res.response, 'hex')
+
 			try {
-				this.socket.emit('message', responseBuffer) // Send response as a buffer
-				console.log('[MOCK] Response sent successfully')
+				if (this.socket instanceof UDPSocket && this.rinfo) {
+					// For UDP, we need to send back to the specific address and port
+					this.socket.send(
+						responseBuffer,
+						this.rinfo.port,
+						this.rinfo.address,
+						(err) => {
+							if (err) {
+								console.error('[MOCK] UDP send error:', err)
+							} else {
+								console.log(
+									'[MOCK] UDP response sent successfully',
+								)
+							}
+						},
+					)
+				} else {
+					// For TCP or when no rinfo is available
+					this.socket.emit('message', responseBuffer, {
+						address: process.env.CI ? '127.0.0.1' : '192.168.1.116',
+						port: 3671,
+						family: 'IPv4',
+						size: responseBuffer.length,
+					})
+					console.log('[MOCK] Response emitted successfully')
+				}
 			} catch (error) {
 				console.error('[MOCK] Error sending response:', error)
 			}
 		} else {
-			console.log('[MOCK] No matching response found for this request.')
+			console.log('[MOCK] No matching response found for this request')
 		}
 	}
 }
