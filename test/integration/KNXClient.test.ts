@@ -15,6 +15,7 @@ describe('KNXClient Tests', () => {
 			console.log('[TEST] Starting discovery test')
 
 			const client = new KNXClient({
+				loglevel: 'trace',
 				hostProtocol: 'Multicast',
 			})
 			console.log('[TEST] KNXClient initialized')
