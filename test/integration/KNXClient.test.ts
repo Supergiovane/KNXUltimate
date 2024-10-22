@@ -26,8 +26,8 @@ describe('KNXClient Tests', () => {
 				const mockServer = new MockKNXServer(
 					[
 						{
-							request: '06100201000e0801c0a8013a0e57',
-							response: '06100201000e0801c0a8013a0e57',
+							request: '06100201000e0801c0a801740e57',
+							response: '06100201000e0801c0a801740e57',
 							deltaReq: 0,
 							deltaRes: 10,
 						},
