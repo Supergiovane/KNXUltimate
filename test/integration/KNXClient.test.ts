@@ -1,22 +1,28 @@
-import { test, describe, beforeEach, afterEach, before, after } from 'node:test'
+import { test, describe } from 'node:test'
 import assert from 'node:assert'
-import { KNXClient, KNXClientEvents, KNXAddress } from '../../src'
+import { KNXClient, KNXClientEvents } from '../../src'
 import MockKNXServer from 'test/utils/MockKNXServer'
-import { wait } from 'src/utils'
 
 const TEST_TIMEOUT = 3000
-const TEST_GROUP_ADDRESS = '0/1'
 
 // Mock response templates based on environment
-const getMockResponses = () => [
-	{
-		request: '06100201000e08017f0000010e57',
-		response:
-			'06100202004e08017f0000010e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
-		deltaReq: 0,
-		deltaRes: 10,
-	},
-]
+const getMockResponses = () => {
+	const localIPHex = 'c0a8013a' // 192.168.1.58
+	const gatewayIPHex = 'c0a80174' // 192.168.1.116
+	const loopbackIPHex = '7f000001' // 127.0.0.1
+
+	const reqIPHex = process.env.CI === 'true' ? loopbackIPHex : localIPHex
+	const resIPHex = process.env.CI === 'true' ? loopbackIPHex : gatewayIPHex
+
+	return [
+		{
+			request: `06100201000e0801${reqIPHex}0e57`,
+			response: `06100202004e0801${resIPHex}0e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501`,
+			deltaReq: 0,
+			deltaRes: 10,
+		},
+	]
+}
 
 describe('KNXClient Tests', () => {
 	test(

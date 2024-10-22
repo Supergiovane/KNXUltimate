@@ -3,6 +3,12 @@ import { Socket as TCPSocket } from 'net'
 import { SnifferPacket, SocketEvents } from 'src'
 import { wait } from 'src/utils'
 
+export type ServerOptions = {
+	port?: number
+	host?: string
+	protocol?: 'udp' | 'tcp'
+}
+
 export default class MockKNXServer {
 	private socket: UDPSocket | TCPSocket
 
@@ -22,25 +28,27 @@ export default class MockKNXServer {
 		if (socket instanceof TCPSocket) {
 			console.log('[MOCK] TCP socket detected')
 			const originalWrite = socket.write
-			socket.write = function (data: Buffer) {
+			socket.write = (data: Buffer) => {
 				this.onRequest(data)
 				return originalWrite.call(socket, data)
-			}.bind(this)
+			}
 		} else {
 			console.log('[MOCK] UDP socket detected')
 			const originalSend = socket.send
-			socket.send = function (data: Buffer, ...args: any[]) {
+			socket.send = (data: Buffer, ...args: any[]) => {
 				this.onRequest(data)
 				return originalSend.call(socket, data, ...args)
-			}.bind(this)
+			}
 		}
 		console.log('[MOCK] MockKNXServer initialized')
 	}
 
+	// Handles incoming connections and data
 	private async onRequest(data: Buffer) {
-		const requestHex = data.toString('hex')
+		const requestHex = data.toString('hex') // Convert data to hex string
 		console.log(`[MOCK] Received request: ${requestHex}`)
 
+		// Look up the captured response
 		const resIndex = this.expectedTelegrams.findIndex(
 			(packet, i) => i >= this.lastIndex && packet.request === requestHex,
 		)
@@ -57,6 +65,7 @@ export default class MockKNXServer {
 			const responseBuffer = Buffer.from(res.response, 'hex')
 
 			try {
+				// Emit response event with correct rinfo for CI environment
 				this.socket.emit('message', responseBuffer, {
 					address: process.env.CI ? '127.0.0.1' : '192.168.1.116',
 					port: 3671,
