@@ -12,17 +12,26 @@ describe('KNXClient Tests', () => {
 		'should discover KNX interfaces',
 		{ timeout: TEST_TIMEOUT },
 		async () => {
+			console.log('[TEST] Starting discovery test')
+
 			const client = new KNXClient({
 				hostProtocol: 'Multicast',
 			})
+			console.log('[TEST] KNXClient initialized')
 
 			const discovered: string[] = []
 
+			client.on(KNXClientEvents.error, (error) => {
+				console.error('[TEST] Client error:', error)
+			})
+
 			client.on(KNXClientEvents.discover, (host) => {
+				console.log('[TEST] Host discovered:', host)
 				discovered.push(host)
 			})
 
 			client.on(KNXClientEvents.socketCreated, (socket) => {
+				console.log('[TEST] Socket created, initializing mock server')
 				const mockServer = new MockKNXServer(
 					[
 						{
@@ -36,13 +45,16 @@ describe('KNXClient Tests', () => {
 				)
 			})
 
+			console.log('[TEST] Starting discovery')
 			client.startDiscovery()
 
-			await wait(12000) // FIX: replace using Sinon fake timers
+			console.log('[TEST] Waiting 500ms...')
+			await wait(500) // FIX: replace using Sinon fake timers
 
 			console.log('Discovered hosts:', discovered)
 
 			await client.Disconnect()
+			console.log('[TEST] Client disconnected')
 
 			assert.equal(
 				discovered[0],
