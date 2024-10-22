@@ -9,10 +9,14 @@ const TEST_GROUP_ADDRESS = '0/1'
 
 // Helper function to get expected response based on environment
 function getDiscoveryResponses() {
-	if (process.env.CI) {
+	const isCI = process.env.CI === 'true'
+
+	if (isCI) {
 		return [
 			{
+				// CI request (using loopback)
 				request: '06100201000e08017f0000010e57',
+				// Response should use same address format as request
 				response:
 					'06100202004e08017f0000010e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
 				deltaReq: 0,
@@ -20,11 +24,14 @@ function getDiscoveryResponses() {
 			},
 		]
 	}
+
 	return [
 		{
+			// Local request (using network interface)
 			request: '06100201000e0801c0a8013a0e57',
+			// Response with KNX interface address
 			response:
-				'06100202004e0801c0a8013a0e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
+				'06100202004e0801c0a801740e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501',
 			deltaReq: 0,
 			deltaRes: 10,
 		},
@@ -37,6 +44,7 @@ describe('KNXClient Tests', () => {
 		{ timeout: TEST_TIMEOUT },
 		async () => {
 			console.log('[TEST] Starting discovery test')
+			console.log('[TEST] Running in CI:', process.env.CI === 'true')
 
 			const client = new KNXClient({
 				loglevel: 'trace',
@@ -57,26 +65,30 @@ describe('KNXClient Tests', () => {
 
 			client.on(KNXClientEvents.socketCreated, (socket) => {
 				console.log('[TEST] Socket created, initializing mock server')
-				const mockServer = new MockKNXServer(
-					getDiscoveryResponses(),
-					socket,
+				const responses = getDiscoveryResponses()
+				console.log(
+					'[TEST] Mock responses:',
+					JSON.stringify(responses, null, 2),
 				)
+				const mockServer = new MockKNXServer(responses, socket)
 			})
 
 			console.log('[TEST] Starting discovery')
 			client.startDiscovery()
 
-			console.log('[TEST] Waiting 500ms...')
-			await wait(500)
+			console.log('[TEST] Waiting 1000ms...')
+			await wait(1000)
 
 			console.log('Discovered hosts:', discovered)
 
 			await client.Disconnect()
 			console.log('[TEST] Client disconnected')
 
-			const expectedHost = process.env.CI
-				? '127.0.0.1:3671'
-				: '192.168.1.116:3671'
+			// Check discovery results
+			const expectedHost =
+				process.env.CI === 'true'
+					? '127.0.0.1:3671'
+					: '192.168.1.116:3671'
 			assert.equal(discovered[0], expectedHost, 'Discovery should work')
 		},
 	)
