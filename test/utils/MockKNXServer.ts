@@ -37,17 +37,14 @@ export default class MockKNXServer {
 		// intercept write method to capture outgoing data
 		if (this.socket instanceof TCPSocket) {
 			console.log('[MOCK] TCP socket detected')
-			const originalWrite = this.socket.write
 			this.socket.write = (data: Buffer) => {
 				this.onRequest(data)
-				return originalWrite.call(this.socket, data)
+				return true
 			}
 		} else {
 			console.log('[MOCK] UDP socket detected')
-			const originalSend = this.socket.send
 			this.socket.send = (data: Buffer, ...args: any[]) => {
 				this.onRequest(data)
-				return originalSend.call(this.socket, data, ...args)
 			}
 
 			this.socket.on(
