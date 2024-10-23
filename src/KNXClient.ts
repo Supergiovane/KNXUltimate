@@ -54,7 +54,6 @@ export enum KNXClientEvents {
 	connecting = 'connecting',
 	ackReceived = 'ackReceived',
 	close = 'close',
-	socketCreated = 'socketCreated',
 }
 
 export interface KNXClientEventCallbacks {
@@ -75,7 +74,6 @@ export interface KNXClientEventCallbacks {
 		ack: boolean,
 	) => void
 	close: () => void
-	socketCreated: (socket: UDPSocket | TCPSocket) => void
 }
 
 const jKNXSecureKeyring: string = ''
@@ -210,7 +208,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private lastSnifferRequest: number
 
-	constructor(options: KNXClientOptions) {
+	constructor(
+		options: KNXClientOptions,
+		createSocket?: (client: KNXClient) => void,
+	) {
 		super()
 		this.timers = new Map()
 		// This is the KNX telegram's queue list
@@ -280,12 +281,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			throw error
 		}
 
-		// allow to catch this event after the constructor
-		process.nextTick(() => {
+		if (createSocket) {
+			createSocket(this)
+		} else {
 			this.createSocket()
-			// DO NOT MOVE THIS INTO createSocket(), otherwise mock will fail
-			this.emit(KNXClientEvents.socketCreated, this._clientSocket)
-		})
+		}
 	}
 
 	private createSocket() {

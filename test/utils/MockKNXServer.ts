@@ -25,7 +25,6 @@ export default class MockKNXServer {
 	constructor(capturedTelegrams: SnifferPacket[], client: KNXClient) {
 		this.expectedTelegrams = capturedTelegrams
 		this.client = client
-		this.client['createSocket'] = this.createFakeSocket.bind(this)
 	}
 
 	private log(message: string) {
@@ -36,7 +35,7 @@ export default class MockKNXServer {
 		this.client['sysLogger'].error(`[MockKNXServer] ${message}`)
 	}
 
-	private createFakeSocket() {
+	public createFakeSocket() {
 		// TODO: create the correct socket based on client hostProtocol
 		this.client['_clientSocket'] = createSocket({
 			type: 'udp4',

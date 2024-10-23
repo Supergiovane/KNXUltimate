@@ -61,10 +61,17 @@ describe('KNXClient Tests', () => {
 		'should discover KNX interfaces',
 		{ timeout: TEST_TIMEOUT },
 		async () => {
-			const client = new KNXClient({
-				loglevel: 'trace',
-				hostProtocol: 'Multicast',
-			})
+			const client = new KNXClient(
+				{
+					loglevel: 'trace',
+					hostProtocol: 'Multicast',
+				},
+				(c: KNXClient) => {
+					const server = new MockKNXServer(getMockResponses(), c)
+					server.createFakeSocket()
+					c.startDiscovery()
+				},
+			)
 
 			const discovered: string[] = []
 
@@ -80,13 +87,6 @@ describe('KNXClient Tests', () => {
 			client.on(KNXClientEvents.discover, (host) => {
 				discovered.push(host)
 			})
-
-			// Initialize mock server when socket is ready
-			client.on(KNXClientEvents.socketCreated, () => {
-				client.startDiscovery()
-			})
-
-			const mockServer = new MockKNXServer(getMockResponses(), client)
 
 			await wait(50)
 
