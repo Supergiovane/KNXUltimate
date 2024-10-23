@@ -55,6 +55,7 @@ export default class MockKNXServer {
 
 		const res = this.expectedTelegrams[resIndex]
 
+		this.lastIndex = resIndex >= 0 ? resIndex + 1 : this.lastIndex
 		if (res && res.response) {
 			console.log(
 				`[MOCK] Found matching response, waiting ${res.deltaRes}ms`,

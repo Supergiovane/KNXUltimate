@@ -19,42 +19,37 @@ describe('KNXClient Tests', () => {
 			const discovered: string[] = []
 			let mockServer: MockKNXServer
 
-			// Set up discovery promise
-			const discoveryPromise = new Promise<void>((resolve, reject) => {
-				// Handle client errors
-				client.on(KNXClientEvents.error, (error) => {
-					if ((error as any).code !== 'ENODEV') {
-						reject(error)
-					}
-				})
+			// Handle client errors
+			client.on(KNXClientEvents.error, (error) => {
+				// ignore ENODEV errors, it happens on CI
+				if ((error as any).code !== 'ENODEV') {
+					throw error
+				}
+			})
 
-				// Handle successful discoveries
-				client.on(KNXClientEvents.discover, (host) => {
-					discovered.push(host)
-					resolve()
-				})
+			// Handle successful discoveries
+			client.on(KNXClientEvents.discover, (host) => {
+				discovered.push(host)
+			})
 
-				// Initialize mock server when socket is ready
-				client.on(KNXClientEvents.socketCreated, (socket) => {
-					mockServer = new MockKNXServer(
-						[
-							{
-								request: `06100201000e0801c0a8013a0e57`,
-								response: `06100202004e0801c0a801740e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501`,
-								deltaReq: 0,
-								deltaRes: 10,
-							},
-						],
-						socket,
-					)
-				})
+			// Initialize mock server when socket is ready
+			client.on(KNXClientEvents.socketCreated, (socket) => {
+				mockServer = new MockKNXServer(
+					[
+						{
+							request: `06100201000e0801c0a8013a0e57`,
+							response: `06100202004e0801c0a801740e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501`,
+							deltaReq: 0,
+							deltaRes: 10,
+						},
+					],
+					socket,
+				)
 
-				// Start discovery process
 				client.startDiscovery()
 			})
 
-			// Wait for discovery to complete
-			await discoveryPromise
+			await wait(1000)
 
 			// Verify discovery results
 			const expectedHost = '192.168.1.116:3671'
