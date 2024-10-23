@@ -4,20 +4,22 @@ import os, { NetworkInterfaceInfo } from 'os'
 
 export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 	const candidateInterfaces: { [key: string]: NetworkInterfaceInfo } = {}
-	const interfaces = os.networkInterfaces()
+	let interfaces: Record<string, NetworkInterfaceInfo[]> =
+		os.networkInterfaces()
 
 	if (process.env.CI) {
 		// create a fake interface for CI
-		candidateInterfaces['eth0'] = {
-			address: '192.168.1.100',
-			netmask: '255.255.255.0',
-			family: 'IPv4',
-			mac: '00:00:00:00:00:00',
-			internal: false,
-			cidr: '192.168.1.100/24',
-		}
-
-		return candidateInterfaces
+		interfaces = {
+			'eth0': [
+			{
+				address: '192.168.1.100',
+				netmask: '255.255.255.0',
+				family: 'IPv4',
+				mac: '00:00:00:00:00:00',
+				internal: false,
+				cidr: '192.168.1.100/24',
+			},
+		]
 	}
 
 	for (const iface in interfaces) {
