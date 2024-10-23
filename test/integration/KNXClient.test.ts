@@ -73,8 +73,8 @@ describe('KNXClient Tests', () => {
 			})
 
 			// Initialize mock server when socket is ready
-			client.on(KNXClientEvents.socketCreated, (socket) => {
-				mockServer = new MockKNXServer(getMockResponses(), socket)
+			client.on(KNXClientEvents.socketCreated, () => {
+				mockServer = new MockKNXServer(getMockResponses(), client)
 
 				client.startDiscovery()
 			})

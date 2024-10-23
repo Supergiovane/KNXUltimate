@@ -280,6 +280,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			throw error
 		}
 
+		// allow to catch this event after the constructor
+		process.nextTick(() => {
+			this.createSocket()
+		})
+	}
+
+	private createSocket() {
 		if (this._options.hostProtocol === 'TunnelUDP') {
 			this._clientSocket = dgram.createSocket({
 				type: 'udp4',
@@ -368,10 +375,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			})
 		}
 
-		// allow to catch this event after the constructor
-		process.nextTick(() => {
-			this.emit(KNXClientEvents.socketCreated, this._clientSocket)
-		})
+		this.emit(KNXClientEvents.socketCreated, this._clientSocket)
 	}
 
 	/**
