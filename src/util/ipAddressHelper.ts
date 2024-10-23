@@ -10,16 +10,17 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 	if (process.env.CI) {
 		// create a fake interface for CI
 		interfaces = {
-			'eth0': [
-			{
-				address: '192.168.1.100',
-				netmask: '255.255.255.0',
-				family: 'IPv4',
-				mac: '00:00:00:00:00:00',
-				internal: false,
-				cidr: '192.168.1.100/24',
-			},
-		]
+			eth0: [
+				{
+					address: '192.168.1.100',
+					netmask: '255.255.255.0',
+					family: 'IPv4',
+					mac: '00:00:00:00:00:00',
+					internal: false,
+					cidr: '192.168.1.100/24',
+				},
+			],
+		}
 	}
 
 	for (const iface in interfaces) {
