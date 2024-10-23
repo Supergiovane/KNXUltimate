@@ -25,10 +25,14 @@ function getDefaultIpLocal() {
 	return null
 }
 
+function ipToHex(ip: string) {
+	return Buffer.from(ip.split('.').map(Number)).toString('hex')
+}
+
 const getMockResponses = (): SnifferPacket[] => {
-	const ciLocalIp = 'c0a8013a' // 192.168.1.58
+	const ciLocalIp = ipToHex('192.168.1.58')
 	const realLocalIp = getDefaultIpLocal()
-	const knxGwIp = 'c0a80174' // 192.168.1.116
+	const knxGwIp = ipToHex(MockKNXServer.host)
 
 	const reqIP = process.env.CI ? ciLocalIp : realLocalIp
 
@@ -37,9 +41,7 @@ const getMockResponses = (): SnifferPacket[] => {
 	}
 
 	// convert real IP to hex
-	const reqIPHex = Buffer.from(realLocalIp.split('.').map(Number)).toString(
-		'hex',
-	)
+	const reqIPHex = ipToHex(reqIP)
 
 	return [
 		{
@@ -86,7 +88,7 @@ describe('KNXClient Tests', () => {
 			await wait(50)
 
 			// Verify discovery results
-			const expectedHost = '192.168.1.116:3671'
+			const expectedHost = `${MockKNXServer.host}:${MockKNXServer.port}`
 			assert.equal(discovered[0], expectedHost, 'Discovery should work')
 
 			await client.Disconnect()

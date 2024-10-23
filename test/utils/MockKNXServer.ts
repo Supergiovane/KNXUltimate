@@ -10,6 +10,10 @@ export type ServerOptions = {
 }
 
 export default class MockKNXServer {
+	public static port = 3671
+
+	public static host = '192.168.1.116'
+
 	private socket: UDPSocket | TCPSocket
 
 	private client: KNXClient
@@ -47,10 +51,14 @@ export default class MockKNXServer {
 				this.onRequest(data)
 			}
 
-			this.socket.on(
-				SocketEvents.message,
-				this.client['processInboundMessage'].bind(this.client),
-			)
+			this.socket.on(SocketEvents.message, (buf) => {
+				this.client['processInboundMessage'](buf, {
+					address: MockKNXServer.host,
+					port: MockKNXServer.port,
+					family: 'IPv4',
+					size: buf.length,
+				})
+			})
 
 			this.socket.on(SocketEvents.error, (error) =>
 				this.client.emit('error', error),
