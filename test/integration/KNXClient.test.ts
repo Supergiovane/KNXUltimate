@@ -7,7 +7,13 @@ import { networkInterfaces } from 'node:os'
 
 const TEST_TIMEOUT = undefined
 
+const ciIP = '192.168.1.58'
+
 function getDefaultIpLocal() {
+	if (process.env.CI) {
+		return ciIP
+	}
+
 	const interfaces = networkInterfaces()
 
 	for (const iface in interfaces) {
@@ -30,18 +36,15 @@ function ipToHex(ip: string) {
 }
 
 const getMockResponses = (): SnifferPacket[] => {
-	const ciLocalIp = ipToHex('192.168.1.58')
-	const realLocalIp = getDefaultIpLocal()
+	const localIp = getDefaultIpLocal()
 	const knxGwIp = ipToHex(MockKNXServer.host)
 
-	const reqIP = process.env.CI ? ciLocalIp : realLocalIp
-
-	if (realLocalIp === reqIP && !realLocalIp) {
+	if (!localIp) {
 		throw new Error('No local IP found')
 	}
 
 	// convert real IP to hex
-	const reqIPHex = ipToHex(reqIP)
+	const reqIPHex = ipToHex(localIp)
 
 	return [
 		{
