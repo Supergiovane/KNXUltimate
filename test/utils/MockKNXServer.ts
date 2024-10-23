@@ -23,14 +23,20 @@ export default class MockKNXServer {
 	private lastIndex = 0
 
 	constructor(capturedTelegrams: SnifferPacket[], client: KNXClient) {
-		console.log('[MOCK] Initializing MockKNXServer')
 		this.expectedTelegrams = capturedTelegrams
 		this.client = client
 		this.client['createSocket'] = this.createFakeSocket.bind(this)
 	}
 
+	private log(message: string) {
+		this.client['sysLogger'].info(`[MockKNXServer] ${message}`)
+	}
+
+	private error(message: string) {
+		this.client['sysLogger'].error(`[MockKNXServer] ${message}`)
+	}
+
 	private createFakeSocket() {
-		console.log('[MOCK] Creating fake socket')
 		// TODO: create the correct socket based on client hostProtocol
 		this.client['_clientSocket'] = createSocket({
 			type: 'udp4',
@@ -40,13 +46,11 @@ export default class MockKNXServer {
 
 		// intercept write method to capture outgoing data
 		if (this.socket instanceof TCPSocket) {
-			console.log('[MOCK] TCP socket detected')
 			this.socket.write = (data: Buffer) => {
 				this.onRequest(data)
 				return true
 			}
 		} else {
-			console.log('[MOCK] UDP socket detected')
 			this.socket.send = (data: Buffer, ...args: any[]) => {
 				this.onRequest(data)
 			}
@@ -66,13 +70,13 @@ export default class MockKNXServer {
 
 			this.socket.on(SocketEvents.close, () => this.client.emit('close'))
 		}
-		console.log('[MOCK] MockKNXServer initialized')
+		this.log('MockKNXServer initialized')
 	}
 
 	// Handles incoming connections and data
 	private async onRequest(data: Buffer) {
 		const requestHex = data.toString('hex') // Convert data to hex string
-		console.log(`[MOCK] Received request: ${requestHex}`)
+		this.log(`Received request: ${requestHex}`)
 
 		// Look up the captured response
 		const resIndex = this.expectedTelegrams.findIndex(
@@ -83,21 +87,14 @@ export default class MockKNXServer {
 
 		this.lastIndex = resIndex >= 0 ? resIndex + 1 : this.lastIndex
 		if (res && res.response) {
-			console.log(
-				`[MOCK] Found matching response, waiting ${res.deltaRes}ms`,
-			)
+			this.log(`Found matching response, waiting ${res.deltaRes}ms`)
 			await wait(res.deltaRes || 0)
-			console.log(`[MOCK] Sending response: ${res.response}`)
+			this.log(`Sending response: ${res.response}`)
 			const responseBuffer = Buffer.from(res.response, 'hex')
 
-			try {
-				this.socket.emit('message', responseBuffer)
-				console.log('[MOCK] Response sent successfully')
-			} catch (error) {
-				console.error('[MOCK] Error sending response:', error)
-			}
-		} else {
-			console.log('[MOCK] No matching response found for this request.')
+			this.socket.emit('message', responseBuffer)
+		} else if (!res) {
+			this.error('No matching response found for this request.')
 		}
 	}
 }
