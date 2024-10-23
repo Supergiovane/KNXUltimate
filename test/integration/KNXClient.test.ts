@@ -6,106 +6,61 @@ import { wait } from 'src/utils'
 
 const TEST_TIMEOUT = 30000
 
-// Mock response templates based on environment
-const getMockResponses = () => {
-	const localIPHex = 'c0a8013a' // 192.168.1.58
-	const gatewayIPHex = 'c0a80174' // 192.168.1.116
-	const loopbackIPHex = '7f000001' // 127.0.0.1
-
-	const reqIPHex = process.env.CI === 'true' ? loopbackIPHex : localIPHex
-	const resIPHex = process.env.CI === 'true' ? loopbackIPHex : gatewayIPHex
-
-	return [
-		{
-			request: `06100201000e0801${reqIPHex}0e57`,
-			response: `06100202004e0801${resIPHex}0e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501`,
-			deltaReq: 0,
-			deltaRes: 10,
-		},
-	]
-}
-
 describe('KNXClient Tests', () => {
 	test(
 		'should discover KNX interfaces',
 		{ timeout: TEST_TIMEOUT },
 		async () => {
-			console.log('[TEST] Starting discovery test')
-			console.log('[TEST] Running in CI:', process.env.CI === 'true')
-
 			const client = new KNXClient({
 				loglevel: 'trace',
 				hostProtocol: 'Multicast',
 			})
-			console.log('[TEST] KNXClient initialized')
 
 			const discovered: string[] = []
 			let mockServer: MockKNXServer
 
-			try {
-				// Set up discovery promise
-				const discoveryPromise = new Promise<void>(
-					(resolve, reject) => {
-						// Handle client errors
-						client.on(KNXClientEvents.error, (error) => {
-							console.error('[TEST] Client error:', error)
-							reject(error)
-						})
+			// Set up discovery promise
+			const discoveryPromise = new Promise<void>((resolve, reject) => {
+				// Handle client errors
+				client.on(KNXClientEvents.error, (error) => {
+					if ((error as any).code !== 'ENODEV') {
+						reject(error)
+					}
+				})
 
-						// Handle successful discoveries
-						client.on(KNXClientEvents.discover, (host) => {
-							console.log('[TEST] Host discovered:', host)
-							discovered.push(host)
-							resolve()
-						})
+				// Handle successful discoveries
+				client.on(KNXClientEvents.discover, (host) => {
+					discovered.push(host)
+					resolve()
+				})
 
-						// Initialize mock server when socket is ready
-						client.on(KNXClientEvents.socketCreated, (socket) => {
-							console.log(
-								'[TEST] Socket created, initializing mock server',
-							)
-							const responses = getMockResponses()
-							console.log(
-								'[TEST] Mock responses:',
-								JSON.stringify(responses, null, 2),
-							)
-							mockServer = new MockKNXServer(responses, socket)
-						})
+				// Initialize mock server when socket is ready
+				client.on(KNXClientEvents.socketCreated, (socket) => {
+					mockServer = new MockKNXServer(
+						[
+							{
+								request: `06100201000e0801c0a8013a0e57`,
+								response: `06100202004e0801c0a801740e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501`,
+								deltaReq: 0,
+								deltaRes: 10,
+							},
+						],
+						socket,
+					)
+				})
 
-						// Start discovery process
-						console.log('[TEST] Starting discovery')
-						client.startDiscovery()
-					},
-				)
+				// Start discovery process
+				client.startDiscovery()
+			})
 
-				// Wait for discovery to complete
-				await discoveryPromise
+			// Wait for discovery to complete
+			await discoveryPromise
 
-				// Verify discovery results
-				console.log('[TEST] Verifying discovered hosts:', discovered)
-				const expectedHost =
-					process.env.CI === 'true'
-						? '127.0.0.1:3671'
-						: '192.168.1.116:3671'
-				assert.equal(
-					discovered[0],
-					expectedHost,
-					'Discovery should work',
-				)
-			} catch (error) {
-				console.error('[TEST] Test failed:', error)
-				throw error
-			} finally {
-				// Ensure cleanup happens regardless of test outcome
-				console.log('[TEST] Cleaning up...')
-				try {
-					await wait(500)
-					await client.Disconnect()
-					console.log('[TEST] Client disconnected successfully')
-				} catch (error) {
-					console.error('[TEST] Error during cleanup:', error)
-				}
-			}
+			// Verify discovery results
+			const expectedHost = '192.168.1.116:3671'
+			assert.equal(discovered[0], expectedHost, 'Discovery should work')
+
+			await client.Disconnect()
 		},
 	)
 

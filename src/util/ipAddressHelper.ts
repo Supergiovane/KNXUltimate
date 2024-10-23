@@ -12,12 +12,12 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 		interfaces = {
 			eth0: [
 				{
-					address: '192.168.1.100',
+					address: '192.168.1.58',
 					netmask: '255.255.255.0',
 					family: 'IPv4',
 					mac: '00:00:00:00:00:00',
 					internal: false,
-					cidr: '192.168.1.100/24',
+					cidr: '192.168.1.58/24',
 				},
 			],
 		}
@@ -67,9 +67,7 @@ export function getLocalAddress(_interface = ''): string {
 	KnxLog.get().debug(
 		'ipAddressHelper.js: getLocalAddress: getting interfaces',
 	)
-	if (process.env.CI) {
-		return '127.0.0.1'
-	}
+
 	const candidateInterfaces = getIPv4Interfaces()
 	if (_interface !== '') {
 		if (!hasProp(candidateInterfaces, _interface)) {

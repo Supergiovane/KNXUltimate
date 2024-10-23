@@ -65,13 +65,7 @@ export default class MockKNXServer {
 			const responseBuffer = Buffer.from(res.response, 'hex')
 
 			try {
-				// Emit response event with correct rinfo for CI environment
-				this.socket.emit('message', responseBuffer, {
-					address: process.env.CI ? '127.0.0.1' : '192.168.1.116',
-					port: 3671,
-					family: 'IPv4',
-					size: responseBuffer.length,
-				})
+				this.socket.emit('message', responseBuffer)
 				console.log('[MOCK] Response sent successfully')
 			} catch (error) {
 				console.error('[MOCK] Error sending response:', error)
