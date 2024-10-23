@@ -24,8 +24,7 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 	}
 
 	for (const iface in interfaces) {
-		for (const key in interfaces[iface]) {
-			const intf = interfaces[iface][key]
+		for (const intf of interfaces[iface]) {
 			try {
 				KnxLog.get().debug(
 					'ipAddressHelper.js: parsing interface: %s (%j)',
