@@ -283,6 +283,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// allow to catch this event after the constructor
 		process.nextTick(() => {
 			this.createSocket()
+			// DO NOT MOVE THIS INTO createSocket(), otherwise mock will fail
+			this.emit(KNXClientEvents.socketCreated, this._clientSocket)
 		})
 	}
 
@@ -374,8 +376,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 			})
 		}
-
-		this.emit(KNXClientEvents.socketCreated, this._clientSocket)
 	}
 
 	/**

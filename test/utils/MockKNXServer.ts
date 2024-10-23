@@ -1,4 +1,4 @@
-import { Socket as UDPSocket } from 'dgram'
+import { createSocket, Socket as UDPSocket } from 'dgram'
 import { Socket as TCPSocket } from 'net'
 import { KNXClient, SnifferPacket, SocketEvents } from 'src'
 import { wait } from 'src/utils'
@@ -21,15 +21,19 @@ export default class MockKNXServer {
 	constructor(capturedTelegrams: SnifferPacket[], client: KNXClient) {
 		console.log('[MOCK] Initializing MockKNXServer')
 		this.expectedTelegrams = capturedTelegrams
-		client['createSocket'] = this.createFakeSocket.bind(this)
+		this.client = client
+		this.client['createSocket'] = this.createFakeSocket.bind(this)
 	}
 
 	private createFakeSocket() {
 		console.log('[MOCK] Creating fake socket')
-		this.client['_clientSocket'] = new UDPSocket()
+		// TODO: create the correct socket based on client hostProtocol
+		this.client['_clientSocket'] = createSocket({
+			type: 'udp4',
+			reuseAddr: false,
+		})
 		this.socket = this.client['_clientSocket']
 
-		this.socket.on('message', this.onRequest.bind(this))
 		// intercept write method to capture outgoing data
 		if (this.socket instanceof TCPSocket) {
 			console.log('[MOCK] TCP socket detected')
@@ -45,6 +49,17 @@ export default class MockKNXServer {
 				this.onRequest(data)
 				return originalSend.call(this.socket, data, ...args)
 			}
+
+			this.socket.on(
+				SocketEvents.message,
+				this.client['processInboundMessage'].bind(this.client),
+			)
+
+			this.socket.on(SocketEvents.error, (error) =>
+				this.client.emit('error', error),
+			)
+
+			this.socket.on(SocketEvents.close, () => this.client.emit('close'))
 		}
 		console.log('[MOCK] MockKNXServer initialized')
 	}

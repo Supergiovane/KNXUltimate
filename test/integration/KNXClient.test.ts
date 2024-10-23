@@ -57,7 +57,6 @@ describe('KNXClient Tests', () => {
 			})
 
 			const discovered: string[] = []
-			let mockServer: MockKNXServer
 
 			// Handle client errors
 			client.on(KNXClientEvents.error, (error) => {
@@ -74,10 +73,10 @@ describe('KNXClient Tests', () => {
 
 			// Initialize mock server when socket is ready
 			client.on(KNXClientEvents.socketCreated, () => {
-				mockServer = new MockKNXServer(getMockResponses(), client)
-
 				client.startDiscovery()
 			})
+
+			const mockServer = new MockKNXServer(getMockResponses(), client)
 
 			await wait(50)
 
