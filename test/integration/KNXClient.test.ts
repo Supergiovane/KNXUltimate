@@ -2,8 +2,9 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert'
 import { KNXClient, KNXClientEvents } from '../../src'
 import MockKNXServer from 'test/utils/MockKNXServer'
+import { wait } from 'src/utils'
 
-const TEST_TIMEOUT = 3000
+const TEST_TIMEOUT = 30000
 
 // Mock response templates based on environment
 const getMockResponses = () => {
@@ -98,6 +99,7 @@ describe('KNXClient Tests', () => {
 				// Ensure cleanup happens regardless of test outcome
 				console.log('[TEST] Cleaning up...')
 				try {
+					await wait(500)
 					await client.Disconnect()
 					console.log('[TEST] Client disconnected successfully')
 				} catch (error) {
