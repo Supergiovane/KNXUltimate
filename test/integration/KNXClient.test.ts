@@ -30,16 +30,21 @@ const getMockResponses = (): SnifferPacket[] => {
 	const realLocalIp = getDefaultIpLocal()
 	const knxGwIp = 'c0a80174' // 192.168.1.116
 
-	const reqIPHex = process.env.CI ? ciLocalIp : realLocalIp
+	const reqIP = process.env.CI ? ciLocalIp : realLocalIp
 
-	if (realLocalIp === reqIPHex && !realLocalIp) {
+	if (realLocalIp === reqIP && !realLocalIp) {
 		throw new Error('No local IP found')
 	}
+
+	// convert real IP to hex
+	const reqIPHex = Buffer.from(realLocalIp.split('.').map(Number)).toString(
+		'hex',
+	)
 
 	return [
 		{
 			request: `06100201000e0801${reqIPHex}0e57`,
-			response: `06100202004e0801${knxGwIp}0e57`,
+			response: `06100202004e0801${knxGwIp}0e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501`,
 			deltaReq: 0,
 			deltaRes: 10,
 		},
