@@ -1,10 +1,50 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert'
-import { KNXClient, KNXClientEvents } from '../../src'
+import { KNXClient, KNXClientEvents, SnifferPacket } from '../../src'
 import MockKNXServer from 'test/utils/MockKNXServer'
 import { wait } from 'src/utils'
+import { networkInterfaces } from 'node:os'
 
-const TEST_TIMEOUT = 30000
+const TEST_TIMEOUT = undefined
+
+function getDefaultIpLocal() {
+	const interfaces = networkInterfaces()
+
+	for (const iface in interfaces) {
+		for (const intf of interfaces[iface]) {
+			if (
+				intf.family === 'IPv4' &&
+				!intf.internal &&
+				intf.address !== '::1'
+			) {
+				return intf.address
+			}
+		}
+	}
+
+	return null
+}
+
+const getMockResponses = (): SnifferPacket[] => {
+	const ciLocalIp = 'c0a8013a' // 192.168.1.58
+	const realLocalIp = getDefaultIpLocal()
+	const knxGwIp = 'c0a80174' // 192.168.1.116
+
+	const reqIPHex = process.env.CI ? ciLocalIp : realLocalIp
+
+	if (realLocalIp === reqIPHex && !realLocalIp) {
+		throw new Error('No local IP found')
+	}
+
+	return [
+		{
+			request: `06100201000e0801${reqIPHex}0e57`,
+			response: `06100202004e0801${knxGwIp}0e57`,
+			deltaReq: 0,
+			deltaRes: 10,
+		},
+	]
+}
 
 describe('KNXClient Tests', () => {
 	test(
@@ -34,22 +74,12 @@ describe('KNXClient Tests', () => {
 
 			// Initialize mock server when socket is ready
 			client.on(KNXClientEvents.socketCreated, (socket) => {
-				mockServer = new MockKNXServer(
-					[
-						{
-							request: `06100201000e0801c0a8013a0e57`,
-							response: `06100202004e0801c0a801740e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501`,
-							deltaReq: 0,
-							deltaRes: 10,
-						},
-					],
-					socket,
-				)
+				mockServer = new MockKNXServer(getMockResponses(), socket)
 
 				client.startDiscovery()
 			})
 
-			await wait(1000)
+			await wait(50)
 
 			// Verify discovery results
 			const expectedHost = '192.168.1.116:3671'
