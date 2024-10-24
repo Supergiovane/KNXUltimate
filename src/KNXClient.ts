@@ -147,8 +147,10 @@ export enum KNXTimer {
 }
 
 export type SnifferPacket = {
+	reqType?: string
 	request?: string
 	response?: string
+	resType?: string
 	/** Time in ms between this request and the previous */
 	deltaReq: number
 	/** Time in ms between the request and the response */
@@ -204,7 +206,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private queueLock = false
 
-	private sniffingBuffers: SnifferPacket[]
+	private sniffingPackets: SnifferPacket[]
 
 	private lastSnifferRequest: number
 
@@ -228,7 +230,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 		this._options = options
 
-		this.sniffingBuffers = []
+		this.sniffingPackets = []
 
 		this.sysLogger = KnxLog.get({
 			loglevel: this._options.loglevel,
@@ -623,7 +625,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		if (this._options.sniffingMode) {
 			const buffer = _knxPacket.toBuffer()
-			this.sniffingBuffers.push({
+			this.sniffingPackets.push({
+				reqType: _knxPacket.constructor.name,
 				request: buffer.toString('hex'),
 				deltaReq: this.lastSnifferRequest
 					? Date.now() - this.lastSnifferRequest
@@ -649,11 +652,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	public getSniffingBuffers() {
-		return this.sniffingBuffers
+		return this.sniffingPackets
 	}
 
 	public clearSniffingBuffers(): void {
-		this.sniffingBuffers = []
+		this.sniffingPackets = []
 	}
 
 	/** Sends a WRITE telegram to the BUS.
@@ -1220,6 +1223,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				"Forced call from KNXClient Disconnect() function, because the KNX Interface hasn't sent the DISCONNECT_RESPONSE in time.",
 			)
 		}
+
+		if (this._options.sniffingMode) {
+			console.log('Sniffing mode is enabled. Dumping sniffing buffers...')
+			console.log(this.sniffingPackets)
+			this.clearSniffingBuffers()
+		}
 	}
 
 	/**
@@ -1401,14 +1410,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(msg)
 
 			if (this._options.sniffingMode) {
-				if (
-					knxHeader.service_type !==
-					KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
-				) {
-					const lastEntry =
-						this.sniffingBuffers[this.sniffingBuffers.length - 1]
-					if (lastEntry && !lastEntry.response) {
+				const lastEntry =
+					this.sniffingPackets[this.sniffingPackets.length - 1]
+				if (lastEntry) {
+					// last entry already has a response, so create a new entry
+					if (lastEntry.response) {
+						this.sniffingPackets.push({
+							reqType: knxMessage.constructor.name,
+							response: msg.toString('hex'),
+							deltaReq: Date.now() - this.lastSnifferRequest,
+						})
+					} else {
 						lastEntry.response = msg.toString('hex')
+						lastEntry.resType = knxMessage.constructor.name
 						lastEntry.deltaRes =
 							Date.now() - this.lastSnifferRequest
 					}

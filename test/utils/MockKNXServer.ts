@@ -20,6 +20,8 @@ export default class MockKNXServer {
 
 	public static host = '192.168.1.116'
 
+	public static physicalAddress = '10.15.2'
+
 	private socket: UDPSocket | TCPSocket
 
 	private client: KNXClient
@@ -27,8 +29,6 @@ export default class MockKNXServer {
 	private expectedTelegrams: SnifferPacket[]
 
 	private lastIndex = 0
-
-	private connectionStateInterval: NodeJS.Timeout
 
 	get rInfo(): RemoteInfo {
 		return {
@@ -50,34 +50,6 @@ export default class MockKNXServer {
 
 	private error(message: string) {
 		this.client['sysLogger'].error(`[MockKNXServer] ${message}`)
-	}
-
-	/** Send a conection state response every connectKeepalive interval */
-	private setupHeartbeat() {
-		const timeout =
-			this.client['_options'].connectionKeepAliveTimeout ||
-			KNX_CONSTANTS.CONNECTION_ALIVE_TIME
-		this.connectionStateInterval = setInterval(
-			() => {
-				this.sendConnectionStateResponse()
-			},
-			(timeout / 3) * 1000,
-		)
-	}
-
-	private sendConnectionStateResponse() {
-		const response = new KNXConnectionStateResponse(
-			this.client.channelID,
-			ConnectionStatus.E_NO_ERROR,
-		)
-
-		const responseBuffer = response.toBuffer()
-
-		this.socket.emit('message', responseBuffer, this.rInfo)
-	}
-
-	public close() {
-		clearInterval(this.connectionStateInterval)
 	}
 
 	public createFakeSocket() {
@@ -110,15 +82,6 @@ export default class MockKNXServer {
 			this.socket.on(SocketEvents.close, () => this.client.emit('close'))
 		}
 
-		this.client.on('connected', () => {
-			this.sendConnectionStateResponse()
-			this.setupHeartbeat()
-		})
-
-		this.client.on('close', () => {
-			this.close()
-		})
-
 		this.log('MockKNXServer initialized')
 	}
 
@@ -142,6 +105,15 @@ export default class MockKNXServer {
 			const responseBuffer = Buffer.from(res.response, 'hex')
 
 			this.socket.emit('message', responseBuffer)
+
+			const next = this.expectedTelegrams[this.lastIndex]
+			if (next && !next.request) {
+				// next doesn't have a request, send the response after deltaReq
+				await wait(next.deltaReq || 0)
+				this.log(`Sending response: ${next.response}`)
+				const nextResponseBuffer = Buffer.from(next.response, 'hex')
+				this.socket.emit('message', nextResponseBuffer)
+			}
 		} else if (!res) {
 			this.error('No matching response found for this request.')
 		}
