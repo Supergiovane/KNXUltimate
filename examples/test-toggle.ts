@@ -10,6 +10,26 @@ const groupAddress = process.argv[2]
 
 let client: KNXClient
 
+// Helper function to print sniffed packets
+function printSniffedPackets(client: KNXClient) {
+    const packets = client.getSniffingBuffers()
+    if (packets.length === 0) return
+
+    console.log('\nSniffed KNX packets:')
+    packets.forEach((packet, index) => {
+        console.log(`\nPacket ${index + 1}:`)
+        console.log(`  Request:  ${packet.request}`)
+        console.log(`  Response: ${packet.response || 'No response'}`)
+        console.log(`  Time since last request: ${packet.deltaReq}ms`)
+        if (packet.deltaRes !== undefined) {
+            console.log(`  Response time: ${packet.deltaRes}ms`)
+        }
+    })
+    
+    // Clear the buffer after printing
+    client.clearSniffingBuffers()
+}
+
 async function initClient() {
 	const interfaces = await KNXClient.discover(1000)
 
@@ -28,7 +48,8 @@ async function initClient() {
 		ipPort: port,
 		loglevel: 'trace',
 		suppress_ack_ldatareq: false,
-		hostProtocol: 'TunnelUDP', 
+		hostProtocol: 'TunnelUDP',
+        sniffingMode: true
 	})
 	
 	client.on(KNXClientEvents.connected, info => {
@@ -36,6 +57,11 @@ async function initClient() {
 		console.log('Connected. On Duty', info)
 		onConnect()
 	})
+
+    // Add indication handler to print sniffed packets after each telegram
+    client.on(KNXClientEvents.indication, () => {
+        printSniffedPackets(client)
+    })
 
 	client.Connect()
 }
@@ -56,10 +82,10 @@ function onConnect() {
 		console.log(JSON.stringify(data))
 		if (data[0] === 113) {
 			if (client && client?.isConnected()) {
+                printSniffedPackets(client)
 				await client.Disconnect()
 				client = null
 				console.log('\n\n\n')
-
 				console.log('PRESS ANY KEY TO RECONNECT AND "q" TO QUIT')
 				return
 			} else {
