@@ -1,6 +1,12 @@
-import { createSocket, Socket as UDPSocket } from 'dgram'
+import { createSocket, RemoteInfo, Socket as UDPSocket } from 'dgram'
 import { Socket as TCPSocket } from 'net'
-import { KNXClient, SnifferPacket, SocketEvents } from 'src'
+import {
+	KNXClient,
+	KNXConnectionStateResponse,
+	SnifferPacket,
+	SocketEvents,
+} from 'src'
+import { ConnectionStatus, KNX_CONSTANTS } from 'src/protocol/KNXConstants'
 import { wait } from 'src/utils'
 
 export type ServerOptions = {
@@ -22,6 +28,17 @@ export default class MockKNXServer {
 
 	private lastIndex = 0
 
+	private connectionStateInterval: NodeJS.Timeout
+
+	get rInfo(): RemoteInfo {
+		return {
+			address: MockKNXServer.host,
+			port: MockKNXServer.port,
+			family: 'IPv4',
+			size: 0, // not used
+		}
+	}
+
 	constructor(capturedTelegrams: SnifferPacket[], client: KNXClient) {
 		this.expectedTelegrams = capturedTelegrams
 		this.client = client
@@ -33,6 +50,34 @@ export default class MockKNXServer {
 
 	private error(message: string) {
 		this.client['sysLogger'].error(`[MockKNXServer] ${message}`)
+	}
+
+	/** Send a conection state response every connectKeepalive interval */
+	private setupHeartbeat() {
+		const timeout =
+			this.client['_options'].connectionKeepAliveTimeout ||
+			KNX_CONSTANTS.CONNECTION_ALIVE_TIME
+		this.connectionStateInterval = setInterval(
+			() => {
+				this.sendConnectionStateResponse()
+			},
+			(timeout / 3) * 1000,
+		)
+	}
+
+	private sendConnectionStateResponse() {
+		const response = new KNXConnectionStateResponse(
+			this.client.channelID,
+			ConnectionStatus.E_NO_ERROR,
+		)
+
+		const responseBuffer = response.toBuffer()
+
+		this.socket.emit('message', responseBuffer, this.rInfo)
+	}
+
+	public close() {
+		clearInterval(this.connectionStateInterval)
 	}
 
 	public createFakeSocket() {
@@ -55,12 +100,7 @@ export default class MockKNXServer {
 			}
 
 			this.socket.on(SocketEvents.message, (buf) => {
-				this.client['processInboundMessage'](buf, {
-					address: MockKNXServer.host,
-					port: MockKNXServer.port,
-					family: 'IPv4',
-					size: buf.length,
-				})
+				this.client['processInboundMessage'](buf, this.rInfo)
 			})
 
 			this.socket.on(SocketEvents.error, (error) =>
@@ -69,6 +109,16 @@ export default class MockKNXServer {
 
 			this.socket.on(SocketEvents.close, () => this.client.emit('close'))
 		}
+
+		this.client.on('connected', () => {
+			this.sendConnectionStateResponse()
+			this.setupHeartbeat()
+		})
+
+		this.client.on('close', () => {
+			this.close()
+		})
+
 		this.log('MockKNXServer initialized')
 	}
 

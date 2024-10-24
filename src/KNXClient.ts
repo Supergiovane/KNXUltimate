@@ -147,7 +147,7 @@ export enum KNXTimer {
 }
 
 export type SnifferPacket = {
-	request: string
+	request?: string
 	response?: string
 	/** Time in ms between this request and the previous */
 	deltaReq: number
@@ -1385,15 +1385,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
 		let sProcessInboundLog = ''
 
-		if (this._options.sniffingMode) {
-			const lastEntry =
-				this.sniffingBuffers[this.sniffingBuffers.length - 1]
-			if (lastEntry && !lastEntry.response) {
-				lastEntry.response = msg.toString('hex')
-				lastEntry.deltaRes = Date.now() - this.lastSnifferRequest
-			}
-		}
-
 		try {
 			// Composing debug string
 			sProcessInboundLog = `Data received: ${msg.toString('hex')}`
@@ -1408,6 +1399,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// msg = Buffer.from("0610053000102900b06011fe11150080","hex");
 
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(msg)
+
+			if (this._options.sniffingMode) {
+				if (
+					knxHeader.service_type !==
+					KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
+				) {
+					const lastEntry =
+						this.sniffingBuffers[this.sniffingBuffers.length - 1]
+					if (lastEntry && !lastEntry.response) {
+						lastEntry.response = msg.toString('hex')
+						lastEntry.deltaRes =
+							Date.now() - this.lastSnifferRequest
+					}
+				}
+			}
 
 			// 26/12/2021 ROUTING LOST MESSAGE OR BUSY
 			if (knxHeader.service_type === KNX_CONSTANTS.ROUTING_LOST_MESSAGE) {
