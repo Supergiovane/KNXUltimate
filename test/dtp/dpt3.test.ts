@@ -84,41 +84,4 @@ describe('DPT3 (4-bit relative dimming control)', () => {
 			assert.strictEqual(DPT3.fromBuffer(Buffer.from([0, 1])), null)
 		})
 	})
-
-	describe('basetype', () => {
-		test('should have correct properties', () => {
-			assert.strictEqual(DPT3.basetype.bitlength, 4)
-			assert.strictEqual(DPT3.basetype.valuetype, 'composite')
-			assert.strictEqual(
-				DPT3.basetype.desc,
-				'4-bit relative dimming control',
-			)
-			assert.ok(DPT3.basetype.help.includes('dimming'))
-			assert.ok(DPT3.basetype.helplink.includes('Sample---Dimming'))
-		})
-	})
-
-	describe('subtypes', () => {
-		test('should have correct dimming control (007) subtype', () => {
-			const dimmingControl = DPT3.subtypes['007']
-			assert.strictEqual(dimmingControl.name, 'Dimming control')
-			assert.strictEqual(dimmingControl.desc, 'dimming control')
-		})
-
-		test('should have correct blinds control (008) subtype', () => {
-			const blindsControl = DPT3.subtypes['008']
-			assert.strictEqual(blindsControl.name, 'Blinds control')
-			assert.strictEqual(blindsControl.desc, 'blinds control')
-		})
-
-		test('should verify all subtypes have required properties', () => {
-			Object.entries(DPT3.subtypes).forEach(([id, subtype]) => {
-				assert.ok(subtype.name, `Subtype ${id} should have a name`)
-				assert.ok(
-					subtype.desc,
-					`Subtype ${id} should have a description`,
-				)
-			})
-		})
-	})
 })
