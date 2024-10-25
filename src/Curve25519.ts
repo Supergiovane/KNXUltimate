@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-shadow */
 /* eslint-disable no-multi-assign */
+/* node:coverage disable */
 const _0 = new Uint8Array(16)
 const _9 = new Uint8Array(32)
 _9[0] = 9
