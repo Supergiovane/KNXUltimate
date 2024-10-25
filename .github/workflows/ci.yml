@@ -40,6 +40,12 @@ jobs:
       run: npm run test:coverage
       timeout-minutes: 1
 
+    - name: Coveralls
+      uses: coverallsapp/github-action@master
+      if: matrix['node-version'] == '20.x'
+      with:
+        github-token: ${{ secrets.github_token }}
+
 
   
 
