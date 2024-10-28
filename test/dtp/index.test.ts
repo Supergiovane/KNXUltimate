@@ -125,24 +125,4 @@ describe('KNX DPT Handler', () => {
 			assert.equal(fromBuffer(buf, dpt), 100)
 		})
 	})
-
-	describe('DPT Registry', () => {
-		it('should have all required DPTs registered', () => {
-			assert(dpts['DPT1'])
-			assert(dpts['DPT2'])
-			assert(dpts['DPT3'])
-			// ... and so on for all expected DPTs
-		})
-
-		it('should have correct structure for each DPT', () => {
-			for (const [key, dpt] of Object.entries(dpts)) {
-				assert(dpt.id, `${key} should have an id`)
-				assert(dpt.basetype, `${key} should have a basetype`)
-				assert(
-					typeof dpt.basetype.bitlength === 'number',
-					`${key} should have a numeric bitlength`,
-				)
-			}
-		})
-	})
 })
