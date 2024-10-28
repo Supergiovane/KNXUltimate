@@ -337,4 +337,8 @@ ASALocalRun/
 
 build
 
-lcov.info
+/coverage/
+
+/.nyc_output/
+
+

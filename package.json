@@ -16,7 +16,7 @@
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",
     "test": "node -r esbuild-register --test test/**/*.test.ts",
-    "test:coverage": "node -r esbuild-register --test-reporter=lcov --experimental-test-coverage --test-coverage-filter=./src --test-reporter-destination=lcov.info --test test/**/*.test.ts",
+    "test:coverage": "nyc npm run test",
     "test-connection": "",
     "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it",
     "betarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it patch --preRelease=beta"
@@ -90,6 +90,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-prettier": "^5.1.3",
+    "nyc": "^17.1.0",
     "prettier": "^3.2.5",
     "release-it": "^17.2.0",
     "sinon": "^19.0.2",

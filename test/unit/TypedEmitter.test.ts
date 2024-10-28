@@ -2,12 +2,6 @@ import { describe, it } from 'node:test'
 import assert from 'assert'
 import { applyMixin } from '../../src/TypedEmitter'
 
-class BaseClass {
-	baseMethod() {
-		return 'baseMethod'
-	}
-}
-
 class MixinClass {
 	mixinMethod() {
 		return 'mixinMethod'

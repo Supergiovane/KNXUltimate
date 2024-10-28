@@ -1,0 +1,19 @@
+{
+    "all": true,
+    "include": [
+        "src/**/*.ts"
+    ],
+    "exclude": [
+        "src/Curve25519.ts"
+    ],
+    "reporter": [
+        "html",
+        "text",
+        "lcov"
+    ],
+    "check-coverage": false,
+    "statements": 70,
+    "branches": 60,
+    "functions": 70,
+    "lines": 70
+}
