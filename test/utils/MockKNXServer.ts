@@ -30,7 +30,7 @@ export default class MockKNXServer {
 
 	private lastIndex = 0
 
-	private isPaused = false
+	private isPaused: boolean = false
 
 	get rInfo(): RemoteInfo {
 		return {
@@ -97,26 +97,40 @@ export default class MockKNXServer {
 		const requestHex = data.toString('hex')
 		this.log(`Received request: ${requestHex}`)
 
-		// When paused, simulate network disconnection by not responding
-		if (this.isPaused) {
-			this.log('Server is paused, simulating network disconnection')
-			return
-		}
-
 		// Look up the captured response
 		const resIndex = this.expectedTelegrams.findIndex(
 			(packet, i) => i >= this.lastIndex && packet.request === requestHex,
 		)
 
 		const res = this.expectedTelegrams[resIndex]
-		this.lastIndex = resIndex >= 0 ? resIndex + 1 : this.lastIndex
 
-		if (res && res.response) {
+		// Update lastIndex if we found a matching request
+		if (resIndex >= 0) {
+			this.lastIndex = resIndex + 1
+		}
+
+		// When paused, don't send any response
+		if (this.isPaused) {
+			this.log('Server is paused, simulating network disconnection')
+			return
+		}
+
+		if (res?.response) {
 			this.log(`Found matching response, waiting ${res.deltaRes}ms`)
 			await wait(res.deltaRes || 0)
 			this.log(`Sending response: ${res.response}`)
 			const responseBuffer = Buffer.from(res.response, 'hex')
 			this.socket.emit('message', responseBuffer, this.rInfo)
+
+			// Handle next automatic response if any
+			const next = this.expectedTelegrams[this.lastIndex]
+			if (next && !next.request) {
+				await wait(next.deltaReq || 0)
+				this.log(`Sending automatic response: ${next.response}`)
+				const nextResponseBuffer = Buffer.from(next.response, 'hex')
+				this.socket.emit('message', nextResponseBuffer, this.rInfo)
+				this.lastIndex++
+			}
 		} else {
 			this.error('No matching response found for this request.')
 		}
