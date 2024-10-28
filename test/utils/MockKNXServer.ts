@@ -30,6 +30,8 @@ export default class MockKNXServer {
 
 	private lastIndex = 0
 
+	private isPaused = false
+
 	get rInfo(): RemoteInfo {
 		return {
 			address: MockKNXServer.host,
@@ -85,10 +87,21 @@ export default class MockKNXServer {
 		this.log('MockKNXServer initialized')
 	}
 
+	public setPaused(paused: boolean) {
+		this.isPaused = paused
+		this.log(`Server ${paused ? 'paused' : 'resumed'}`)
+	}
+
 	// Handles incoming connections and data
 	private async onRequest(data: Buffer) {
-		const requestHex = data.toString('hex') // Convert data to hex string
+		const requestHex = data.toString('hex')
 		this.log(`Received request: ${requestHex}`)
+
+		// When paused, simulate network disconnection by not responding
+		if (this.isPaused) {
+			this.log('Server is paused, simulating network disconnection')
+			return
+		}
 
 		// Look up the captured response
 		const resIndex = this.expectedTelegrams.findIndex(
@@ -96,25 +109,15 @@ export default class MockKNXServer {
 		)
 
 		const res = this.expectedTelegrams[resIndex]
-
 		this.lastIndex = resIndex >= 0 ? resIndex + 1 : this.lastIndex
+
 		if (res && res.response) {
 			this.log(`Found matching response, waiting ${res.deltaRes}ms`)
 			await wait(res.deltaRes || 0)
 			this.log(`Sending response: ${res.response}`)
 			const responseBuffer = Buffer.from(res.response, 'hex')
-
-			this.socket.emit('message', responseBuffer)
-
-			const next = this.expectedTelegrams[this.lastIndex]
-			if (next && !next.request) {
-				// next doesn't have a request, send the response after deltaReq
-				await wait(next.deltaReq || 0)
-				this.log(`Sending response: ${next.response}`)
-				const nextResponseBuffer = Buffer.from(next.response, 'hex')
-				this.socket.emit('message', nextResponseBuffer)
-			}
-		} else if (!res) {
+			this.socket.emit('message', responseBuffer, this.rInfo)
+		} else {
 			this.error('No matching response found for this request.')
 		}
 	}
