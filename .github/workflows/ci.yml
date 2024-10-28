@@ -37,7 +37,7 @@ jobs:
     - name: Test NodeJS
       env: 
         CI: true
-      run: npm run test
+      run: npm run test:coverage
       timeout-minutes: 1
 
     - name: Coveralls
