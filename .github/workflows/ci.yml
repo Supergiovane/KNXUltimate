@@ -45,7 +45,7 @@ jobs:
       if: matrix['node-version'] == '20.x'
       env: 
         CI: true
-      run: nyc --exclude 'test/**/*' npm run test:coverag
+      run: npm run test:coverage
       timeout-minutes: 1
 
     - name: Coveralls

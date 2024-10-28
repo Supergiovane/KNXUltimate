@@ -16,7 +16,7 @@
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",
     "test": "node -r esbuild-register --test test/**/*.test.ts",
-    "test:coverage": "node -r esbuild-register --test-reporter=lcov --experimental-test-coverage --test-reporter-destination=lcov.info  --test test/**/*.test.ts",
+    "test:coverage": "node -r esbuild-register --test-reporter=lcov --experimental-test-coverage --test-coverage-exclude='test/**/*' --test-reporter-destination=lcov.info --test test/**/*.test.ts",
     "test-connection": "",
     "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it",
     "betarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it patch --preRelease=beta"
