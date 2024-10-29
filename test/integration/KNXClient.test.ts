@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert'
+import sinon from 'sinon'
 import { dptlib, KNXClient, KNXClientEvents, SnifferPacket } from '../../src'
 import MockKNXServer from 'test/utils/MockKNXServer'
 import { wait } from 'src/utils'
@@ -147,6 +148,47 @@ const getMockToggleResponses = (): SnifferPacket[] => {
 	]
 }
 
+const getMockPacketsForDisconnectTest = (): SnifferPacket[] => {
+	return [
+		// Initial connection
+		{
+			reqType: 'KNXConnectRequest',
+			request: '06100205001a0801000000000000080100000000000004040200',
+			response: '06100206001424000801c0a801740e570404affc',
+			deltaReq: 0,
+			deltaRes: 8,
+			resType: 'KNXConnectResponse',
+		},
+		// First successful heartbeat
+		{
+			reqType: 'KNXConnectionStateRequest',
+			request: '06100207001024000801000000000000',
+			response: '0610020800082400',
+			deltaReq: 9,
+			deltaRes: 21,
+			resType: 'KNXConnectionStateResponse',
+		},
+		// First failed heartbeat during disconnection
+		{
+			reqType: 'KNXConnectionStateRequest',
+			request: '06100207001024000801000000000000',
+			deltaReq: 10005,
+		},
+		// Second failed heartbeat
+		{
+			reqType: 'KNXConnectionStateRequest',
+			request: '06100207001024000801000000000000',
+			deltaReq: 10001,
+		},
+		// Third failed heartbeat - should trigger disconnection
+		{
+			reqType: 'KNXConnectionStateRequest',
+			request: '06100207001024000801000000000000',
+			deltaReq: 10006,
+		},
+	]
+}
+
 describe('KNXClient Tests', () => {
 	test(
 		'should discover KNX interfaces',
@@ -253,4 +295,156 @@ describe('KNXClient Tests', () => {
 			client.Connect()
 		})
 	})
+
+	test(
+		'should handle long network disconnection leading to auto-disconnect',
+		{ timeout: 600000 },
+		async () => {
+			const events: string[] = []
+			let server: MockKNXServer
+			let disconnectReason = ''
+
+			const client = new KNXClient(
+				{
+					loglevel: 'trace',
+					hostProtocol: 'TunnelUDP',
+					ipAddr: MockKNXServer.host,
+					ipPort: MockKNXServer.port,
+					connectionKeepAliveTimeout: 3,
+					localIPAddress: getDefaultIpLocal(),
+				},
+				(c: KNXClient) => {
+					server = new MockKNXServer(
+						getMockPacketsForDisconnectTest(),
+						c,
+					)
+
+					// Override error log to fail test when no matching response found
+					const originalError = server['error'].bind(server)
+					server['error'] = (message: string) => {
+						if (message.includes('No matching response found')) {
+							throw new Error(`MockKNXServer error: ${message}`)
+						}
+						originalError(message)
+					}
+
+					server.createFakeSocket()
+				},
+			)
+
+			// Wait for connection
+			const connectionPromise = new Promise<void>((resolve) => {
+				client.once(KNXClientEvents.connected, () => {
+					console.log(
+						'Connected event received at',
+						new Date().toISOString(),
+					)
+					events.push('connected')
+					resolve()
+				})
+			})
+
+			// Track disconnection with reason
+			const disconnectionPromise = new Promise<void>((resolve) => {
+				client.on(KNXClientEvents.error, (error) => {
+					console.log(
+						'Error event received at',
+						new Date().toISOString(),
+						error.message,
+					)
+					events.push('error')
+				})
+
+				client.once(KNXClientEvents.disconnected, (reason) => {
+					console.log(
+						'Disconnected event received at',
+						new Date().toISOString(),
+						'Reason:',
+						reason,
+					)
+					disconnectReason = reason
+					events.push('disconnected')
+					resolve()
+				})
+			})
+
+			try {
+				// Connect and wait for connection
+				client.Connect()
+				await connectionPromise
+
+				// Verify initial connection
+				assert.strictEqual(
+					client.isConnected(),
+					true,
+					'Should be connected initially',
+				)
+				assert.deepStrictEqual(
+					events,
+					['connected'],
+					'Should have connected event',
+				)
+				assert.strictEqual(
+					client['_heartbeatFailures'],
+					0,
+					'Should have no heartbeat failures',
+				)
+
+				// Wait for first successful heartbeat
+				await wait(4000)
+
+				assert.strictEqual(
+					client.isConnected(),
+					true,
+					'Should still be connected after first heartbeat',
+				)
+				assert.strictEqual(
+					client['_heartbeatFailures'],
+					0,
+					'Should still have no failures',
+				)
+
+				// Simulate disconnection
+				console.log(
+					'Pausing server to simulate disconnection at',
+					new Date().toISOString(),
+				)
+				server.setPaused(true)
+
+				// Wait for disconnection event after 3 heartbeat failures
+				console.log(
+					'Waiting for three heartbeat failures to trigger disconnection...',
+				)
+				await disconnectionPromise
+
+				// Verify correct disconnection after 3 heartbeat failures
+				assert.strictEqual(
+					client['_heartbeatFailures'],
+					0,
+					'Heartbeat failures should reset after disconnection',
+				)
+				assert.strictEqual(
+					client.isConnected(),
+					false,
+					'Should be disconnected',
+				)
+				assert.ok(
+					disconnectReason.includes('Connection dead'),
+					`Should disconnect due to dead connection, got: ${disconnectReason}`,
+				)
+
+				// Verify events happened in correct order
+				assert.deepStrictEqual(
+					events,
+					['connected', 'error', 'disconnected'],
+					'Events should occur in correct order',
+				)
+			} finally {
+				// Only try to disconnect if we're still connected
+				if (client.isConnected()) {
+					await client.Disconnect()
+				}
+			}
+		},
+	)
 })
