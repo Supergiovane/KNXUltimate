@@ -2,11 +2,9 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert'
 import sinon from 'sinon'
 import { dptlib, KNXClient, KNXClientEvents, SnifferPacket } from '../../src'
+import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
 import MockKNXServer from 'test/utils/MockKNXServer'
-import { wait } from 'src/utils'
 import { networkInterfaces } from 'node:os'
-
-const TEST_TIMEOUT = undefined
 
 const ciIP = '192.168.1.58'
 
@@ -190,10 +188,10 @@ const getMockPacketsForDisconnectTest = (): SnifferPacket[] => {
 }
 
 describe('KNXClient Tests', () => {
-	test(
-		'should discover KNX interfaces',
-		{ timeout: TEST_TIMEOUT },
-		async () => {
+	test('should discover KNX interfaces', async () => {
+		const clock = sinon.useFakeTimers({ shouldAdvanceTime: true })
+
+		try {
 			const client = new KNXClient(
 				{
 					loglevel: 'trace',
@@ -221,33 +219,27 @@ describe('KNXClient Tests', () => {
 				discovered.push(host)
 			})
 
-			await wait(50)
+			// Advance virtual time instead of waiting
+			await clock.tickAsync(50)
 
 			// Verify discovery results
 			const expectedHost = `${MockKNXServer.host}:${MockKNXServer.port}`
 			assert.equal(discovered[0], expectedHost, 'Discovery should work')
 
 			await client.Disconnect()
-		},
-	)
+		} finally {
+			// Restore real timers
+			clock.restore()
+		}
+	})
 
-	test('should perform toggle operation', { timeout: 10000 }, async () => {
+	test('should perform toggle operation', async () => {
+		const clock = sinon.useFakeTimers({ shouldAdvanceTime: true })
 		const groupId = '0/0/1'
 		const dpt = '1.001'
+		let client: KNXClient
 
-		const client = new KNXClient(
-			{
-				loglevel: 'trace',
-				hostProtocol: 'TunnelUDP',
-				sniffingMode: true,
-			},
-			(c: KNXClient) => {
-				const server = new MockKNXServer(getMockToggleResponses(), c)
-				server.createFakeSocket()
-			},
-		)
-
-		function waitForIndication(expectedValue: any) {
+		const waitForIndication = async (expectedValue: any): Promise<void> => {
 			return new Promise<void>((resolve) => {
 				client.once('indication', (packet) => {
 					const { npdu } = packet.cEMIMessage
@@ -267,42 +259,86 @@ describe('KNXClient Tests', () => {
 			})
 		}
 
-		return new Promise<void>((resolve, reject) => {
-			client.on(KNXClientEvents.error, (error) => {
-				reject(error)
-			})
+		try {
+			client = new KNXClient(
+				{
+					loglevel: 'trace',
+					hostProtocol: 'TunnelUDP',
+					sniffingMode: true,
+				},
+				(c: KNXClient) => {
+					const server = new MockKNXServer(
+						getMockToggleResponses(),
+						c,
+					)
+					server.createFakeSocket()
+				},
+			)
 
-			client.on(KNXClientEvents.connected, async () => {
-				try {
-					// First toggle - ON
-					client.write(groupId, true, dpt)
-
-					await waitForIndication(true)
-
-					// Second toggle - OFF
-
-					client.write(groupId, false, dpt)
-
-					await waitForIndication(false)
-
-					await client.Disconnect()
-					resolve()
-				} catch (error) {
+			return await new Promise<void>((resolve, reject) => {
+				client.on(KNXClientEvents.error, (error) => {
 					reject(error)
-				}
-			})
+				})
 
-			client.Connect()
-		})
+				client.on(KNXClientEvents.connected, async () => {
+					try {
+						// First toggle - ON
+						client.write(groupId, true, dpt)
+						// Advance by exact deltas from the mock
+						await clock.tickAsync(9) // First response delta
+						await clock.tickAsync(44) // Second response delta
+						await clock.tickAsync(670) // Third response delta
+						await waitForIndication(true)
+
+						// Second toggle - OFF
+						client.write(groupId, false, dpt)
+						await clock.tickAsync(7) // First response delta
+						await clock.tickAsync(43) // Second response delta
+						await clock.tickAsync(563) // Third response delta
+						await waitForIndication(false)
+
+						await client.Disconnect()
+						resolve()
+					} catch (error) {
+						reject(error)
+					}
+				})
+
+				client.Connect()
+				// Initial connection timing
+				clock.tickAsync(9) // Connect response
+				clock.tickAsync(20) // First heartbeat response
+			})
+		} finally {
+			clock.restore()
+		}
 	})
 
-	test(
-		'should handle long network disconnection leading to auto-disconnect',
-		{ timeout: 600000 },
-		async () => {
+	test('should handle long network disconnection leading to auto-disconnect', async () => {
+		const clock = sinon.useFakeTimers({
+			shouldAdvanceTime: true,
+			toFake: [
+				'setTimeout',
+				'clearTimeout',
+				'setInterval',
+				'clearInterval',
+				'Date',
+			],
+		})
+
+		try {
 			const events: string[] = []
 			let server: MockKNXServer
 			let disconnectReason = ''
+
+			// Store original constants
+			const originalStateTimeout =
+				KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT
+			const originalAliveTime = KNX_CONSTANTS.CONNECTION_ALIVE_TIME
+
+			// Override timeouts for test
+			KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT = 0.1 // 100ms instead of 10s
+			KNX_CONSTANTS.CONNECTION_ALIVE_TIME = 0.1 // 100ms instead of 60s
 
 			const client = new KNXClient(
 				{
@@ -310,7 +346,7 @@ describe('KNXClient Tests', () => {
 					hostProtocol: 'TunnelUDP',
 					ipAddr: MockKNXServer.host,
 					ipPort: MockKNXServer.port,
-					connectionKeepAliveTimeout: 3,
+					connectionKeepAliveTimeout: 0.1, // This needs to match CONNECTION_ALIVE_TIME
 					localIPAddress: getDefaultIpLocal(),
 				},
 				(c: KNXClient) => {
@@ -332,36 +368,21 @@ describe('KNXClient Tests', () => {
 				},
 			)
 
-			// Wait for connection
+			// Track connection
 			const connectionPromise = new Promise<void>((resolve) => {
 				client.once(KNXClientEvents.connected, () => {
-					console.log(
-						'Connected event received at',
-						new Date().toISOString(),
-					)
 					events.push('connected')
 					resolve()
 				})
 			})
 
-			// Track disconnection with reason
+			// Track disconnection
 			const disconnectionPromise = new Promise<void>((resolve) => {
 				client.on(KNXClientEvents.error, (error) => {
-					console.log(
-						'Error event received at',
-						new Date().toISOString(),
-						error.message,
-					)
 					events.push('error')
 				})
 
 				client.once(KNXClientEvents.disconnected, (reason) => {
-					console.log(
-						'Disconnected event received at',
-						new Date().toISOString(),
-						'Reason:',
-						reason,
-					)
 					disconnectReason = reason
 					events.push('disconnected')
 					resolve()
@@ -371,9 +392,10 @@ describe('KNXClient Tests', () => {
 			try {
 				// Connect and wait for connection
 				client.Connect()
+				await clock.tickAsync(10) // Wait for connection
 				await connectionPromise
 
-				// Verify initial connection
+				// Initial state verification
 				assert.strictEqual(
 					client.isConnected(),
 					true,
@@ -391,7 +413,7 @@ describe('KNXClient Tests', () => {
 				)
 
 				// Wait for first successful heartbeat
-				await wait(4000)
+				await clock.tickAsync(20)
 
 				assert.strictEqual(
 					client.isConnected(),
@@ -405,19 +427,16 @@ describe('KNXClient Tests', () => {
 				)
 
 				// Simulate disconnection
-				console.log(
-					'Pausing server to simulate disconnection at',
-					new Date().toISOString(),
-				)
 				server.setPaused(true)
 
-				// Wait for disconnection event after 3 heartbeat failures
-				console.log(
-					'Waiting for three heartbeat failures to trigger disconnection...',
-				)
+				// Wait for three heartbeat failures
+				await clock.tickAsync(200) // First failure
+				await clock.tickAsync(200) // Second failure
+				await clock.tickAsync(200) // Third failure
+
 				await disconnectionPromise
 
-				// Verify correct disconnection after 3 heartbeat failures
+				// Final state verification
 				assert.strictEqual(
 					client['_heartbeatFailures'],
 					0,
@@ -432,19 +451,23 @@ describe('KNXClient Tests', () => {
 					disconnectReason.includes('Connection dead'),
 					`Should disconnect due to dead connection, got: ${disconnectReason}`,
 				)
-
-				// Verify events happened in correct order
 				assert.deepStrictEqual(
 					events,
 					['connected', 'error', 'disconnected'],
 					'Events should occur in correct order',
 				)
 			} finally {
-				// Only try to disconnect if we're still connected
+				// Restore original constants
+				KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT =
+					originalStateTimeout
+				KNX_CONSTANTS.CONNECTION_ALIVE_TIME = originalAliveTime
+
 				if (client.isConnected()) {
 					await client.Disconnect()
 				}
 			}
-		},
-	)
+		} finally {
+			clock.restore()
+		}
+	})
 })

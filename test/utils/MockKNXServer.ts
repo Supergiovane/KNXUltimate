@@ -13,6 +13,7 @@ export type ServerOptions = {
 	port?: number
 	host?: string
 	protocol?: 'udp' | 'tcp'
+	useFakeTimers?: boolean
 }
 
 export default class MockKNXServer {
@@ -32,6 +33,8 @@ export default class MockKNXServer {
 
 	private isPaused: boolean = false
 
+	private useFakeTimers: boolean = false
+
 	get rInfo(): RemoteInfo {
 		return {
 			address: MockKNXServer.host,
@@ -41,9 +44,14 @@ export default class MockKNXServer {
 		}
 	}
 
-	constructor(capturedTelegrams: SnifferPacket[], client: KNXClient) {
+	constructor(
+		capturedTelegrams: SnifferPacket[],
+		client: KNXClient,
+		options: ServerOptions = {},
+	) {
 		this.expectedTelegrams = capturedTelegrams
 		this.client = client
+		this.useFakeTimers = options.useFakeTimers || false
 	}
 
 	private log(message: string) {
@@ -117,7 +125,10 @@ export default class MockKNXServer {
 
 		if (res?.response) {
 			this.log(`Found matching response, waiting ${res.deltaRes}ms`)
-			await wait(res.deltaRes || 0)
+			// Skip waiting when using fake timers
+			if (!this.useFakeTimers) {
+				await wait(res.deltaRes || 0)
+			}
 			this.log(`Sending response: ${res.response}`)
 			const responseBuffer = Buffer.from(res.response, 'hex')
 			this.socket.emit('message', responseBuffer, this.rInfo)
@@ -125,7 +136,10 @@ export default class MockKNXServer {
 			// Handle next automatic response if any
 			const next = this.expectedTelegrams[this.lastIndex]
 			if (next && !next.request) {
-				await wait(next.deltaReq || 0)
+				// Skip waiting when using fake timers
+				if (!this.useFakeTimers) {
+					await wait(next.deltaReq || 0)
+				}
 				this.log(`Sending automatic response: ${next.response}`)
 				const nextResponseBuffer = Buffer.from(next.response, 'hex')
 				this.socket.emit('message', nextResponseBuffer, this.rInfo)
