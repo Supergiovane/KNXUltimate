@@ -55,137 +55,126 @@ const getMockResponses = (): SnifferPacket[] => {
 	]
 }
 
-const getMockToggleResponses = (): SnifferPacket[] => {
-	const localIp = getDefaultIpLocal()
-	const knxGwIp = ipToHex(MockKNXServer.host)
+const mockToggleResponses: SnifferPacket[] = [
+	{
+		reqType: 'KNXConnectRequest',
+		request: '06100205001a0801000000000000080100000000000004040200',
+		deltaReq: 0,
+		response: '06100206001451000801c0a801740e570404affb',
+		resType: 'KNXConnectResponse',
+		deltaRes: 9,
+	},
+	{
+		reqType: 'KNXConnectionStateRequest',
+		request: '06100207001051000801000000000000',
+		deltaReq: 11,
+		response: '0610020800085100',
+		resType: 'KNXConnectionStateResponse',
+		deltaRes: 20,
+	},
+	// Toggle ON
+	{
+		reqType: 'KNXTunnelingRequest',
+		request: '061004200015045100001100bce0ffc80001010081',
+		deltaReq: 1581,
+		response: '06100421000a04510000',
+		resType: 'KNXTunnelingAck',
+		deltaRes: 9,
+	},
+	{
+		reqType: 'KNXTunnelingRequest',
+		response: '061004200015045100002e00bce0affb0001010081',
+		deltaReq: 44,
+	},
+	{
+		reqType: 'KNXTunnelingAck',
+		request: '06100421000a04510000',
+		deltaReq: 44,
+		response: '061004200015045101002900bce0af020101010081',
+		resType: 'KNXTunnelingRequest',
+		deltaRes: 670,
+	},
+	{
+		reqType: 'KNXTunnelingAck',
+		request: '06100421000a04510100',
+		deltaReq: 671,
+	},
+	// Toggle OFF
+	{
+		reqType: 'KNXTunnelingRequest',
+		request: '061004200015045101001100bce0ffc80001010080',
+		deltaReq: 516,
+		response: '06100421000a04510100',
+		resType: 'KNXTunnelingAck',
+		deltaRes: 7,
+	},
+	{
+		reqType: 'KNXTunnelingRequest',
+		response: '061004200015045102002e00bce0affb0001010080',
+		deltaReq: 43,
+	},
+	{
+		reqType: 'KNXTunnelingAck',
+		request: '06100421000a04510200',
+		deltaReq: 43,
+		response: '061004200015045103002900bce0af020101010080',
+		resType: 'KNXTunnelingRequest',
+		deltaRes: 563,
+	},
+	{
+		reqType: 'KNXTunnelingAck',
+		request: '06100421000a04510300',
+		deltaReq: 563,
+	},
+	// Disconnect
+	{
+		reqType: 'KNXDisconnectRequest',
+		request: '06100209001051000801000000000000',
+		deltaReq: 1250,
+		response: '0610020a00085100',
+		resType: 'KNXDisconnectResponse',
+		deltaRes: 4,
+	},
+]
 
-	if (!localIp) {
-		throw new Error('No local IP found')
-	}
-
-	return [
-		{
-			reqType: 'KNXConnectRequest',
-			request: '06100205001a0801000000000000080100000000000004040200',
-			deltaReq: 0,
-			response: '06100206001451000801c0a801740e570404affb',
-			resType: 'KNXConnectResponse',
-			deltaRes: 9,
-		},
-		{
-			reqType: 'KNXConnectionStateRequest',
-			request: '06100207001051000801000000000000',
-			deltaReq: 11,
-			response: '0610020800085100',
-			resType: 'KNXConnectionStateResponse',
-			deltaRes: 20,
-		},
-		// Toggle ON
-		{
-			reqType: 'KNXTunnelingRequest',
-			request: '061004200015045100001100bce0ffc80001010081',
-			deltaReq: 1581,
-			response: '06100421000a04510000',
-			resType: 'KNXTunnelingAck',
-			deltaRes: 9,
-		},
-		{
-			reqType: 'KNXTunnelingRequest',
-			response: '061004200015045100002e00bce0affb0001010081',
-			deltaReq: 44,
-		},
-		{
-			reqType: 'KNXTunnelingAck',
-			request: '06100421000a04510000',
-			deltaReq: 44,
-			response: '061004200015045101002900bce0af020101010081',
-			resType: 'KNXTunnelingRequest',
-			deltaRes: 670,
-		},
-		{
-			reqType: 'KNXTunnelingAck',
-			request: '06100421000a04510100',
-			deltaReq: 671,
-		},
-		// Toggle OFF
-		{
-			reqType: 'KNXTunnelingRequest',
-			request: '061004200015045101001100bce0ffc80001010080',
-			deltaReq: 516,
-			response: '06100421000a04510100',
-			resType: 'KNXTunnelingAck',
-			deltaRes: 7,
-		},
-		{
-			reqType: 'KNXTunnelingRequest',
-			response: '061004200015045102002e00bce0affb0001010080',
-			deltaReq: 43,
-		},
-		{
-			reqType: 'KNXTunnelingAck',
-			request: '06100421000a04510200',
-			deltaReq: 43,
-			response: '061004200015045103002900bce0af020101010080',
-			resType: 'KNXTunnelingRequest',
-			deltaRes: 563,
-		},
-		{
-			reqType: 'KNXTunnelingAck',
-			request: '06100421000a04510300',
-			deltaReq: 563,
-		},
-		// Disconnect
-		{
-			reqType: 'KNXDisconnectRequest',
-			request: '06100209001051000801000000000000',
-			deltaReq: 1250,
-			response: '0610020a00085100',
-			resType: 'KNXDisconnectResponse',
-			deltaRes: 4,
-		},
-	]
-}
-
-const getMockPacketsForDisconnectTest = (): SnifferPacket[] => {
-	return [
-		// Initial connection
-		{
-			reqType: 'KNXConnectRequest',
-			request: '06100205001a0801000000000000080100000000000004040200',
-			response: '06100206001424000801c0a801740e570404affc',
-			deltaReq: 0,
-			deltaRes: 8,
-			resType: 'KNXConnectResponse',
-		},
-		// First successful heartbeat
-		{
-			reqType: 'KNXConnectionStateRequest',
-			request: '06100207001024000801000000000000',
-			response: '0610020800082400',
-			deltaReq: 9,
-			deltaRes: 21,
-			resType: 'KNXConnectionStateResponse',
-		},
-		// First failed heartbeat during disconnection
-		{
-			reqType: 'KNXConnectionStateRequest',
-			request: '06100207001024000801000000000000',
-			deltaReq: 10005,
-		},
-		// Second failed heartbeat
-		{
-			reqType: 'KNXConnectionStateRequest',
-			request: '06100207001024000801000000000000',
-			deltaReq: 10001,
-		},
-		// Third failed heartbeat - should trigger disconnection
-		{
-			reqType: 'KNXConnectionStateRequest',
-			request: '06100207001024000801000000000000',
-			deltaReq: 10006,
-		},
-	]
-}
+const getMockPacketsForDisconnectTest: SnifferPacket[] = [
+	// Initial connection
+	{
+		reqType: 'KNXConnectRequest',
+		request: '06100205001a0801000000000000080100000000000004040200',
+		response: '06100206001424000801c0a801740e570404affc',
+		deltaReq: 0,
+		deltaRes: 8,
+		resType: 'KNXConnectResponse',
+	},
+	// First successful heartbeat
+	{
+		reqType: 'KNXConnectionStateRequest',
+		request: '06100207001024000801000000000000',
+		response: '0610020800082400',
+		deltaReq: 9,
+		deltaRes: 21,
+		resType: 'KNXConnectionStateResponse',
+	},
+	// First failed heartbeat during disconnection
+	{
+		reqType: 'KNXConnectionStateRequest',
+		request: '06100207001024000801000000000000',
+		deltaReq: 10005,
+	},
+	// Second failed heartbeat
+	{
+		reqType: 'KNXConnectionStateRequest',
+		request: '06100207001024000801000000000000',
+		deltaReq: 10001,
+	},
+	// Third failed heartbeat - should trigger disconnection
+	{
+		reqType: 'KNXConnectionStateRequest',
+		request: '06100207001024000801000000000000',
+		deltaReq: 10006,
+	},
+]
 
 describe('KNXClient Tests', () => {
 	test('should discover KNX interfaces', async () => {
@@ -267,10 +256,16 @@ describe('KNXClient Tests', () => {
 					sniffingMode: true,
 				},
 				(c: KNXClient) => {
-					const server = new MockKNXServer(
-						getMockToggleResponses(),
-						c,
-					)
+					const server = new MockKNXServer(mockToggleResponses, c)
+					server.on('error', (error) => {
+						if (
+							!error.message.includes(
+								'No matching response found',
+							)
+						) {
+							throw error
+						}
+					})
 					server.createFakeSocket()
 				},
 			)
@@ -351,18 +346,18 @@ describe('KNXClient Tests', () => {
 				},
 				(c: KNXClient) => {
 					server = new MockKNXServer(
-						getMockPacketsForDisconnectTest(),
+						getMockPacketsForDisconnectTest,
 						c,
 					)
-
-					// Override error log to fail test when no matching response found
-					const originalError = server['error'].bind(server)
-					server['error'] = (message: string) => {
-						if (message.includes('No matching response found')) {
-							throw new Error(`MockKNXServer error: ${message}`)
+					server.on('error', (error) => {
+						if (
+							error.message.includes('No matching response found')
+						) {
+							throw new Error(
+								`MockKNXServer error: ${error.message}`,
+							)
 						}
-						originalError(message)
-					}
+					})
 
 					server.createFakeSocket()
 				},

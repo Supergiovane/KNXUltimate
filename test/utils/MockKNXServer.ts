@@ -1,13 +1,22 @@
 import { createSocket, RemoteInfo, Socket as UDPSocket } from 'dgram'
 import { Socket as TCPSocket } from 'net'
+import { TypedEventEmitter } from 'src/TypedEmitter'
+import { KNXClientEvents } from 'src/KNXClient'
 import {
 	KNXClient,
 	KNXConnectionStateResponse,
 	SnifferPacket,
 	SocketEvents,
 } from 'src'
-import { ConnectionStatus, KNX_CONSTANTS } from 'src/protocol/KNXConstants'
 import { wait } from 'src/utils'
+
+enum MockServerEvents {
+	error = 'error',
+}
+
+interface MockServerEventCallbacks {
+	error: (error: Error) => void
+}
 
 export type ServerOptions = {
 	port?: number
@@ -16,7 +25,7 @@ export type ServerOptions = {
 	useFakeTimers?: boolean
 }
 
-export default class MockKNXServer {
+export default class MockKNXServer extends TypedEventEmitter<MockServerEventCallbacks> {
 	public static port = 3671
 
 	public static host = '192.168.1.116'
@@ -49,6 +58,7 @@ export default class MockKNXServer {
 		client: KNXClient,
 		options: ServerOptions = {},
 	) {
+		super()
 		this.expectedTelegrams = capturedTelegrams
 		this.client = client
 		this.useFakeTimers = options.useFakeTimers || false
@@ -60,6 +70,7 @@ export default class MockKNXServer {
 
 	private error(message: string) {
 		this.client['sysLogger'].error(`[MockKNXServer] ${message}`)
+		this.emit(MockServerEvents.error, new Error(message))
 	}
 
 	public createFakeSocket() {
