@@ -28,7 +28,8 @@ async function initClient() {
 		ipPort: port,
 		loglevel: 'trace',
 		suppress_ack_ldatareq: false,
-		hostProtocol: 'TunnelUDP', 
+		hostProtocol: 'TunnelUDP',
+		sniffingMode: true,
 	})
 	
 	client.on(KNXClientEvents.connected, info => {
