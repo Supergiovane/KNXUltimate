@@ -337,3 +337,8 @@ ASALocalRun/
 
 build
 
+/coverage/
+
+/.nyc_output/
+
+

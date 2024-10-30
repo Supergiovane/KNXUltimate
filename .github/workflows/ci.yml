@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [18.x, 20.x, 22.x]
       fail-fast: false
 
     steps:
@@ -35,8 +35,16 @@ jobs:
         npm run lint
 
     - name: Test NodeJS
-      run: npm run test
-      timeout-minutes: 5
+      env: 
+        CI: true
+      run: npm run test:coverage
+      timeout-minutes: 1
+
+    - name: Coveralls
+      uses: coverallsapp/github-action@v2.3.4
+      if: matrix['node-version'] == '20.x'
+      with:
+        github-token: ${{ secrets.github_token }}
 
 
   
