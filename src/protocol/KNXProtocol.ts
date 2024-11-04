@@ -12,7 +12,6 @@ import KNXDisconnectResponse from './KNXDisconnectResponse'
 import KNXTunnelingRequest from './KNXTunnelingRequest'
 import KNXTunnelingAck from './KNXTunnelingAck'
 import KNXRoutingIndication from './KNXRoutingIndication'
-import KNXSecureSessionRequest from './KNXSecureSessionRequest'
 import HPAI from './HPAI'
 import { KNX_CONSTANTS } from './KNXConstants'
 import TunnelCRI from './TunnelCRI'
@@ -141,13 +140,5 @@ export default class KNXProtocol {
 
 	static newKNXRoutingIndication(cEMIMessage: CEMIMessage) {
 		return new KNXRoutingIndication(cEMIMessage)
-	}
-
-	static newKNXSecureSessionRequest(
-		cri: TunnelCRI,
-		hpaiData: HPAI = HPAI.NULLHPAI,
-		jKNXSecureKeyring?: any,
-	) {
-		return new KNXSecureSessionRequest(cri, hpaiData, jKNXSecureKeyring)
 	}
 }

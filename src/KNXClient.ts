@@ -76,8 +76,6 @@ export interface KNXClientEventCallbacks {
 	close: () => void
 }
 
-const jKNXSecureKeyring: string = ''
-
 export type KNXClientOptions = {
 	/** The physical address to be identified in the KNX bus */
 	physAddr?: string
@@ -87,10 +85,8 @@ export type KNXClientOptions = {
 	ipAddr?: string
 	/** The port, default is "3671" */
 	ipPort?: number | string
-	/** Default: "TunnelUDP". "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces, or "TunnelTCP" for secure KNX Interfaces (not yet implemented) */
+	/** Default: "TunnelUDP". "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces */
 	hostProtocol?: KNXClientProtocol
-	/** True: Enables the secure connection. Leave false until KNX-Secure has been released. */
-	isSecureKNXEnabled?: boolean
 	/** Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true */
 	suppress_ack_ldatareq?: boolean
 	/** Leave true forever. This is used only in Node-Red KNX-Ultimate node */
@@ -99,8 +95,6 @@ export type KNXClientOptions = {
 	localIPAddress?: string
 	/** Specifies the local eth interface to be used to connect to the KNX Bus. */
 	interface?: string
-	/** ETS Keyring JSON file content (leave blank until KNX-Secure has been released) */
-	jKNXSecureKeyring?: any
 	/** Local socket address. Automatically filled by KNXClient */
 	localSocketAddress?: string
 	// ** Local queue interval between each KNX telegram. Default is 1 telegram each 25ms
@@ -115,18 +109,12 @@ const optionsDefaults: KNXClientOptions = {
 	ipAddr: '224.0.23.12',
 	ipPort: 3671,
 	hostProtocol: 'Multicast',
-	isSecureKNXEnabled: false,
 	suppress_ack_ldatareq: false,
 	loglevel: 'info',
 	localEchoInTunneling: true,
 	localIPAddress: '',
 	interface: '',
-	jKNXSecureKeyring: {},
 	KNXQueueSendIntervalMilliseconds: 25,
-}
-
-export function getDecodedKeyring() {
-	return jKNXSecureKeyring
 }
 
 export enum KNXTimer {
@@ -190,8 +178,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private sysLogger: any
 
-	private jKNXSecureKeyring: any
-
 	private _clearToSend = false
 
 	private timers: Map<KNXTimer, NodeJS.Timeout>
@@ -249,7 +235,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.max_HeartbeatFailures = 3
 		this._awaitingResponseType = null
 		this._clientSocket = null
-		this.jKNXSecureKeyring = this._options.jKNXSecureKeyring
 		// Configure the limiter
 		try {
 			if (Number(this._options.KNXQueueSendIntervalMilliseconds) < 20) {
@@ -1123,15 +1108,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 				2000,
 			)
-		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			this._clientSocket.connect(this._peerPort, this._peerHost, () => {
-				this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
-				this._clientTunnelSeqNumber = 0
-				if (this._options.isSecureKNXEnabled)
-					this.sendSecureSessionRequestMessage(
-						new TunnelCRI(knxLayer),
-					)
-			})
 		} else {
 			// Multicast
 			this._connectionState = ConncetionState.CONNECTED
@@ -1755,22 +1731,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	) {
 		this.send(
 			KNXProtocol.newKNXDisconnectResponse(channelID, status),
-			undefined,
-			true,
-			this.getSeqNumber(),
-		)
-	}
-
-	private sendSecureSessionRequestMessage(cri: TunnelCRI) {
-		const oHPAI = new HPAI(
-			'0.0.0.0',
-			0,
-			this._options.hostProtocol === 'TunnelTCP'
-				? KNX_CONSTANTS.IPV4_TCP
-				: KNX_CONSTANTS.IPV4_UDP,
-		)
-		this.send(
-			KNXProtocol.newKNXSecureSessionRequest(cri, oHPAI),
 			undefined,
 			true,
 			this.getSeqNumber(),

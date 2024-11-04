@@ -16,7 +16,6 @@ import KNXDisconnectResponse from '../../src/protocol/KNXDisconnectResponse'
 import KNXTunnelingAck from '../../src/protocol/KNXTunnelingAck'
 import KNXTunnelingRequest from '../../src/protocol/KNXTunnelingRequest'
 import KNXRoutingIndication from '../../src/protocol/KNXRoutingIndication'
-import KNXSecureSessionRequest from '../../src/protocol/KNXSecureSessionRequest'
 
 describe('KNXProtocol', () => {
 	let mockHPAI: HPAI
