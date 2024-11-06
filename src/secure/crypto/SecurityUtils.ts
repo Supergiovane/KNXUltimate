@@ -1,17 +1,30 @@
 import { createHash, pbkdf2Sync, createCipheriv } from 'crypto'
 import { generateKeyPair, sharedKey } from '../../Curve25519'
 
+export enum MessageType {
+	SECURE_WRAPPER = 'SECURE_WRAPPER',
+	SESSION_REQUEST = 'SESSION_REQUEST',
+	SESSION_RESPONSE = 'SESSION_RESPONSE',
+	SESSION_AUTHENTICATE = 'SESSION_AUTHENTICATE',
+	TIMER_NOTIFY = 'TIMER_NOTIFY',
+}
+
 export interface KNXSecureConfig {
 	channelId: number
 	sequenceNumber: number
 	serialNumber: number
 	messageTag: number
+	messageType: MessageType
 }
 
 export interface SecureWrapperData {
+	messageType: MessageType
 	knxHeader: Buffer
 	secureSessionId: Buffer
-	encapsulatedFrame: Buffer
+	encapsulatedFrame?: Buffer
+	dhPublicX?: Buffer // Client's public key
+	dhPublicY?: Buffer // Server's public key
+	userId?: number // For SESSION_AUTHENTICATE
 }
 
 export class SecurityUtils {
@@ -28,15 +41,18 @@ export class SecurityUtils {
 
 	private static readonly MAC_LENGTH = 16 // 128 bits
 
-	private static readonly MAX_PAYLOAD_LENGTH = 65279 // Maximum payload length according to spec
+	private static readonly MAX_PAYLOAD_LENGTH = 65279 // 0xFEFF
 
-	private static readonly MAX_COUNTER_BLOCKS = 255 // Maximum counter blocks allowed
+	private static readonly MAX_COUNTER_BLOCKS = 255
 
 	private static readonly BLOCK_SIZE = 16 // AES block size
 
+	private static readonly CCM_FLAGS = 0x79 // For B0 block
+
+	private static readonly CTR_FLAGS = 0x01 // For Counter blocks
+
 	/**
 	 * Generate ECDH keypair using Curve25519
-	 * @returns Public and private key pair
 	 */
 	static generateKeyPair(): { publicKey: Buffer; privateKey: Buffer } {
 		const seed = Buffer.alloc(32)
@@ -50,14 +66,14 @@ export class SecurityUtils {
 	/**
 	 * Calculate shared secret and session key using Curve25519
 	 */
-	static calculateSharedSecret(
+	static calculateSessionKey(
 		privateKey: Buffer,
 		peerPublicKey: Buffer,
 	): Buffer {
-		// 1. Calculate Curve25519 shared secret (in little-endian)
+		// 1. Calculate shared secret (in little-endian)
 		const sharedSecretLE = sharedKey(privateKey, peerPublicKey)
 
-		// 2. Hash the shared secret with SHA-256
+		// 2. Hash shared secret with SHA-256 (converting to big-endian)
 		const hash = createHash('sha256')
 			.update(Buffer.from(sharedSecretLE))
 			.digest()
@@ -93,50 +109,135 @@ export class SecurityUtils {
 	}
 
 	/**
-	 * CCM encryption for SECURE_WRAPPER
+	 * XOR operation between two buffers
 	 */
-	static encryptSecureWrapper(
+	private static xor(a: Buffer, b: Buffer): Buffer {
+		const result = Buffer.alloc(a.length)
+		for (let i = 0; i < a.length; i++) {
+			result[i] = a[i] ^ b[i]
+		}
+		return result
+	}
+
+	/**
+	 * Calculate Associated Data (A) based on message type
+	 */
+	private static calculateAssociatedData(data: SecureWrapperData): Buffer {
+		switch (data.messageType) {
+			case MessageType.SECURE_WRAPPER:
+				// A = KNXnet/IP header | Secure Session ID
+				return Buffer.concat([data.knxHeader, data.secureSessionId])
+
+			case MessageType.SESSION_RESPONSE:
+				// A = KNXnet/IP Header | Session ID | (X ^ Y)
+				return Buffer.concat([
+					data.knxHeader,
+					data.secureSessionId,
+					this.xor(data.dhPublicX, data.dhPublicY),
+				])
+
+			case MessageType.SESSION_AUTHENTICATE: {
+				// A = KNXnet/IP Header | 00h | User ID | (X ^ Y)
+				const userIdBuf = Buffer.alloc(1)
+				userIdBuf.writeUInt8(data.userId)
+				return Buffer.concat([
+					data.knxHeader,
+					Buffer.from([0x00]),
+					userIdBuf,
+					this.xor(data.dhPublicX, data.dhPublicY),
+				])
+			}
+
+			case MessageType.TIMER_NOTIFY:
+				// A = KNXnet/IP Header only
+				return data.knxHeader
+
+			default:
+				throw new Error(`Unsupported message type: ${data.messageType}`)
+		}
+	}
+
+	/**
+	 * Generate B0 block
+	 */
+	private static generateB0Block(
+		config: KNXSecureConfig,
+		payloadLength: number,
+	): Buffer {
+		const b0 = Buffer.alloc(this.BLOCK_SIZE)
+
+		// Flags byte
+		b0[0] = this.CCM_FLAGS
+
+		// Nonce: sequenceInfo(6) | serialNumber(6) | messageTag(2)
+		b0.writeUIntBE(config.sequenceNumber, 1, 6)
+		b0.writeUIntBE(config.serialNumber, 7, 6)
+		b0.writeUInt16BE(config.messageTag, 13)
+
+		// Payload length Q
+		b0.writeUInt16BE(payloadLength, 14)
+
+		return b0
+	}
+
+	/**
+	 * Generate Counter block
+	 */
+	private static generateCounterBlock(
+		counter: number,
+		config: KNXSecureConfig,
+	): Buffer {
+		const ctr = Buffer.alloc(this.BLOCK_SIZE)
+
+		// Flags byte
+		ctr[0] = this.CTR_FLAGS
+
+		// Nonce: sequenceInfo(6) | serialNumber(6) | messageTag(2)
+		ctr.writeUIntBE(config.sequenceNumber, 1, 6)
+		ctr.writeUIntBE(config.serialNumber, 7, 6)
+		ctr.writeUInt16BE(config.messageTag, 13)
+
+		// Counter [i]
+		ctr[15] = counter & 0xff
+
+		return ctr
+	}
+
+	/**
+	 * CCM encryption
+	 */
+	static encrypt(
 		data: SecureWrapperData,
 		key: Buffer,
 		config: KNXSecureConfig,
 	): { ciphertext: Buffer; mac: Buffer } {
+		const payload = data.encapsulatedFrame || Buffer.alloc(0)
+
 		// Validate payload length
-		if (data.encapsulatedFrame.length > this.MAX_PAYLOAD_LENGTH) {
+		if (payload.length > this.MAX_PAYLOAD_LENGTH) {
 			throw new Error('Payload too long')
 		}
 
-		// A = KNXnet/IP secure wrapper header | Secure Session Identifier
-		const associatedData = Buffer.concat([
-			data.knxHeader,
-			data.secureSessionId,
-		])
+		// Calculate blocks required
+		const numBlocks = Math.ceil(payload.length / this.BLOCK_SIZE)
+		if (numBlocks > this.MAX_COUNTER_BLOCKS) {
+			throw new Error('Data too long for CTR mode encryption')
+		}
 
-		// P = encapsulated KNXnet/IP frame
-		const payload = data.encapsulatedFrame
+		// Calculate Associated Data (A) specific to message type
+		const associatedData = this.calculateAssociatedData(data)
 
 		// Generate B0 block
-		const b0 = this.generateB0Block({
-			payloadLength: payload.length,
-			associatedLength: associatedData.length,
-			sequenceInfo: config.sequenceNumber,
-			serialNumber: config.serialNumber,
-			messageTag: config.messageTag,
-		})
-
-		// Generate auth data blocks
-		const authData = this.formatAuthData(associatedData)
+		const b0 = this.generateB0Block(config, payload.length)
 
 		// Calculate CBC-MAC
-		const mac = this.calculateCBCMAC(key, b0, authData, payload)
+		const mac = this.calculateCBCMAC(key, b0, associatedData, payload)
 
-		// Encrypt payload using CTR mode
-		const ciphertext = this.encryptCTRMode(
-			key,
-			payload,
-			config.sequenceNumber,
-			config.serialNumber,
-			config.messageTag,
-		)
+		// Encrypt payload using CTR mode (if present)
+		const ciphertext =
+			payload.length > 0
+				? this.encryptCTRMode(key, payload, config)
+				: Buffer.alloc(0)
 
 		// Encrypt MAC
 		const encryptedMac = this.encryptMac(key, mac, config)
@@ -145,46 +246,33 @@ export class SecurityUtils {
 	}
 
 	/**
-	 * CCM decryption for SECURE_WRAPPER
+	 * CCM decryption
 	 */
-	static decryptSecureWrapper(
+	static decrypt(
 		ciphertext: Buffer,
 		receivedMac: Buffer,
 		data: SecureWrapperData,
 		key: Buffer,
 		config: KNXSecureConfig,
 	): Buffer {
-		// A = KNXnet/IP secure wrapper header | Secure Session Identifier
-		const associatedData = Buffer.concat([
-			data.knxHeader,
-			data.secureSessionId,
-		])
-
 		// Decrypt ciphertext using CTR mode
-		const plaintext = this.encryptCTRMode(
-			key,
-			ciphertext,
-			config.sequenceNumber,
-			config.serialNumber,
-			config.messageTag,
-		)
+		const plaintext = this.encryptCTRMode(key, ciphertext, config)
+
+		// Calculate Associated Data (A) specific to message type
+		const associatedData = this.calculateAssociatedData(data)
 
 		// Generate B0 block
-		const b0 = this.generateB0Block({
-			payloadLength: plaintext.length,
-			associatedLength: associatedData.length,
-			sequenceInfo: config.sequenceNumber,
-			serialNumber: config.serialNumber,
-			messageTag: config.messageTag,
-		})
+		const b0 = this.generateB0Block(config, plaintext.length)
 
-		// Generate auth data blocks
-		const authData = this.formatAuthData(associatedData)
+		// Calculate CBC-MAC
+		const calculatedMac = this.calculateCBCMAC(
+			key,
+			b0,
+			associatedData,
+			plaintext,
+		)
 
-		// Calculate MAC
-		const calculatedMac = this.calculateCBCMAC(key, b0, authData, plaintext)
-
-		// Encrypt calculated MAC
+		// Encrypt calculated MAC for comparison
 		const encryptedCalculatedMac = this.encryptMac(
 			key,
 			calculatedMac,
@@ -200,93 +288,43 @@ export class SecurityUtils {
 	}
 
 	/**
-	 * CCM for TIMER_NOTIFY
+	 * Calculate CBC-MAC
 	 */
-	static calculateTimerNotifyMAC(
-		header: Buffer,
+	private static calculateCBCMAC(
 		key: Buffer,
-		config: KNXSecureConfig,
+		b0: Buffer,
+		associatedData: Buffer,
+		payload: Buffer,
 	): Buffer {
-		// A = KNXnet/IP secure wrapper header only
-		const associatedData = header
+		const cipher = createCipheriv('aes-128-cbc', key, Buffer.alloc(16))
 
-		// P is empty for TIMER_NOTIFY
-		const payload = Buffer.alloc(0)
+		// Process B0
+		let mac = cipher.update(b0)
 
-		// Generate B0 block
-		const b0 = this.generateB0Block({
-			payloadLength: 0,
-			associatedLength: associatedData.length,
-			sequenceInfo: config.sequenceNumber,
-			serialNumber: config.serialNumber,
-			messageTag: config.messageTag,
-		})
+		// Process Associated Data with XOR
+		const adBlocks = this.formatBlocks(associatedData)
+		for (const block of adBlocks) {
+			mac = this.xor(mac, block)
+			mac = cipher.update(mac)
+		}
 
-		// Generate auth data blocks
-		const authData = this.formatAuthData(associatedData)
+		// Process Payload with XOR if present
+		if (payload.length > 0) {
+			const payloadBlocks = this.formatBlocks(payload)
+			for (const block of payloadBlocks) {
+				mac = this.xor(mac, block)
+				mac = cipher.update(mac)
+			}
+		}
 
-		// Calculate CBC-MAC
-		const mac = this.calculateCBCMAC(key, b0, authData, payload)
-
-		// Encrypt MAC
-		return this.encryptMac(key, mac, config)
+		cipher.final()
+		return mac.subarray(0, this.MAC_LENGTH)
 	}
 
 	/**
-	 * Generate B0 block according to spec
+	 * Format data into AES blocks
 	 */
-	private static generateB0Block(params: {
-		payloadLength: number
-		associatedLength: number
-		sequenceInfo: number
-		serialNumber: number
-		messageTag: number
-	}): Buffer {
-		const b0 = Buffer.alloc(16)
-
-		// Flags
-		b0[0] = 0x79
-
-		// Nonce: sequenceInfo(6) | serialNumber(6) | messageTag(2)
-		b0.writeUIntBE(params.sequenceInfo, 1, 6)
-		b0.writeUIntBE(params.serialNumber, 7, 6)
-		b0.writeUInt16BE(params.messageTag, 13)
-
-		// Q: payload length
-		b0.writeUInt16BE(params.payloadLength, 14)
-
-		return b0
-	}
-
-	/**
-	 * Generate Counter blocks according to spec
-	 */
-	private static generateCounterBlock(
-		counter: number,
-		sequenceInfo: number,
-		serialNumber: number,
-		messageTag: number,
-	): Buffer {
-		const ctr = Buffer.alloc(16)
-
-		// Flags: 0x01
-		ctr[0] = 0x01
-
-		// Nonce: sequenceInfo(6) | serialNumber(6) | messageTag(2)
-		ctr.writeUIntBE(sequenceInfo, 1, 6)
-		ctr.writeUIntBE(serialNumber, 7, 6)
-		ctr.writeUInt16BE(messageTag, 13)
-
-		// Counter
-		ctr[15] = counter & 0xff
-
-		return ctr
-	}
-
-	/**
-	 * Format associated data blocks
-	 */
-	private static formatAuthData(data: Buffer): Buffer[] {
+	private static formatBlocks(data: Buffer): Buffer[] {
 		const blocks: Buffer[] = []
 		const numBlocks = Math.ceil(data.length / this.BLOCK_SIZE)
 
@@ -302,60 +340,18 @@ export class SecurityUtils {
 	}
 
 	/**
-	 * Calculate CBC-MAC
-	 */
-	private static calculateCBCMAC(
-		key: Buffer,
-		b0: Buffer,
-		authData: Buffer[],
-		payload: Buffer,
-	): Buffer {
-		const cipher = createCipheriv('aes-128-cbc', key, Buffer.alloc(16))
-
-		// Process B0
-		cipher.update(b0)
-
-		// Process auth data blocks
-		for (const block of authData) {
-			cipher.update(block)
-		}
-
-		// Process payload
-		if (payload.length > 0) {
-			const payloadBlocks = this.formatAuthData(payload)
-			for (const block of payloadBlocks) {
-				cipher.update(block)
-			}
-		}
-
-		return cipher.final().subarray(0, this.MAC_LENGTH)
-	}
-
-	/**
 	 * Encrypt using CTR mode
 	 */
 	private static encryptCTRMode(
 		key: Buffer,
 		data: Buffer,
-		sequenceInfo: number,
-		serialNumber: number,
-		messageTag: number,
+		config: KNXSecureConfig,
 	): Buffer {
-		const numBlocks = Math.ceil(data.length / this.BLOCK_SIZE)
-		if (numBlocks > this.MAX_COUNTER_BLOCKS) {
-			throw new Error('Data too long for CTR mode encryption')
-		}
-
 		const result = Buffer.alloc(data.length)
+		const numBlocks = Math.ceil(data.length / this.BLOCK_SIZE)
 
 		for (let i = 0; i < numBlocks; i++) {
-			const counter = this.generateCounterBlock(
-				i,
-				sequenceInfo,
-				serialNumber,
-				messageTag,
-			)
-
+			const counter = this.generateCounterBlock(i + 1, config)
 			const cipher = createCipheriv('aes-128-ecb', key, null)
 			const keystream = cipher.update(counter)
 			cipher.final()
@@ -372,30 +368,21 @@ export class SecurityUtils {
 	}
 
 	/**
-	 * Encrypt MAC according to spec
+	 * Encrypt MAC
 	 */
 	private static encryptMac(
 		key: Buffer,
 		mac: Buffer,
 		config: KNXSecureConfig,
 	): Buffer {
-		const counter = this.generateCounterBlock(
-			0,
-			config.sequenceNumber,
-			config.serialNumber,
-			config.messageTag,
-		)
+		// Use Counter[0] for MAC encryption
+		const counter = this.generateCounterBlock(0, config)
 
 		const cipher = createCipheriv('aes-128-ecb', key, null)
 		const keystream = cipher.update(counter)
 		cipher.final()
 
-		const encryptedMac = Buffer.alloc(this.MAC_LENGTH)
-		for (let i = 0; i < this.MAC_LENGTH; i++) {
-			encryptedMac[i] = mac[i] ^ keystream[i]
-		}
-
-		return encryptedMac
+		return this.xor(mac, keystream.subarray(0, this.MAC_LENGTH))
 	}
 
 	/**
@@ -411,7 +398,7 @@ export class SecurityUtils {
 	}
 
 	/**
-	 * Validate tunneling sequence number
+	 * Validate tunneling sequence
 	 */
 	static validateTunnelingSequence(
 		receivedSeq: number,

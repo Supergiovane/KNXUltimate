@@ -4,6 +4,7 @@ import {
 	SecurityUtils,
 	KNXSecureConfig,
 	SecureWrapperData,
+	MessageType,
 } from '../../src/secure/crypto/SecurityUtils'
 
 describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
@@ -19,6 +20,7 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 		sequenceNumber: 12345,
 		serialNumber: 67890,
 		messageTag: 1,
+		messageType: MessageType.SECURE_WRAPPER,
 	}
 
 	describe('Key Generation and Authentication', async () => {
@@ -43,12 +45,12 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 			const aliceKeyPair = SecurityUtils.generateKeyPair()
 			const bobKeyPair = SecurityUtils.generateKeyPair()
 
-			const aliceShared = SecurityUtils.calculateSharedSecret(
+			const aliceShared = SecurityUtils.calculateSessionKey(
 				aliceKeyPair.privateKey,
 				bobKeyPair.publicKey,
 			)
 
-			const bobShared = SecurityUtils.calculateSharedSecret(
+			const bobShared = SecurityUtils.calculateSessionKey(
 				bobKeyPair.privateKey,
 				aliceKeyPair.publicKey,
 			)
@@ -99,9 +101,10 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 				knxHeader: TEST_HEADER,
 				secureSessionId: TEST_MULTICAST_SESSION_ID,
 				encapsulatedFrame: TEST_FRAME,
+				messageType: MessageType.SECURE_WRAPPER,
 			}
 
-			const encrypted = SecurityUtils.encryptSecureWrapper(
+			const encrypted = SecurityUtils.encrypt(
 				multicastData,
 				TEST_KEY,
 				TEST_CONFIG,
@@ -111,7 +114,7 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 			assert(encrypted.mac instanceof Buffer)
 			assert.equal(encrypted.mac.length, 16, 'MAC must be 16 bytes')
 
-			const decrypted = SecurityUtils.decryptSecureWrapper(
+			const decrypted = SecurityUtils.decrypt(
 				encrypted.ciphertext,
 				encrypted.mac,
 				multicastData,
@@ -127,6 +130,7 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 				knxHeader: TEST_HEADER,
 				secureSessionId: TEST_SESSION_ID,
 				encapsulatedFrame: TEST_FRAME,
+				messageType: MessageType.SECURE_WRAPPER,
 			}
 
 			// Test internal B0 block generation
@@ -143,14 +147,11 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 				knxHeader: TEST_HEADER,
 				secureSessionId: TEST_SESSION_ID,
 				encapsulatedFrame: Buffer.alloc(65280), // Max is 65279
+				messageType: MessageType.SECURE_WRAPPER,
 			}
 
 			assert.throws(() => {
-				SecurityUtils.encryptSecureWrapper(
-					testData,
-					TEST_KEY,
-					TEST_CONFIG,
-				)
+				SecurityUtils.encrypt(testData, TEST_KEY, TEST_CONFIG)
 			}, Error('Payload too long'))
 		})
 	})
@@ -248,9 +249,10 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 				knxHeader: TEST_HEADER,
 				secureSessionId: TEST_SESSION_ID,
 				encapsulatedFrame: TEST_FRAME,
+				messageType: MessageType.SECURE_WRAPPER,
 			}
 
-			const encrypted = SecurityUtils.encryptSecureWrapper(
+			const encrypted = SecurityUtils.encrypt(
 				testData,
 				TEST_KEY,
 				TEST_CONFIG,
@@ -271,14 +273,11 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 				knxHeader: TEST_HEADER,
 				secureSessionId: TEST_SESSION_ID,
 				encapsulatedFrame: Buffer.alloc(4081), // Exceeds max CTR blocks (255)
+				messageType: MessageType.SECURE_WRAPPER,
 			}
 
 			assert.throws(() => {
-				SecurityUtils.encryptSecureWrapper(
-					testData,
-					TEST_KEY,
-					TEST_CONFIG,
-				)
+				SecurityUtils.encrypt(testData, TEST_KEY, TEST_CONFIG)
 			}, Error('Data too long for CTR mode encryption'))
 		})
 
@@ -287,9 +286,10 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 				knxHeader: TEST_HEADER,
 				secureSessionId: TEST_SESSION_ID,
 				encapsulatedFrame: TEST_FRAME,
+				messageType: MessageType.SECURE_WRAPPER,
 			}
 
-			const encrypted = SecurityUtils.encryptSecureWrapper(
+			const encrypted = SecurityUtils.encrypt(
 				testData,
 				TEST_KEY,
 				TEST_CONFIG,
@@ -299,7 +299,7 @@ describe('SecurityUtils - KNX Secure Implementation Tests', async (t) => {
 			encrypted.mac[0] ^= 0xff
 
 			assert.throws(() => {
-				SecurityUtils.decryptSecureWrapper(
+				SecurityUtils.decrypt(
 					encrypted.ciphertext,
 					encrypted.mac,
 					testData,
