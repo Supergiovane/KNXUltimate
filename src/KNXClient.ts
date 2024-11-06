@@ -1557,7 +1557,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						`Received KNX packet: TUNNELLING: L_DATA_CON, ChannelID:${this._channelID} seqCounter:${knxTunnellingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 				}
-			} else if (knxHeader.service_type === KNX_CONSTANTS.TUNNELLING_ACK) {
+			} else if (
+				knxHeader.service_type === KNX_CONSTANTS.TUNNELLING_ACK
+			) {
 				const knxTunnellingAck = knxMessage as KNXTunnellingAck
 				if (knxTunnellingAck.channelID !== this._channelID) {
 					return
