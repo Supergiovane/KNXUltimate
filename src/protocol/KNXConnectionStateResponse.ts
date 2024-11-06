@@ -42,8 +42,8 @@ export default class KNXConnectionStateResponse extends KNXPacket {
 				return 'Invalid Data Connection'
 			case KNX_CONSTANTS.E_KNX_CONNECTION:
 				return 'Invalid KNX Connection'
-			case KNX_CONSTANTS.E_TUNNELING_LAYER:
-				return 'Invalid Tunneling Layer'
+			case KNX_CONSTANTS.E_TUNNELLING_LAYER:
+				return 'Invalid Tunnelling Layer'
 			default:
 				return `Unknown error ${status}`
 		}

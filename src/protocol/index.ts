@@ -16,8 +16,8 @@ import KNXConnectionStateRequest from './KNXConnectionStateRequest'
 import KNXConnectionStateResponse from './KNXConnectionStateResponse'
 import KNXDisconnectRequest from './KNXDisconnectRequest'
 import KNXDisconnectResponse from './KNXDisconnectResponse'
-import KNXTunnelingRequest from './KNXTunnelingRequest'
-import KNXTunnelingAck from './KNXTunnelingAck'
+import KNXTunnellingRequest from './KNXTunnellingRequest'
+import KNXTunnellingAck from './KNXTunnellingAck'
 import KNXRoutingIndication from './KNXRoutingIndication'
 import { validateKNXAddress } from './KNXUtils'
 
@@ -38,8 +38,8 @@ export {
 	KNXConnectionStateResponse,
 	KNXDisconnectRequest,
 	KNXDisconnectResponse,
-	KNXTunnelingRequest,
-	KNXTunnelingAck,
+	KNXTunnellingRequest,
+	KNXTunnellingAck,
 	KNXRoutingIndication,
 	validateKNXAddress,
 }

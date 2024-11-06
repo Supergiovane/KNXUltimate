@@ -77,7 +77,7 @@ You should see something like this in the console window (the **msg.payload** is
 | Property       | Description                                                                                          |
 | -------------- | ---------------------------------------------------------------------------------------------------- |
 | .isConnected() | Returns **true** if you the client is connected to the KNX Gateway Router/Interface, **false** if not connected. |
-| .clearToSend   | **true** if you can send a telegram, **false** if the client is still waiting for the last telegram's ACK or whenever the client cannot temporary send the telegram. In tunneling mode, you could also refer to the event **KNXClientEvents.ackReceived**, that is fired everytime a telegram has been succesfully acknowledge or not acknowledge. See the sample.js file. |
+| .clearToSend   | **true** if you can send a telegram, **false** if the client is still waiting for the last telegram's ACK or whenever the client cannot temporary send the telegram. In tunnelling mode, you could also refer to the event **KNXClientEvents.ackReceived**, that is fired everytime a telegram has been succesfully acknowledge or not acknowledge. See the sample.js file. |
 | .channelID     | The actual Channel ID. Only defined after a successfull connection                                   |
 
 ## EVENTS

@@ -1,7 +1,7 @@
 import KNXPacket from './KNXPacket'
 import { KNX_CONSTANTS } from './KNXConstants'
 
-export default class KNXTunnelingAck extends KNXPacket {
+export default class KNXTunnellingAck extends KNXPacket {
 	channelID: number
 
 	seqCounter: number
@@ -9,7 +9,7 @@ export default class KNXTunnelingAck extends KNXPacket {
 	status: number
 
 	constructor(channelID: number, seqCounter: number, status: number) {
-		super(KNX_CONSTANTS.TUNNELING_ACK, 4)
+		super(KNX_CONSTANTS.TUNNELLING_ACK, 4)
 		this.channelID = channelID
 		this.seqCounter = seqCounter
 		this.status = status
@@ -18,7 +18,7 @@ export default class KNXTunnelingAck extends KNXPacket {
 	static createFromBuffer(
 		buffer: Buffer,
 		offset: number = 0,
-	): KNXTunnelingAck {
+	): KNXTunnellingAck {
 		if (offset >= buffer.length) {
 			throw new Error('Buffer too short')
 		}
@@ -30,7 +30,7 @@ export default class KNXTunnelingAck extends KNXPacket {
 		const channelID = buffer.readUInt8(offset++)
 		const seqCounter = buffer.readUInt8(offset++)
 		const status = buffer.readUInt8(offset)
-		return new KNXTunnelingAck(channelID, seqCounter, status)
+		return new KNXTunnellingAck(channelID, seqCounter, status)
 	}
 
 	toBuffer(): Buffer {

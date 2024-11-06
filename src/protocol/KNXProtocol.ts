@@ -9,8 +9,8 @@ import KNXConnectionStateRequest from './KNXConnectionStateRequest'
 import KNXConnectionStateResponse from './KNXConnectionStateResponse'
 import KNXDisconnectRequest from './KNXDisconnectRequest'
 import KNXDisconnectResponse from './KNXDisconnectResponse'
-import KNXTunnelingRequest from './KNXTunnelingRequest'
-import KNXTunnelingAck from './KNXTunnelingAck'
+import KNXTunnellingRequest from './KNXTunnellingRequest'
+import KNXTunnellingAck from './KNXTunnellingAck'
 import KNXRoutingIndication from './KNXRoutingIndication'
 import HPAI from './HPAI'
 import { KNX_CONSTANTS } from './KNXConstants'
@@ -23,7 +23,7 @@ export type KnxResponse =
 	| KNXDescriptionResponse
 	| KNXConnectionStateResponse
 	| KNXDisconnectResponse
-	| KNXTunnelingAck
+	| KNXTunnellingAck
 	| KNXRoutingIndication
 
 export type KnxRequest =
@@ -32,7 +32,7 @@ export type KnxRequest =
 	| KNXDescriptionRequest
 	| KNXConnectionStateRequest
 	| KNXDisconnectRequest
-	| KNXTunnelingRequest
+	| KNXTunnellingRequest
 
 export type KnxMessage = KnxResponse | KnxRequest
 
@@ -73,11 +73,11 @@ export default class KNXProtocol {
 			case KNX_CONSTANTS.DISCONNECT_RESPONSE:
 				knxMessage = KNXDisconnectResponse.createFromBuffer(knxData)
 				break
-			case KNX_CONSTANTS.TUNNELING_REQUEST:
-				knxMessage = KNXTunnelingRequest.createFromBuffer(knxData)
+			case KNX_CONSTANTS.TUNNELLING_REQUEST:
+				knxMessage = KNXTunnellingRequest.createFromBuffer(knxData)
 				break
-			case KNX_CONSTANTS.TUNNELING_ACK:
-				knxMessage = KNXTunnelingAck.createFromBuffer(knxData)
+			case KNX_CONSTANTS.TUNNELLING_ACK:
+				knxMessage = KNXTunnellingAck.createFromBuffer(knxData)
 				break
 			case KNX_CONSTANTS.ROUTING_INDICATION:
 				knxMessage = KNXRoutingIndication.createFromBuffer(knxData)
@@ -122,20 +122,20 @@ export default class KNXProtocol {
 		return new KNXDisconnectResponse(channelID, status)
 	}
 
-	static newKNXTunnelingACK(
+	static newKNXTunnellingACK(
 		channelID: number,
 		seqCounter: number,
 		status: number,
 	) {
-		return new KNXTunnelingAck(channelID, seqCounter, status)
+		return new KNXTunnellingAck(channelID, seqCounter, status)
 	}
 
-	static newKNXTunnelingRequest(
+	static newKNXTunnellingRequest(
 		channelID: number,
 		seqCounter: number,
 		cEMIMessage: CEMIMessage,
 	) {
-		return new KNXTunnelingRequest(channelID, seqCounter, cEMIMessage)
+		return new KNXTunnellingRequest(channelID, seqCounter, cEMIMessage)
 	}
 
 	static newKNXRoutingIndication(cEMIMessage: CEMIMessage) {

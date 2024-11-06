@@ -13,8 +13,8 @@ import KNXConnectRequest from '../../src/protocol/KNXConnectRequest'
 import KNXConnectionStateRequest from '../../src/protocol/KNXConnectionStateRequest'
 import KNXDisconnectRequest from '../../src/protocol/KNXDisconnectRequest'
 import KNXDisconnectResponse from '../../src/protocol/KNXDisconnectResponse'
-import KNXTunnelingAck from '../../src/protocol/KNXTunnelingAck'
-import KNXTunnelingRequest from '../../src/protocol/KNXTunnelingRequest'
+import KNXTunnellingAck from '../../src/protocol/KNXTunnellingAck'
+import KNXTunnellingRequest from '../../src/protocol/KNXTunnellingRequest'
 import KNXRoutingIndication from '../../src/protocol/KNXRoutingIndication'
 
 describe('KNXProtocol', () => {
@@ -131,24 +131,24 @@ describe('KNXProtocol', () => {
 		})
 	})
 
-	describe('newKNXTunnelingACK', () => {
-		it('should create a new KNXTunnelingACK', () => {
-			const result = KNXProtocol.newKNXTunnelingACK(1, 2, 0)
-			assert(result instanceof KNXTunnelingAck)
+	describe('newKNXTunnellingACK', () => {
+		it('should create a new KNXTunnellingACK', () => {
+			const result = KNXProtocol.newKNXTunnellingACK(1, 2, 0)
+			assert(result instanceof KNXTunnellingAck)
 			assert.strictEqual(result.channelID, 1)
 			assert.strictEqual(result.seqCounter, 2)
 			assert.strictEqual(result.status, 0)
 		})
 	})
 
-	describe('newKNXTunnelingRequest', () => {
-		it('should create a new KNXTunnelingRequest', () => {
-			const result = KNXProtocol.newKNXTunnelingRequest(
+	describe('newKNXTunnellingRequest', () => {
+		it('should create a new KNXTunnellingRequest', () => {
+			const result = KNXProtocol.newKNXTunnellingRequest(
 				1,
 				2,
 				mockCEMIMessage,
 			)
-			assert(result instanceof KNXTunnelingRequest)
+			assert(result instanceof KNXTunnellingRequest)
 			assert.strictEqual(result.channelID, 1)
 			assert.strictEqual(result.seqCounter, 2)
 			assert.deepStrictEqual(result.cEMIMessage, mockCEMIMessage)

@@ -3,7 +3,7 @@ import { KNX_CONSTANTS } from './KNXConstants'
 import CEMIFactory from './cEMI/CEMIFactory'
 import CEMIMessage from './cEMI/CEMIMessage'
 
-export default class KNXTunnelingRequest extends KNXPacket {
+export default class KNXTunnellingRequest extends KNXPacket {
 	channelID: number
 
 	seqCounter: number
@@ -15,7 +15,7 @@ export default class KNXTunnelingRequest extends KNXPacket {
 		seqCounter: number,
 		cEMIMessage: CEMIMessage,
 	) {
-		super(KNX_CONSTANTS.TUNNELING_REQUEST, 4 + cEMIMessage.length)
+		super(KNX_CONSTANTS.TUNNELLING_REQUEST, 4 + cEMIMessage.length)
 		this.channelID = channelID
 		this.seqCounter = seqCounter
 		this.cEMIMessage = cEMIMessage
@@ -32,7 +32,7 @@ export default class KNXTunnelingRequest extends KNXPacket {
 	static createFromBuffer(
 		buffer: Buffer,
 		offset: number = 0,
-	): KNXTunnelingRequest {
+	): KNXTunnellingRequest {
 		if (offset >= buffer.length) {
 			throw new Error('Buffer too short')
 		}
@@ -45,7 +45,7 @@ export default class KNXTunnelingRequest extends KNXPacket {
 		const seqCounter = buffer.readUInt8(offset++)
 		offset++
 		const cEMIMessage = this.parseCEMIMessage(buffer, offset)
-		return new KNXTunnelingRequest(channelID, seqCounter, cEMIMessage)
+		return new KNXTunnellingRequest(channelID, seqCounter, cEMIMessage)
 	}
 
 	toBuffer(): Buffer {

@@ -150,7 +150,7 @@ knxUltimateClient.on(KNXClientEvents.close, () => {
     console.log("Closed")
 });
 knxUltimateClient.on(KNXClientEvents.ackReceived, (knxMessage, info) => {
-    // In -->tunneling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
+    // In -->tunnelling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
     // knxMessage: contains the telegram sent.
     // info is true it the last telegram has been acknowledge, otherwise false.
     console.log("Last telegram acknowledge", knxMessage, info)
