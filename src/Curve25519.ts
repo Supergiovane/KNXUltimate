@@ -1,3 +1,4 @@
+/* Taken and refactored from curve25519-js https://github.com/harveyconnor/curve25519-js/tree/master */
 /* eslint-disable @typescript-eslint/no-shadow */
 /* eslint-disable no-multi-assign */
 /* node:coverage disable */
