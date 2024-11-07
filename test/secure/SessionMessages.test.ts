@@ -1,0 +1,321 @@
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
+import {
+	SecureServiceType,
+	SecureSessionStatus,
+	SessionRequest,
+	SessionResponse,
+	SessionAuthenticate,
+	SessionStatus,
+} from '../../src/secure/messages/SessionMessages'
+import HPAI from '../../src/protocol/HPAI'
+import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
+
+describe('SessionMessages', () => {
+	describe('SESSION_REQUEST', () => {
+		const validControlEndpoint = new HPAI(
+			'192.168.1.10',
+			3671,
+			KNX_CONSTANTS.IPV4_TCP,
+		)
+		const validPublicKey = Buffer.alloc(32).fill(1) // 32 bytes X value
+
+		it('should create valid SessionRequest', () => {
+			const request = new SessionRequest(
+				validControlEndpoint,
+				validPublicKey,
+			)
+			assert.strictEqual(request.controlEndpoint, validControlEndpoint)
+			assert.strictEqual(request.publicKey, validPublicKey)
+		})
+
+		it('should contain valid HPAI information', () => {
+			const request = new SessionRequest(
+				validControlEndpoint,
+				validPublicKey,
+			)
+			assert.strictEqual(request.controlEndpoint.host, '192.168.1.10')
+			assert.strictEqual(request.controlEndpoint.port, 3671)
+			assert.strictEqual(
+				request.controlEndpoint.protocol,
+				KNX_CONSTANTS.IPV4_TCP,
+			)
+		})
+
+		it('should reject invalid public key length', () => {
+			assert.throws(
+				() =>
+					new SessionRequest(validControlEndpoint, Buffer.alloc(31)),
+				/Public key must be 32 bytes/,
+			)
+		})
+
+		it('should serialize and deserialize correctly', () => {
+			const request = new SessionRequest(
+				validControlEndpoint,
+				validPublicKey,
+			)
+			const buffer = request.toBuffer()
+			const decoded = SessionRequest.createFromBuffer(buffer)
+
+			assert.strictEqual(
+				decoded.controlEndpoint.host,
+				validControlEndpoint.host,
+			)
+			assert.strictEqual(
+				decoded.controlEndpoint.port,
+				validControlEndpoint.port,
+			)
+			assert.ok(decoded.publicKey.equals(validPublicKey))
+		})
+
+		it('should reject invalid buffer length', () => {
+			assert.throws(
+				() => SessionRequest.createFromBuffer(Buffer.alloc(39)),
+				/Invalid buffer length for SessionRequest/,
+			)
+		})
+
+		it('should create correct KNX header', () => {
+			const request = new SessionRequest(
+				validControlEndpoint,
+				validPublicKey,
+			)
+			const header = request.toHeader()
+
+			assert.strictEqual(
+				header.service_type,
+				SecureServiceType.SESSION_REQUEST,
+			)
+			assert.strictEqual(
+				header.length,
+				KNX_CONSTANTS.HEADER_SIZE_10 + request.toBuffer().length,
+			)
+		})
+	})
+
+	describe('SESSION_RESPONSE', () => {
+		const validSessionId = 1
+		const validPublicKey = Buffer.alloc(32).fill(2) // 32 bytes Y value
+		const validMac = Buffer.alloc(16).fill(3) // 16 bytes MAC
+
+		it('should create valid SessionResponse', () => {
+			const response = new SessionResponse(
+				validSessionId,
+				validPublicKey,
+				validMac,
+			)
+			assert.strictEqual(response.sessionId, validSessionId)
+			assert.ok(response.publicKey.equals(validPublicKey))
+			assert.ok(response.messageAuthenticationCode.equals(validMac))
+		})
+
+		it('should reject session ID 0', () => {
+			assert.throws(
+				() => new SessionResponse(0, validPublicKey, validMac),
+				/Session ID 0 is reserved for multicast/,
+			)
+		})
+
+		it('should reject invalid public key length', () => {
+			assert.throws(
+				() =>
+					new SessionResponse(
+						validSessionId,
+						Buffer.alloc(31),
+						validMac,
+					),
+				/Public key must be 32 bytes/,
+			)
+		})
+
+		it('should reject invalid MAC length', () => {
+			assert.throws(
+				() =>
+					new SessionResponse(
+						validSessionId,
+						validPublicKey,
+						Buffer.alloc(15),
+					),
+				/MAC must be 16 bytes/,
+			)
+		})
+
+		it('should serialize and deserialize correctly', () => {
+			const response = new SessionResponse(
+				validSessionId,
+				validPublicKey,
+				validMac,
+			)
+			const buffer = response.toBuffer()
+			const decoded = SessionResponse.createFromBuffer(buffer)
+
+			assert.strictEqual(decoded.sessionId, validSessionId)
+			assert.ok(decoded.publicKey.equals(validPublicKey))
+			assert.ok(decoded.messageAuthenticationCode.equals(validMac))
+		})
+
+		it('should create correct KNX header', () => {
+			const response = new SessionResponse(
+				validSessionId,
+				validPublicKey,
+				validMac,
+			)
+			const header = response.toHeader()
+
+			assert.strictEqual(
+				header.service_type,
+				SecureServiceType.SESSION_RESPONSE,
+			)
+			assert.strictEqual(
+				header.length,
+				KNX_CONSTANTS.HEADER_SIZE_10 + response.toBuffer().length,
+			)
+		})
+	})
+
+	describe('SESSION_AUTHENTICATE', () => {
+		const validUserId = 1 // Management user
+		const validMac = Buffer.alloc(16).fill(4) // 16 bytes MAC
+
+		it('should create valid SessionAuthenticate', () => {
+			const auth = new SessionAuthenticate(validUserId, validMac)
+			assert.strictEqual(auth.userId, validUserId)
+			assert.ok(auth.messageAuthenticationCode.equals(validMac))
+		})
+
+		it('should reject invalid user IDs', () => {
+			assert.throws(
+				() => new SessionAuthenticate(0, validMac),
+				/Invalid user ID/,
+			)
+
+			assert.throws(
+				() => new SessionAuthenticate(0x80, validMac),
+				/Invalid user ID/,
+			)
+		})
+
+		it('should reject invalid MAC length', () => {
+			assert.throws(
+				() => new SessionAuthenticate(validUserId, Buffer.alloc(15)),
+				/MAC must be 16 bytes/,
+			)
+		})
+
+		it('should serialize and deserialize correctly', () => {
+			const auth = new SessionAuthenticate(validUserId, validMac)
+			const buffer = auth.toBuffer()
+			const decoded = SessionAuthenticate.createFromBuffer(buffer)
+
+			assert.strictEqual(decoded.userId, validUserId)
+			assert.ok(decoded.messageAuthenticationCode.equals(validMac))
+		})
+
+		it('should reject non-zero reserved byte', () => {
+			const buffer = Buffer.alloc(18)
+			buffer[0] = 1 // Reserved byte should be 0
+
+			assert.throws(
+				() => SessionAuthenticate.createFromBuffer(buffer),
+				/Reserved byte must be 0x00/,
+			)
+		})
+
+		it('should create correct KNX header', () => {
+			const auth = new SessionAuthenticate(validUserId, validMac)
+			const header = auth.toHeader()
+
+			assert.strictEqual(
+				header.service_type,
+				SecureServiceType.SESSION_AUTHENTICATE,
+			)
+			assert.strictEqual(
+				header.length,
+				KNX_CONSTANTS.HEADER_SIZE_10 + auth.toBuffer().length,
+			)
+		})
+	})
+
+	describe('SESSION_STATUS', () => {
+		it('should create valid SessionStatus for all status codes', () => {
+			Object.values(SecureSessionStatus).forEach((status) => {
+				if (typeof status === 'number') {
+					const statusMsg = new SessionStatus(status)
+					assert.strictEqual(statusMsg.status, status)
+				}
+			})
+		})
+
+		it('should serialize and deserialize correctly', () => {
+			const original = new SessionStatus(
+				SecureSessionStatus.AUTHENTICATION_SUCCESS,
+			)
+			const buffer = original.toBuffer()
+			const decoded = SessionStatus.createFromBuffer(buffer)
+
+			assert.strictEqual(
+				decoded.status,
+				SecureSessionStatus.AUTHENTICATION_SUCCESS,
+			)
+		})
+
+		it('should reject invalid buffer length', () => {
+			assert.throws(
+				() => SessionStatus.createFromBuffer(Buffer.alloc(2)),
+				/Invalid buffer length for SessionStatus/,
+			)
+		})
+
+		it('should reject invalid status codes', () => {
+			const buffer = Buffer.alloc(1)
+			buffer[0] = 0xff // Invalid status code
+
+			assert.throws(
+				() => SessionStatus.createFromBuffer(buffer),
+				/Invalid status code/,
+			)
+		})
+
+		it('should create correct KNX header', () => {
+			const status = new SessionStatus(
+				SecureSessionStatus.AUTHENTICATION_SUCCESS,
+			)
+			const header = status.toHeader()
+
+			assert.strictEqual(
+				header.service_type,
+				SecureServiceType.SESSION_STATUS,
+			)
+			assert.strictEqual(
+				header.length,
+				KNX_CONSTANTS.HEADER_SIZE_10 + status.toBuffer().length,
+			)
+		})
+
+		describe('status strings', () => {
+			it('should match specification', () => {
+				const statusStrings = {
+					[SecureSessionStatus.AUTHENTICATION_SUCCESS]:
+						'Authentication successful',
+					[SecureSessionStatus.AUTHENTICATION_FAILED]:
+						'Authentication failed',
+					[SecureSessionStatus.UNAUTHENTICATED]:
+						'Session not authenticated',
+					[SecureSessionStatus.TIMEOUT]: 'Session timeout',
+					[SecureSessionStatus.CLOSE]: 'Session closed',
+					[SecureSessionStatus.KEEPALIVE]: 'Keep alive',
+				}
+
+				Object.entries(statusStrings).forEach(
+					([status, expectedString]) => {
+						assert.strictEqual(
+							SessionStatus.statusToString(Number(status)),
+							expectedString,
+						)
+					},
+				)
+			})
+		})
+	})
+})
