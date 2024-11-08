@@ -113,23 +113,23 @@ export default class SecureWrapper {
 	}
 
 	static createFromBuffer(buffer: Buffer): SecureWrapper {
-		// Parse KNXnet/IP header
+		// Parse and validate KNXnet/IP header
 		const header = KNXHeader.createFromBuffer(buffer)
 
-		// Validate service type
 		if (header.service_type !== KNX_SECURE.SERVICE_TYPE.SECURE_WRAPPER) {
 			throw new Error('Invalid service type for secure wrapper')
 		}
 
-		// Calculate minimum frame length
-		const minLength = KNX_SECURE.FRAME.HEADER_SIZE + 26 // Header + fixed fields
+		// Calculate minimum length
+		const minLength = KNX_SECURE.FRAME.HEADER_SIZE + 32 // header(6) + fixed fields(16) + MAC(16)
 		if (buffer.length < minLength) {
 			throw new Error(KNX_SECURE.ERROR.INVALID_BUFFER_LENGTH)
 		}
 
-		let offset = header.headerLength
+		const startOffset = KNX_SECURE.FRAME.HEADER_SIZE
+		let offset = startOffset
 
-		// Parse fixed fields
+		// Read fixed fields
 		const sessionId = buffer.readUInt16BE(offset)
 		offset += 2
 
@@ -142,16 +142,17 @@ export default class SecureWrapper {
 		const messageTag = buffer.readUInt16BE(offset)
 		offset += 2
 
+		// Calculate data length
+		const macOffset = buffer.length - KNX_SECURE.CRYPTO.MAC_LENGTH
+		const dataLength = macOffset - offset
+
 		// Extract data and MAC
-		const dataLength = buffer.length - offset - KNX_SECURE.CRYPTO.MAC_LENGTH
 		const encapsulatedData =
 			dataLength > 0
-				? buffer.subarray(offset, offset + dataLength)
+				? Buffer.from(buffer.subarray(offset, macOffset))
 				: Buffer.alloc(0)
 
-		const mac = buffer.subarray(
-			buffer.length - KNX_SECURE.CRYPTO.MAC_LENGTH,
-		)
+		const mac = Buffer.from(buffer.subarray(macOffset))
 
 		return new SecureWrapper(
 			sessionId,
@@ -164,16 +165,27 @@ export default class SecureWrapper {
 	}
 
 	toBuffer(): Buffer {
-		const headerBuffer = this.header.toBuffer()
-
+		// Calculate lengths
+		const headerLength = KNX_SECURE.FRAME.HEADER_SIZE
+		const fixedFieldsLength = 16 // sessionId(2) + sequenceInfo(6) + serialNumber(6) + messageTag(2)
+		const dataLength = this.encapsulatedData?.length || 0
+		const macLength = KNX_SECURE.CRYPTO.MAC_LENGTH
 		const totalLength =
-			headerBuffer.length + 26 + (this.encapsulatedData?.length || 0)
+			headerLength + fixedFieldsLength + dataLength + macLength
 
+		// Create buffer
 		const buffer = Buffer.alloc(totalLength)
 
-		headerBuffer.copy(buffer, 0)
-		let offset = headerBuffer.length
+		// Create and write header
+		const header = new KNXHeader(
+			KNX_SECURE.SERVICE_TYPE.SECURE_WRAPPER,
+			totalLength - headerLength,
+		)
+		header.toBuffer().copy(buffer, 0)
 
+		let offset = headerLength
+
+		// Write fixed fields
 		buffer.writeUInt16BE(this.sessionId, offset)
 		offset += 2
 
@@ -186,10 +198,10 @@ export default class SecureWrapper {
 		buffer.writeUInt16BE(this.messageTag, offset)
 		offset += 2
 
-		// Write encrypted data if present
-		if (this.encapsulatedData?.length > 0) {
+		// Write encapsulated data
+		if (dataLength > 0) {
 			this.encapsulatedData.copy(buffer, offset)
-			offset += this.encapsulatedData.length
+			offset += dataLength
 		}
 
 		// Write MAC
