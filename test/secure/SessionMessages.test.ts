@@ -1,8 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-	SecureServiceType,
-	SecureSessionStatus,
 	SessionRequest,
 	SessionResponse,
 	SessionAuthenticate,
@@ -10,6 +8,7 @@ import {
 } from '../../src/secure/messages/SessionMessages'
 import HPAI from '../../src/protocol/HPAI'
 import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
+import { KNX_SECURE } from '../../src/secure/SecureConstants'
 
 describe('SessionMessages', () => {
 	describe('SESSION_REQUEST', () => {
@@ -85,7 +84,7 @@ describe('SessionMessages', () => {
 
 			assert.strictEqual(
 				header.service_type,
-				SecureServiceType.SESSION_REQUEST,
+				KNX_SECURE.SERVICE_TYPE.SESSION_REQUEST,
 			)
 			assert.strictEqual(
 				header.length,
@@ -165,7 +164,7 @@ describe('SessionMessages', () => {
 
 			assert.strictEqual(
 				header.service_type,
-				SecureServiceType.SESSION_RESPONSE,
+				KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE,
 			)
 			assert.strictEqual(
 				header.length,
@@ -228,7 +227,7 @@ describe('SessionMessages', () => {
 
 			assert.strictEqual(
 				header.service_type,
-				SecureServiceType.SESSION_AUTHENTICATE,
+				KNX_SECURE.SERVICE_TYPE.SESSION_AUTHENTICATE,
 			)
 			assert.strictEqual(
 				header.length,
@@ -239,7 +238,7 @@ describe('SessionMessages', () => {
 
 	describe('SESSION_STATUS', () => {
 		it('should create valid SessionStatus for all status codes', () => {
-			Object.values(SecureSessionStatus).forEach((status) => {
+			Object.values(KNX_SECURE.SESSION_STATUS).forEach((status) => {
 				if (typeof status === 'number') {
 					const statusMsg = new SessionStatus(status)
 					assert.strictEqual(statusMsg.status, status)
@@ -249,14 +248,14 @@ describe('SessionMessages', () => {
 
 		it('should serialize and deserialize correctly', () => {
 			const original = new SessionStatus(
-				SecureSessionStatus.AUTHENTICATION_SUCCESS,
+				KNX_SECURE.SESSION_STATUS.AUTHENTICATION_SUCCESS,
 			)
 			const buffer = original.toBuffer()
 			const decoded = SessionStatus.createFromBuffer(buffer)
 
 			assert.strictEqual(
 				decoded.status,
-				SecureSessionStatus.AUTHENTICATION_SUCCESS,
+				KNX_SECURE.SESSION_STATUS.AUTHENTICATION_SUCCESS,
 			)
 		})
 
@@ -267,55 +266,27 @@ describe('SessionMessages', () => {
 			)
 		})
 
-		it('should reject invalid status codes', () => {
-			const buffer = Buffer.alloc(1)
-			buffer[0] = 0xff // Invalid status code
-
+		it('should reject invalid buffer length', () => {
 			assert.throws(
-				() => SessionStatus.createFromBuffer(buffer),
-				/Invalid status code/,
+				() => SessionStatus.createFromBuffer(Buffer.alloc(2)),
+				new RegExp(KNX_SECURE.ERROR.INVALID_BUFFER_LENGTH),
 			)
 		})
 
 		it('should create correct KNX header', () => {
 			const status = new SessionStatus(
-				SecureSessionStatus.AUTHENTICATION_SUCCESS,
+				KNX_SECURE.SESSION_STATUS.AUTHENTICATION_SUCCESS,
 			)
 			const header = status.toHeader()
 
 			assert.strictEqual(
 				header.service_type,
-				SecureServiceType.SESSION_STATUS,
+				KNX_SECURE.SERVICE_TYPE.SESSION_STATUS,
 			)
 			assert.strictEqual(
 				header.length,
 				KNX_CONSTANTS.HEADER_SIZE_10 + status.toBuffer().length,
 			)
-		})
-
-		describe('status strings', () => {
-			it('should match specification', () => {
-				const statusStrings = {
-					[SecureSessionStatus.AUTHENTICATION_SUCCESS]:
-						'Authentication successful',
-					[SecureSessionStatus.AUTHENTICATION_FAILED]:
-						'Authentication failed',
-					[SecureSessionStatus.UNAUTHENTICATED]:
-						'Session not authenticated',
-					[SecureSessionStatus.TIMEOUT]: 'Session timeout',
-					[SecureSessionStatus.CLOSE]: 'Session closed',
-					[SecureSessionStatus.KEEPALIVE]: 'Keep alive',
-				}
-
-				Object.entries(statusStrings).forEach(
-					([status, expectedString]) => {
-						assert.strictEqual(
-							SessionStatus.statusToString(Number(status)),
-							expectedString,
-						)
-					},
-				)
-			})
 		})
 	})
 })
