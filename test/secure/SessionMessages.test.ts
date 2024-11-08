@@ -9,6 +9,7 @@ import {
 import HPAI from '../../src/protocol/HPAI'
 import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
 import { KNX_SECURE } from '../../src/secure/SecureConstants'
+import { SecurityUtils } from '../../src/secure/crypto/SecurityUtils'
 
 describe('SessionMessages', () => {
 	describe('SESSION_REQUEST', () => {
@@ -97,6 +98,87 @@ describe('SessionMessages', () => {
 		const validSessionId = 1
 		const validPublicKey = Buffer.alloc(32).fill(2) // 32 bytes Y value
 		const validMac = Buffer.alloc(16).fill(3) // 16 bytes MAC
+
+		const deviceAuthCode =
+			SecurityUtils.deriveDeviceAuthenticationCode('test-secret')
+		const clientKeyPair = SecurityUtils.generateKeyPair()
+		const serverKeyPair = SecurityUtils.generateKeyPair()
+
+		it('should verify MAC with correct keys and data', () => {
+			const sessionId = 1234
+			const serialNumber = 56789
+
+			const response = SessionResponse.create(
+				sessionId,
+				serverKeyPair.publicKey,
+				clientKeyPair.publicKey,
+				deviceAuthCode,
+				serialNumber,
+			)
+
+			assert.ok(
+				response.verifyMAC(
+					deviceAuthCode,
+					clientKeyPair.publicKey,
+					serialNumber,
+				),
+			)
+		})
+
+		it('should fail MAC verification with modified serial number', () => {
+			const sessionId = 1234
+			const serialNumber = 56789
+
+			const response = SessionResponse.create(
+				sessionId,
+				serverKeyPair.publicKey,
+				clientKeyPair.publicKey,
+				deviceAuthCode,
+				serialNumber,
+			)
+
+			assert.strictEqual(
+				response.verifyMAC(
+					deviceAuthCode,
+					clientKeyPair.publicKey,
+					serialNumber + 1,
+				),
+				false,
+				'Should fail with modified serial number',
+			)
+		})
+
+		it('should fail MAC verification with modified MAC', () => {
+			const sessionId = 1234
+			const serialNumber = 56789
+
+			const response = SessionResponse.create(
+				sessionId,
+				serverKeyPair.publicKey,
+				clientKeyPair.publicKey,
+				deviceAuthCode,
+				serialNumber,
+			)
+
+			const modifiedMac = Buffer.from(response.messageAuthenticationCode)
+			modifiedMac[0] ^= 0xff
+
+			const modifiedResponse = new SessionResponse(
+				sessionId,
+				response.publicKey,
+				modifiedMac,
+			)
+
+			assert.strictEqual(
+				modifiedResponse.verifyMAC(
+					deviceAuthCode,
+					clientKeyPair.publicKey,
+					serialNumber,
+				),
+				false,
+				'Should fail with modified MAC',
+			)
+		})
 
 		it('should create valid SessionResponse', () => {
 			const response = new SessionResponse(
