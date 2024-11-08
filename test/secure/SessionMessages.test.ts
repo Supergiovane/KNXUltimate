@@ -45,7 +45,7 @@ describe('SessionMessages', () => {
 			assert.throws(
 				() =>
 					new SessionRequest(validControlEndpoint, Buffer.alloc(31)),
-				/Public key must be 32 bytes/,
+				new RegExp(KNX_SECURE.ERROR.INVALID_KEY_LENGTH),
 			)
 		})
 
@@ -71,7 +71,7 @@ describe('SessionMessages', () => {
 		it('should reject invalid buffer length', () => {
 			assert.throws(
 				() => SessionRequest.createFromBuffer(Buffer.alloc(39)),
-				/Invalid buffer length for SessionRequest/,
+				new RegExp(KNX_SECURE.ERROR.INVALID_BUFFER_LENGTH),
 			)
 		})
 
@@ -124,7 +124,7 @@ describe('SessionMessages', () => {
 						Buffer.alloc(31),
 						validMac,
 					),
-				/Public key must be 32 bytes/,
+				new RegExp(KNX_SECURE.ERROR.INVALID_KEY_LENGTH),
 			)
 		})
 
@@ -136,7 +136,7 @@ describe('SessionMessages', () => {
 						validPublicKey,
 						Buffer.alloc(15),
 					),
-				/MAC must be 16 bytes/,
+				new RegExp(KNX_SECURE.ERROR.INVALID_MAC_LENGTH),
 			)
 		})
 
@@ -198,7 +198,7 @@ describe('SessionMessages', () => {
 		it('should reject invalid MAC length', () => {
 			assert.throws(
 				() => new SessionAuthenticate(validUserId, Buffer.alloc(15)),
-				/MAC must be 16 bytes/,
+				new RegExp(KNX_SECURE.ERROR.INVALID_MAC_LENGTH),
 			)
 		})
 

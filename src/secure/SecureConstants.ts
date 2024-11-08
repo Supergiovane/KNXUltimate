@@ -57,8 +57,8 @@ export const KNX_SECURE = {
 
 	ERROR: {
 		INVALID_USER_ID: 'Invalid user ID. Must be between 0x01 and 0x7F',
-		INVALID_MAC_LENGTH: 'Invalid MAC length. Must be 16 bytes',
-		INVALID_KEY_LENGTH: 'Invalid key length. Must be 16 bytes',
+		INVALID_MAC_LENGTH: 'Invalid MAC length',
+		INVALID_KEY_LENGTH: 'Invalid key length',
 		MULTICAST_SESSION_ID: 'Session ID 0 is reserved for multicast',
 		INVALID_BUFFER_LENGTH: 'Invalid buffer length',
 		RESERVED_BYTE: 'Reserved byte must be 0x00',
