@@ -258,23 +258,128 @@ describe('SessionMessages', () => {
 	describe('SESSION_AUTHENTICATE', () => {
 		const validUserId = 1 // Management user
 		const validMac = Buffer.alloc(16).fill(4) // 16 bytes MAC
+		const clientKeyPair = SecurityUtils.generateKeyPair()
+		const serverKeyPair = SecurityUtils.generateKeyPair()
+		const passwordHash = SecurityUtils.derivePasswordHash('test-password')
+
+		describe('User ID Validation', () => {
+			it('should handle all valid user ranges', () => {
+				// Test user ID minimo
+				assert.doesNotThrow(
+					() =>
+						new SessionAuthenticate(
+							KNX_SECURE.USER.MANAGEMENT,
+							Buffer.alloc(16).fill(1),
+						),
+				)
+
+				// Test user ID massimo
+				assert.doesNotThrow(
+					() =>
+						new SessionAuthenticate(
+							KNX_SECURE.USER.USER_MAX,
+							Buffer.alloc(16).fill(1),
+						),
+				)
+			})
+
+			it('should reject invalid user IDs', () => {
+				assert.throws(
+					() => new SessionAuthenticate(0, Buffer.alloc(16).fill(1)),
+					new RegExp(KNX_SECURE.ERROR.INVALID_USER_ID),
+				)
+
+				assert.throws(
+					() =>
+						new SessionAuthenticate(0x80, Buffer.alloc(16).fill(1)),
+					new RegExp(KNX_SECURE.ERROR.INVALID_USER_ID),
+				)
+			})
+		})
+
+		describe('MAC Verification', () => {
+			it('should verify MAC with valid credentials', () => {
+				const userId = KNX_SECURE.USER.MANAGEMENT
+				const serialNumber = 56789
+
+				const auth = SessionAuthenticate.create(
+					userId,
+					clientKeyPair.publicKey,
+					serverKeyPair.publicKey,
+					passwordHash,
+					serialNumber,
+				)
+
+				assert.ok(
+					auth.verifyMAC(
+						passwordHash,
+						clientKeyPair.publicKey,
+						serverKeyPair.publicKey,
+						serialNumber,
+					),
+				)
+			})
+
+			it('should fail with wrong password hash', () => {
+				const userId = KNX_SECURE.USER.MANAGEMENT
+				const serialNumber = 56789
+				const wrongPasswordHash =
+					SecurityUtils.derivePasswordHash('wrong-password')
+
+				const auth = SessionAuthenticate.create(
+					userId,
+					clientKeyPair.publicKey,
+					serverKeyPair.publicKey,
+					passwordHash,
+					serialNumber,
+				)
+
+				assert.strictEqual(
+					auth.verifyMAC(
+						wrongPasswordHash,
+						clientKeyPair.publicKey,
+						serverKeyPair.publicKey,
+						serialNumber,
+					),
+					false,
+					'Should fail with wrong password',
+				)
+			})
+		})
+
+		describe('Buffer Handling', () => {
+			it('should handle minimum valid buffer size', () => {
+				const auth = new SessionAuthenticate(
+					KNX_SECURE.USER.MANAGEMENT,
+					Buffer.alloc(16).fill(1),
+				)
+				const buffer = auth.toBuffer()
+				const decoded = SessionAuthenticate.createFromBuffer(buffer)
+				assert.deepStrictEqual(decoded, auth)
+			})
+
+			it('should reject invalid buffer sizes', () => {
+				const tooSmall = Buffer.alloc(17) // Deve essere 18 bytes
+				assert.throws(
+					() => SessionAuthenticate.createFromBuffer(tooSmall),
+					new RegExp(KNX_SECURE.ERROR.INVALID_BUFFER_LENGTH),
+				)
+			})
+
+			it('should reject non-zero reserved byte', () => {
+				const buffer = Buffer.alloc(18)
+				buffer[0] = 1 // Il byte riservato deve essere 0
+				assert.throws(
+					() => SessionAuthenticate.createFromBuffer(buffer),
+					new RegExp(KNX_SECURE.ERROR.RESERVED_BYTE),
+				)
+			})
+		})
 
 		it('should create valid SessionAuthenticate', () => {
 			const auth = new SessionAuthenticate(validUserId, validMac)
 			assert.strictEqual(auth.userId, validUserId)
 			assert.ok(auth.messageAuthenticationCode.equals(validMac))
-		})
-
-		it('should reject invalid user IDs', () => {
-			assert.throws(
-				() => new SessionAuthenticate(0, validMac),
-				/Invalid user ID/,
-			)
-
-			assert.throws(
-				() => new SessionAuthenticate(0x80, validMac),
-				/Invalid user ID/,
-			)
 		})
 
 		it('should reject invalid MAC length', () => {
@@ -291,16 +396,6 @@ describe('SessionMessages', () => {
 
 			assert.strictEqual(decoded.userId, validUserId)
 			assert.ok(decoded.messageAuthenticationCode.equals(validMac))
-		})
-
-		it('should reject non-zero reserved byte', () => {
-			const buffer = Buffer.alloc(18)
-			buffer[0] = 1 // Reserved byte should be 0
-
-			assert.throws(
-				() => SessionAuthenticate.createFromBuffer(buffer),
-				/Reserved byte must be 0x00/,
-			)
 		})
 
 		it('should create correct KNX header', () => {
