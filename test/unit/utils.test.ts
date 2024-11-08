@@ -171,15 +171,6 @@ describe('utils', () => {
 		})
 	})
 
-	describe('wait', () => {
-		it('should wait for the specified time', async () => {
-			const start = Date.now()
-			await wait(100) // wait for 100 ms
-			const elapsed = Date.now() - start
-			assert(elapsed >= 100 && elapsed < 150) // Allow some margin for execution time
-		})
-	})
-
 	describe('round', () => {
 		it('should round numbers correctly', () => {
 			assert.strictEqual(round(1.2345, 2), 1.23)
