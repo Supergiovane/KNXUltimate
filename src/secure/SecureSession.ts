@@ -146,11 +146,16 @@ export default class SecureSession extends EventEmitter {
 				break
 
 			case SecureSessionStatus.AUTHENTICATION_FAILED:
+				this.state = SecureSessionState.CLOSED
+				this.close('Authentication failed')
+				break
+
 			case SecureSessionStatus.UNAUTHENTICATED:
 				this.close('Authentication failed')
 				break
 
 			case SecureSessionStatus.TIMEOUT:
+				this.state = SecureSessionState.CLOSED
 				this.close('Session timeout')
 				break
 
@@ -209,15 +214,14 @@ export default class SecureSession extends EventEmitter {
 		clearTimeout(this.authenticationTimer)
 		clearTimeout(this.sessionTimer)
 
-		const wasAuthenticated = this.state === SecureSessionState.AUTHENTICATED
+		const previousState = this.state
 		this.state = SecureSessionState.CLOSED
 
-		if (wasAuthenticated) {
-			this.emit('close', reason || 'Session closed')
-		}
+		this.emit('close', reason || 'Session closed')
 	}
 
 	private handleTimeout(reason: string): void {
+		this.state = SecureSessionState.CLOSED
 		this.emit('timeout', reason)
 		this.close(reason)
 	}
