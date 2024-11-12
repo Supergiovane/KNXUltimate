@@ -111,7 +111,7 @@ export default class KNXSecureTunnelling extends EventEmitter {
 	/**
 	 * Send secure tunnelling request
 	 */
-	public sendTunnelingRequest(request: KNXTunnellingRequest): void {
+	public sendTunnellingRequest(request: KNXTunnellingRequest): void {
 		if (!this.isEstablished) {
 			throw new Error('Tunnel not established')
 		}
