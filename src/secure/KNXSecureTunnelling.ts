@@ -116,13 +116,22 @@ export default class KNXSecureTunnelling extends EventEmitter {
 			throw new Error('Tunnel not established')
 		}
 
-		// Update sequence counter
-		request.seqCounter = this.sequenceNumber++
+		request.seqCounter = this.sequenceNumber
+
+		const header = new KNXHeader(
+			request.header.service_type,
+			request.toBuffer().length,
+		)
+		const data = Buffer.concat([header.toBuffer(), request.toBuffer()])
+
+		const wrapper = this.session.wrapData(data, this.sequenceNumber)
+
+		this.sequenceNumber++
 		if (this.sequenceNumber > 255) {
 			this.sequenceNumber = 0
 		}
 
-		this.sendSecureRequest(request)
+		this.emit('send', wrapper)
 	}
 
 	/**
