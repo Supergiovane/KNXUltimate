@@ -8,7 +8,12 @@ import KNXTunnellingRequest from '../../src/protocol/KNXTunnellingRequest'
 import CEMIFactory from '../../src/protocol/cEMI/CEMIFactory'
 import KNXAddress from '../../src/protocol/KNXAddress'
 import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
-import { SecurityUtils } from '../../src/secure/crypto/SecurityUtils'
+import {
+	SecurityUtils,
+	MessageType,
+} from '../../src/secure/crypto/SecurityUtils'
+import KNXHeader from '../../src/protocol/KNXHeader'
+import SecureWrapper from '../../src/secure/messages/SecureWrapper'
 
 describe('KNXSecureTunnelling', () => {
 	let secureTunnel: KNXSecureTunnelling
@@ -124,39 +129,19 @@ describe('KNXSecureTunnelling', () => {
 			let wrapper1: any
 			let wrapper2: any
 
-			console.log('DEBUG - Test start:', {
-				currentSequence: secureTunnel['sequenceNumber'],
-			})
-
 			secureTunnel.on('send', (w) => {
-				console.log('DEBUG - Send event:', {
-					wrapper: w,
-					currentSequence: secureTunnel['sequenceNumber'],
-					wrapperSequenceInfo: w.sequenceInfo,
-				})
-
 				if (!wrapper1) {
 					wrapper1 = w
-					console.log('DEBUG - Saved wrapper1')
 				} else {
 					wrapper2 = w
-					console.log('DEBUG - Saved wrapper2')
 				}
 			})
 
 			const req1 = createMockTunnellingRequest()
-			console.log('DEBUG - Sending request 1')
 			secureTunnel.sendTunnellingRequest(req1)
 
 			const req2 = createMockTunnellingRequest()
-			console.log('DEBUG - Sending request 2')
 			secureTunnel.sendTunnellingRequest(req2)
-
-			console.log('DEBUG - Final wrappers:', {
-				wrapper1SequenceInfo: wrapper1?.sequenceInfo,
-				wrapper2SequenceInfo: wrapper2?.sequenceInfo,
-				finalSequence: secureTunnel['sequenceNumber'],
-			})
 
 			assert.equal(
 				wrapper1.sequenceInfo,
@@ -172,21 +157,25 @@ describe('KNXSecureTunnelling', () => {
 
 		it('should wrap sequence number back to 0 after 255', () => {
 			let lastWrapper: any
+			let prevWrapper: any
 			secureTunnel.on('send', (w) => {
+				prevWrapper = lastWrapper
 				lastWrapper = w
 			})
 
 			// Set sequence number to 255
-			for (let i = 0; i < 255; i++) {
+			for (let i = 0; i <= 255; i++) {
 				secureTunnel.sendTunnellingRequest(
 					createMockTunnellingRequest(),
 				)
 			}
 
-			// Send one more request
+			assert.equal(lastWrapper.sequenceInfo, 255, 'Should reach 255')
+
+			// Send one more request which should wrap to 0
 			secureTunnel.sendTunnellingRequest(createMockTunnellingRequest())
 
-			assert.equal(lastWrapper.sequenceNumber, 0)
+			assert.equal(lastWrapper.sequenceInfo, 0, 'Should wrap back to 0')
 		})
 
 		it('should throw when sending request before establishment', () => {
@@ -271,12 +260,30 @@ describe('KNXSecureTunnelling', () => {
 
 	describe('Cleanup', () => {
 		it('should send disconnect request on close if established', () => {
-			setupEstablishedConnection(secureTunnel)
+			const session = setupEstablishedConnection(secureTunnel)
 
 			let disconnectSent = false
 			secureTunnel.on('send', (wrapper) => {
-				const data = Buffer.from(wrapper.encapsulatedData)
-				const serviceType = data.readUInt16BE(2)
+				const decryptedData = SecurityUtils.decrypt(
+					wrapper.encapsulatedData,
+					wrapper.messageAuthenticationCode,
+					{
+						messageType: MessageType.SECURE_WRAPPER,
+						knxHeader: wrapper.toHeader().toBuffer(),
+						secureSessionId: Buffer.alloc(2),
+						encapsulatedFrame: wrapper.encapsulatedData,
+					},
+					secureTunnel['session']['sessionKey'],
+					{
+						channelId: wrapper.sessionId,
+						sequenceNumber: wrapper.sequenceInfo,
+						serialNumber: wrapper.serialNumber,
+						messageTag: wrapper.messageTag,
+						messageType: MessageType.SECURE_WRAPPER,
+					},
+				)
+
+				const serviceType = decryptedData.readUInt16BE(2)
 				if (serviceType === KNX_CONSTANTS.DISCONNECT_REQUEST) {
 					disconnectSent = true
 				}
@@ -302,16 +309,17 @@ describe('KNXSecureTunnelling', () => {
 })
 
 // Helper functions
-function setupEstablishedConnection(tunnel: KNXSecureTunnelling) {
-	console.log('DEBUG - Setting up established connection')
+function setupEstablishedConnection(tunnel: KNXSecureTunnelling): any {
+	const session = simulateSecureSession()
 
-	tunnel['sequenceNumber'] = 0
+	tunnel['session']['sessionKey'] = session.sessionKey
+	tunnel['session']['sequenceNumber'] = 0
 
 	tunnel.connect()
 
 	const sessionResponse = {
 		sessionId: 1,
-		publicKey: Buffer.alloc(32, 1),
+		publicKey: session.serverKeyPair.publicKey,
 		messageAuthenticationCode: Buffer.alloc(16, 1),
 		verifyMAC: () => true,
 	} as any
@@ -325,13 +333,7 @@ function setupEstablishedConnection(tunnel: KNXSecureTunnelling) {
 
 	tunnel.handleConnectResponse(1)
 
-	console.log('DEBUG - Connection setup complete:', {
-		isEstablished: tunnel.isEstablished,
-		channelId: tunnel['channelId'],
-		sessionState: tunnel['session']['state'],
-	})
-
-	return sessionAuth
+	return session
 }
 
 function simulateSecureSession() {
@@ -362,19 +364,47 @@ function createMockTunnellingRequest() {
 	return new KNXTunnellingRequest(1, 0, cEMIMessage)
 }
 
-function createMockSecureWrapper(serviceType: number, sequenceNumber = 0) {
-	const header = Buffer.alloc(6)
-	header.writeUInt16BE(serviceType, 2)
+function createMockSecureWrapper(
+	serviceType: number,
+	sequenceNumber = 1,
+): SecureWrapper {
+	// Create a valid KNX header for tunnelling
+	const header = new KNXHeader(serviceType, 0)
+	const headerBuffer = header.toBuffer()
 
-	return {
-		sessionId: 1,
-		sequenceInfo: sequenceNumber,
+	// Get the established session and its key
+	const session = simulateSecureSession()
+
+	// Create data to be encrypted according to KNX spec
+	const secureData = {
+		messageType: MessageType.SECURE_WRAPPER,
+		knxHeader: headerBuffer,
+		secureSessionId: Buffer.alloc(2),
+		encapsulatedFrame: headerBuffer,
+	}
+
+	// Configure CCM parameters as per spec
+	const config = {
+		channelId: 1,
+		sequenceNumber,
 		serialNumber: 12345678,
 		messageTag: 0,
-		encapsulatedData: header,
-		messageAuthenticationCode: Buffer.alloc(16, 1),
-		// According to spec, unwrap should decrypt data
-		unwrapData: () => header,
-		toBuffer: () => Buffer.concat([header, Buffer.alloc(32)]),
-	} as any
+		messageType: MessageType.SECURE_WRAPPER,
+	}
+
+	// Generate encrypted data and MAC using actual SecurityUtils
+	const { ciphertext, mac } = SecurityUtils.encrypt(
+		secureData,
+		session.sessionKey,
+		config,
+	)
+
+	return new SecureWrapper(
+		1, // sessionId
+		sequenceNumber, // sequenceInfo
+		12345678, // serialNumber
+		0, // messageTag
+		ciphertext, // encapsulatedData
+		mac, // messageAuthenticationCode
+	)
 }
