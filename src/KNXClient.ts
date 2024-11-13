@@ -298,7 +298,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				type: 'udp4',
 				reuseAddr: false,
 			}) as UDPSocket
-			// this._clientSocket.removeAllListeners()
+
 			const Port =
 				this._options.ipPort === undefined ||
 				this._options.ipPort === ''
