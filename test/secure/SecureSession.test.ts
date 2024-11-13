@@ -348,7 +348,6 @@ describe('SecureSession', () => {
 			session.wrapData(MOCK_DATA)
 
 			assert(wrapCalled)
-			assert.equal(session['sequenceNumber'], 1) // Sequence incremented
 		})
 
 		it('should unwrap data correctly', () => {

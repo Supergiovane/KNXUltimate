@@ -171,7 +171,7 @@ export default class SecureSession extends EventEmitter {
 		this.emit('status', status)
 	}
 
-	public wrapData(data: Buffer): SecureWrapper {
+	public wrapData(data: Buffer, sequenceNumber?: number): SecureWrapper {
 		if (this.state !== SecureSessionState.AUTHENTICATED) {
 			throw new Error('Session not authenticated')
 		}
@@ -179,7 +179,7 @@ export default class SecureSession extends EventEmitter {
 		return SecureWrapper.wrap(
 			data,
 			this.sessionId,
-			this.sequenceNumber++,
+			sequenceNumber ?? 0,
 			this.options.serialNumber,
 			this.messageTag++,
 			this.sessionKey,
