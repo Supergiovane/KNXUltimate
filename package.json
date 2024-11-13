@@ -54,13 +54,18 @@
     {
       "name": "Massimo 'Supergiovane' Saccani",
       "email": "maxsupergiovane@icloud.com"
-    },
+    }
+  ],
+  "contributors": [
     {
       "name": "Daniel Lando",
       "email": "daniel.sorridi@gmail.com"
+    },
+    {
+      "name": "Andrea Zanetti",
+      "email": "zanetti.sw@gmail.com"
     }
   ],
-  "contributors": [],
   "keywords": [
     "knx",
     "eib",
