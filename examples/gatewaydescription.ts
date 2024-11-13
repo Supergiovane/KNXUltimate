@@ -22,7 +22,7 @@ async function initClient() {
 	client = new KNXClient({
 		ipAddr: ip,
 		ipPort: port,
-		loglevel: 'trace',
+		loglevel: 'info',
 		suppress_ack_ldatareq: false,
 		hostProtocol: 'TunnelUDP'
 	})
