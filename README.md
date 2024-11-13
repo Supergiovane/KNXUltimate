@@ -73,6 +73,8 @@ You should see something like this in the console window (the **msg.payload** is
 | .writeRaw (GA, payload, datapoint) | Sends a WRITE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the buffer you want to send, **datapoint** is a string representing the datapoint (for example "5.001") |
 | .respond (GA, payload, datapoint)  | Sends a RESPONSE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
 | .read (GA)                         | Sends a READ telegram to the BUS. **GA** is the group address (for example "0/0/1").                 |
+| . discover()                        | Sends a discover request on the KNX default multicast port and returns the results as an array. This is an async method. See the example in the **examples** folder |
+| .getGatewayDescription()           | Sends a gateway description request. It works after an established connection. The async results will be sent to the *descriptionResponse* event. There is an example in the **examples** folder named **gatewaydescription.ts** . |
 
 | Property       | Description                                                                                          |
 | -------------- | ---------------------------------------------------------------------------------------------------- |
@@ -92,7 +94,9 @@ List of events raised by KNXultimate, in proper order. For the signatures, pleas
 | ackReceived  | Ack telegram from KNX/IP Gateway has been received. This confirms that the telegram sent by KNXUltimate has reached the KNX/IP Gateway successfully. |
 | disconnected | The KNX connection has been disconnected.                                                            |
 | close        | The main KNXUltimate socket has been closed.                                                         |
-| error        | KNXUltimate has raised an error. The error description is provided as well.                          |
+| error        | KNXUltimate has raised an error. The error description is provided as well.                         |
+| descriptionResponse | Gather the *getGatewayDescription* responses. There is an example in the **examples** folder named **gatewaydescription.ts** . |
+
 
 ## DECONDING THE TELEGRAMS FROM BUS
 
@@ -115,6 +119,7 @@ You can find all examples in the [examples](./examples/) folder:
 - [simpleSample](./examples/simpleSample.ts) - A simple example that shows how to connect to the KNX bus and send a telegram. **WARNING** this sends data to your KNX BUS!
 - [discovery](./examples/discovery.ts) - A simple example that shows how to discover KNX devices on the network.
 - [test-toggle](./examples/test-toggle.ts) - An interactive example that shows how to toggle a switch on/off. **WARNING** this sends data to your KNX BUS!
+- [gatewaydescription](./examples/gatewaydescription.ts) - Discover all gateways on your network and shows the details (name, mac address, etc...).
 
 <br/>
 

@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "examples": "tsc -p tsconfig.examples.json",
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",
     "test": "node -r esbuild-register --test test/**/*.test.ts",
