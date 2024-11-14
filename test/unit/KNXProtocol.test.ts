@@ -6,7 +6,7 @@ import HPAI from '../../src/protocol/HPAI'
 import TunnelCRI from '../../src/protocol/TunnelCRI'
 import CEMIMessage from '../../src/protocol/cEMI/CEMIMessage'
 import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
-
+import { KNX_SECURE } from '../../src/secure/SecureConstants'
 import KNXSearchRequest from '../../src/protocol/KNXSearchRequest'
 import KNXDescriptionRequest from '../../src/protocol/KNXDescriptionRequest'
 import KNXConnectRequest from '../../src/protocol/KNXConnectRequest'
@@ -16,150 +16,268 @@ import KNXDisconnectResponse from '../../src/protocol/KNXDisconnectResponse'
 import KNXTunnellingAck from '../../src/protocol/KNXTunnellingAck'
 import KNXTunnellingRequest from '../../src/protocol/KNXTunnellingRequest'
 import KNXRoutingIndication from '../../src/protocol/KNXRoutingIndication'
+import SecureWrapper from '../../src/secure/messages/SecureWrapper'
+import { SessionRequest } from '../../src/secure/messages/SessionMessages'
 
 describe('KNXProtocol', () => {
 	let mockHPAI: HPAI
 	let mockTunnelCRI: TunnelCRI
 	let mockCEMIMessage: CEMIMessage
+	let mockSessionKey: Buffer
+	let mockPublicKey: Buffer
+	let mockSerialNumber: number
 
 	beforeEach(() => {
 		mockHPAI = new HPAI('192.168.1.1', 3671, KNX_CONSTANTS.IPV4_UDP)
 		mockTunnelCRI = new TunnelCRI(KNX_CONSTANTS.TUNNEL_LINKLAYER)
 		mockCEMIMessage = {} as CEMIMessage
+		mockSessionKey = Buffer.alloc(16, 1) // 16 byte key
+		mockPublicKey = Buffer.alloc(32, 2) // 32 byte Curve25519 key
+		mockSerialNumber = 12345678
 	})
 
-	describe('parseMessage', () => {
-		it('should parse KNXSearchRequest correctly', () => {
-			const mockBuffer = Buffer.from([
-				0x06,
-				0x10,
-				0x02,
-				0x01,
-				0x00,
-				0x0e,
-				...mockHPAI.toBuffer(),
-			])
-			const result = KNXProtocol.parseMessage(mockBuffer)
-			assert(result.knxHeader instanceof KNXHeader)
-			assert(result.knxMessage instanceof KNXSearchRequest)
+	describe('Standard KNX Messages', () => {
+		describe('parseMessage', () => {
+			it('should parse KNXSearchRequest correctly', () => {
+				const mockBuffer = Buffer.from([
+					0x06,
+					0x10,
+					0x02,
+					0x01,
+					0x00,
+					0x0e,
+					...mockHPAI.toBuffer(),
+				])
+				const result = KNXProtocol.parseMessage(mockBuffer)
+				assert(result.knxHeader instanceof KNXHeader)
+				assert(result.knxMessage instanceof KNXSearchRequest)
+			})
+
+			it('should handle unknown message types', () => {
+				const mockBuffer = Buffer.from([
+					0x06, 0x10, 0xff, 0xff, 0x00, 0x0e,
+				])
+				console.log('Test input buffer:', mockBuffer.toString('hex'))
+				const result = KNXProtocol.parseMessage(mockBuffer)
+				assert(result.knxHeader instanceof KNXHeader)
+				assert(result.knxMessage === undefined)
+			})
 		})
 
-		it('should handle unknown message types', () => {
-			const mockBuffer = Buffer.from([0x06, 0x10, 0xff, 0xff, 0x00, 0x0e])
-			const result = KNXProtocol.parseMessage(mockBuffer)
-			assert(result.knxHeader instanceof KNXHeader)
-			assert(result.knxMessage === undefined)
+		describe('Standard Message Creation', () => {
+			it('should create KNXSearchRequest', () => {
+				const result = KNXProtocol.newKNXSearchRequest(mockHPAI)
+				assert(result instanceof KNXSearchRequest)
+				assert.deepStrictEqual(result.hpai, mockHPAI)
+			})
+
+			it('should create KNXDescriptionRequest', () => {
+				const result = KNXProtocol.newKNXDescriptionRequest(mockHPAI)
+				assert(result instanceof KNXDescriptionRequest)
+				assert.deepStrictEqual(result.hpai, mockHPAI)
+			})
+
+			it('should create KNXConnectRequest with default HPAIs', () => {
+				const result = KNXProtocol.newKNXConnectRequest(mockTunnelCRI)
+				assert(result instanceof KNXConnectRequest)
+				assert.deepStrictEqual(result.cri, mockTunnelCRI)
+				assert.deepStrictEqual(result.hpaiControl, HPAI.NULLHPAI)
+				assert.deepStrictEqual(result.hpaiData, HPAI.NULLHPAI)
+			})
+
+			it('should create KNXConnectRequest with custom HPAIs', () => {
+				const result = KNXProtocol.newKNXConnectRequest(
+					mockTunnelCRI,
+					mockHPAI,
+					mockHPAI,
+				)
+				assert(result instanceof KNXConnectRequest)
+				assert.deepStrictEqual(result.cri, mockTunnelCRI)
+				assert.deepStrictEqual(result.hpaiControl, mockHPAI)
+				assert.deepStrictEqual(result.hpaiData, mockHPAI)
+			})
+
+			it('should create KNXConnectionStateRequest with default HPAI', () => {
+				const result = KNXProtocol.newKNXConnectionStateRequest(1)
+				assert(result instanceof KNXConnectionStateRequest)
+				assert.strictEqual(result.channelID, 1)
+				assert.deepStrictEqual(result.hpaiControl, HPAI.NULLHPAI)
+			})
+
+			it('should create KNXConnectionStateRequest with custom HPAI', () => {
+				const result = KNXProtocol.newKNXConnectionStateRequest(
+					1,
+					mockHPAI,
+				)
+				assert(result instanceof KNXConnectionStateRequest)
+				assert.strictEqual(result.channelID, 1)
+				assert.deepStrictEqual(result.hpaiControl, mockHPAI)
+			})
+
+			it('should create KNXDisconnectRequest with default HPAI', () => {
+				const result = KNXProtocol.newKNXDisconnectRequest(1)
+				assert(result instanceof KNXDisconnectRequest)
+				assert.strictEqual(result.channelID, 1)
+				assert.deepStrictEqual(result.hpaiControl, HPAI.NULLHPAI)
+			})
+
+			it('should create KNXDisconnectRequest with custom HPAI', () => {
+				const result = KNXProtocol.newKNXDisconnectRequest(1, mockHPAI)
+				assert(result instanceof KNXDisconnectRequest)
+				assert.strictEqual(result.channelID, 1)
+				assert.deepStrictEqual(result.hpaiControl, mockHPAI)
+			})
+
+			it('should create KNXDisconnectResponse', () => {
+				const result = KNXProtocol.newKNXDisconnectResponse(1, 0)
+				assert(result instanceof KNXDisconnectResponse)
+				assert.strictEqual(result.channelID, 1)
+				assert.strictEqual(result.status, 0)
+			})
+
+			it('should create KNXTunnellingACK', () => {
+				const result = KNXProtocol.newKNXTunnellingACK(1, 2, 0)
+				assert(result instanceof KNXTunnellingAck)
+				assert.strictEqual(result.channelID, 1)
+				assert.strictEqual(result.seqCounter, 2)
+				assert.strictEqual(result.status, 0)
+			})
+
+			it('should create KNXTunnellingRequest', () => {
+				const result = KNXProtocol.newKNXTunnellingRequest(
+					1,
+					2,
+					mockCEMIMessage,
+				)
+				assert(result instanceof KNXTunnellingRequest)
+				assert.strictEqual(result.channelID, 1)
+				assert.strictEqual(result.seqCounter, 2)
+				assert.deepStrictEqual(result.cEMIMessage, mockCEMIMessage)
+			})
+
+			it('should create KNXRoutingIndication', () => {
+				const result =
+					KNXProtocol.newKNXRoutingIndication(mockCEMIMessage)
+				assert(result instanceof KNXRoutingIndication)
+				assert.deepStrictEqual(result.cEMIMessage, mockCEMIMessage)
+			})
 		})
 	})
 
-	describe('newKNXSearchRequest', () => {
-		it('should create a new KNXSearchRequest', () => {
-			const result = KNXProtocol.newKNXSearchRequest(mockHPAI)
-			assert(result instanceof KNXSearchRequest)
-			assert.deepStrictEqual(result.hpai, mockHPAI)
-		})
-	})
+	describe('Secure Messages', () => {
+		describe('parseSecureMessage', () => {
+			it('should parse SESSION_REQUEST correctly', () => {
+				const mockBuffer = Buffer.concat([
+					new KNXHeader(
+						KNX_SECURE.SERVICE_TYPE.SESSION_REQUEST,
+						40,
+					).toBuffer(),
+					mockHPAI.toBuffer(),
+					mockPublicKey,
+				])
+				const result = KNXProtocol.parseSecureMessage(mockBuffer)
+				assert(result.secureMessage instanceof SessionRequest)
+				assert.deepStrictEqual(
+					(result.secureMessage as SessionRequest).publicKey,
+					mockPublicKey,
+				)
+			})
 
-	describe('newKNXDescriptionRequest', () => {
-		it('should create a new KNXDescriptionRequest', () => {
-			const result = KNXProtocol.newKNXDescriptionRequest(mockHPAI)
-			assert(result instanceof KNXDescriptionRequest)
-			assert.deepStrictEqual(result.hpai, mockHPAI)
-		})
-	})
+			it('should parse SECURE_WRAPPER correctly', () => {
+				const wrappedData = Buffer.from([1, 2, 3, 4])
+				const mockWrapper = SecureWrapper.wrap(
+					wrappedData,
+					1,
+					1,
+					mockSerialNumber,
+					0,
+					mockSessionKey,
+				)
+				const mockBuffer = Buffer.concat([
+					new KNXHeader(
+						KNX_SECURE.SERVICE_TYPE.SECURE_WRAPPER,
+						mockWrapper.toBuffer().length,
+					).toBuffer(),
+					mockWrapper.toBuffer(),
+				])
 
-	describe('newKNXConnectRequest', () => {
-		it('should create a new KNXConnectRequest with default HPAIs', () => {
-			const result = KNXProtocol.newKNXConnectRequest(mockTunnelCRI)
-			assert(result instanceof KNXConnectRequest)
-			assert.deepStrictEqual(result.cri, mockTunnelCRI)
-			assert.deepStrictEqual(result.hpaiControl, HPAI.NULLHPAI)
-			assert.deepStrictEqual(result.hpaiData, HPAI.NULLHPAI)
-		})
+				const result = KNXProtocol.parseSecureMessage(mockBuffer)
+				assert(result.secureMessage instanceof SecureWrapper)
+			})
 
-		it('should create a new KNXConnectRequest with custom HPAIs', () => {
-			const result = KNXProtocol.newKNXConnectRequest(
-				mockTunnelCRI,
-				mockHPAI,
-				mockHPAI,
-			)
-			assert(result instanceof KNXConnectRequest)
-			assert.deepStrictEqual(result.cri, mockTunnelCRI)
-			assert.deepStrictEqual(result.hpaiControl, mockHPAI)
-			assert.deepStrictEqual(result.hpaiData, mockHPAI)
-		})
-	})
-
-	describe('newKNXConnectionStateRequest', () => {
-		it('should create a new KNXConnectionStateRequest with default HPAI', () => {
-			const result = KNXProtocol.newKNXConnectionStateRequest(1)
-			assert(result instanceof KNXConnectionStateRequest)
-			assert.strictEqual(result.channelID, 1)
-			assert.deepStrictEqual(result.hpaiControl, HPAI.NULLHPAI)
-		})
-
-		it('should create a new KNXConnectionStateRequest with custom HPAI', () => {
-			const result = KNXProtocol.newKNXConnectionStateRequest(1, mockHPAI)
-			assert(result instanceof KNXConnectionStateRequest)
-			assert.strictEqual(result.channelID, 1)
-			assert.deepStrictEqual(result.hpaiControl, mockHPAI)
-		})
-	})
-
-	describe('newKNXDisconnectRequest', () => {
-		it('should create a new KNXDisconnectRequest with default HPAI', () => {
-			const result = KNXProtocol.newKNXDisconnectRequest(1)
-			assert(result instanceof KNXDisconnectRequest)
-			assert.strictEqual(result.channelID, 1)
-			assert.deepStrictEqual(result.hpaiControl, HPAI.NULLHPAI)
+			it('should throw on unknown secure service type', () => {
+				const mockBuffer = Buffer.concat([
+					new KNXHeader(0xffff, 1).toBuffer(),
+					Buffer.from([0]),
+				])
+				assert.throws(
+					() => KNXProtocol.parseSecureMessage(mockBuffer),
+					/Unknown secure service type/,
+				)
+			})
 		})
 
-		it('should create a new KNXDisconnectRequest with custom HPAI', () => {
-			const result = KNXProtocol.newKNXDisconnectRequest(1, mockHPAI)
-			assert(result instanceof KNXDisconnectRequest)
-			assert.strictEqual(result.channelID, 1)
-			assert.deepStrictEqual(result.hpaiControl, mockHPAI)
-		})
-	})
+		describe('Secure Message Creation', () => {
+			it('should create SecureConnectRequest', () => {
+				console.log('Test mock values:', {
+					mockTunnelCRI,
+					mockSessionKey: mockSessionKey.toString('hex'),
+				})
 
-	describe('newKNXDisconnectResponse', () => {
-		it('should create a new KNXDisconnectResponse', () => {
-			const result = KNXProtocol.newKNXDisconnectResponse(1, 0)
-			assert(result instanceof KNXDisconnectResponse)
-			assert.strictEqual(result.channelID, 1)
-			assert.strictEqual(result.status, 0)
-		})
-	})
+				const baseRequest =
+					KNXProtocol.newKNXConnectRequest(mockTunnelCRI)
+				console.log('Base request created:', baseRequest)
 
-	describe('newKNXTunnellingACK', () => {
-		it('should create a new KNXTunnellingACK', () => {
-			const result = KNXProtocol.newKNXTunnellingACK(1, 2, 0)
-			assert(result instanceof KNXTunnellingAck)
-			assert.strictEqual(result.channelID, 1)
-			assert.strictEqual(result.seqCounter, 2)
-			assert.strictEqual(result.status, 0)
-		})
-	})
+				const result = KNXProtocol.newSecureConnectRequest(
+					mockTunnelCRI,
+					1,
+					1,
+					mockSerialNumber,
+					0,
+					mockSessionKey,
+				)
+				console.log('Secure wrapper result:', {
+					buffer: result.toBuffer().toString('hex'),
+				})
 
-	describe('newKNXTunnellingRequest', () => {
-		it('should create a new KNXTunnellingRequest', () => {
-			const result = KNXProtocol.newKNXTunnellingRequest(
-				1,
-				2,
-				mockCEMIMessage,
-			)
-			assert(result instanceof KNXTunnellingRequest)
-			assert.strictEqual(result.channelID, 1)
-			assert.strictEqual(result.seqCounter, 2)
-			assert.deepStrictEqual(result.cEMIMessage, mockCEMIMessage)
-		})
-	})
+				assert(result instanceof SecureWrapper)
+				const unwrapped = SecureWrapper.unwrap(result, mockSessionKey)
+				console.log('Unwrapped data:', unwrapped.toString('hex'))
+				const connectRequest = KNXConnectRequest.createFromBuffer(
+					unwrapped.subarray(6),
+				)
+				assert(connectRequest instanceof KNXConnectRequest)
+				assert.deepStrictEqual(connectRequest.cri, mockTunnelCRI)
+			})
 
-	describe('newKNXRoutingIndication', () => {
-		it('should create a new KNXRoutingIndication', () => {
-			const result = KNXProtocol.newKNXRoutingIndication(mockCEMIMessage)
-			assert(result instanceof KNXRoutingIndication)
-			assert.deepStrictEqual(result.cEMIMessage, mockCEMIMessage)
+			it('should create SecureDisconnectRequest', () => {
+				const channelId = 1
+				console.log(
+					'Creating disconnect request for channel:',
+					channelId,
+				)
+
+				const result = KNXProtocol.newSecureDisconnectRequest(
+					channelId,
+					1,
+					1,
+					mockSerialNumber,
+					0,
+					mockSessionKey,
+				)
+				console.log('Secure wrapper result:', {
+					buffer: result.toBuffer().toString('hex'),
+				})
+
+				assert(result instanceof SecureWrapper)
+				const unwrapped = SecureWrapper.unwrap(result, mockSessionKey)
+				console.log('Unwrapped data:', unwrapped.toString('hex'))
+				const disconnectRequest = KNXDisconnectRequest.createFromBuffer(
+					unwrapped.subarray(6),
+				)
+				assert(disconnectRequest instanceof KNXDisconnectRequest)
+				assert.strictEqual(disconnectRequest.channelID, channelId)
+			})
 		})
 	})
 })

@@ -64,8 +64,14 @@ export default class KNXProtocol {
 	 * Parse standard KNX message from buffer
 	 */
 	static parseMessage(buffer: Buffer) {
+		console.log('parseMessage input buffer:', buffer.toString('hex'))
 		const knxHeader: KNXHeader = KNXHeader.createFromBuffer(buffer)
+		console.log('Parsed header:', {
+			service_type: knxHeader.service_type.toString(16),
+			headerLength: knxHeader.headerLength,
+		})
 		const knxData: Buffer = buffer.subarray(knxHeader.headerLength)
+		console.log('Data buffer:', knxData.toString('hex'))
 		let knxMessage: KnxMessage
 
 		switch (knxHeader.service_type) {
@@ -112,9 +118,11 @@ export default class KNXProtocol {
 			case KNX_CONSTANTS.ROUTING_LOST_MESSAGE:
 				break
 			default:
-				throw new Error(
-					`Unknown service type: ${knxHeader.service_type}`,
+				console.log(
+					'Ignoring invalid packet with unknown service type:',
+					knxHeader.service_type.toString(16),
 				)
+				return { knxHeader, knxMessage: undefined, knxData }
 		}
 
 		return { knxHeader, knxMessage, knxData }
@@ -253,14 +261,29 @@ export default class KNXProtocol {
 		messageTag: number,
 		sessionKey: Buffer,
 	) {
+		console.log('Creating secure connect request with:', {
+			cri,
+			sessionId,
+			sequenceNumber,
+			serialNumber,
+			messageTag,
+			sessionKeyLength: sessionKey?.length,
+		})
+
 		const connectRequest = this.newKNXConnectRequest(cri)
+		console.log('Base connect request:', {
+			header: connectRequest.header,
+			buffer: connectRequest.toBuffer().toString('hex'),
+		})
+
 		const header = connectRequest.header
 		const data = Buffer.concat([
 			header.toBuffer(),
 			connectRequest.toBuffer(),
 		])
+		console.log('Combined data buffer:', data.toString('hex'))
 
-		return SecureWrapper.wrap(
+		const wrapper = SecureWrapper.wrap(
 			data,
 			sessionId,
 			sequenceNumber,
@@ -268,6 +291,13 @@ export default class KNXProtocol {
 			messageTag,
 			sessionKey,
 		)
+		console.log('Created secure wrapper:', {
+			sessionId: wrapper.sessionId,
+			sequenceInfo: wrapper.sequenceInfo,
+			buffer: wrapper.toBuffer().toString('hex'),
+		})
+
+		return wrapper
 	}
 
 	static newSecureDisconnectRequest(
@@ -278,12 +308,26 @@ export default class KNXProtocol {
 		messageTag: number,
 		sessionKey: Buffer,
 	) {
+		console.log('Creating secure disconnect request with:', {
+			channelId,
+			sessionId,
+			sequenceNumber,
+			serialNumber,
+			messageTag,
+		})
+
 		const disconnectRequest = this.newKNXDisconnectRequest(channelId)
+		console.log('Base disconnect request:', {
+			channelId: disconnectRequest.channelID,
+			buffer: disconnectRequest.toBuffer().toString('hex'),
+		})
+
 		const header = disconnectRequest.header
 		const data = Buffer.concat([
 			header.toBuffer(),
 			disconnectRequest.toBuffer(),
 		])
+		console.log('Combined data buffer:', data.toString('hex'))
 
 		return SecureWrapper.wrap(
 			data,
