@@ -1031,7 +1031,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	/**
 	 * Send a search request message to the KNX bus and wait for responses
-	 * Set _clearToSend to true to allow the discovery packet to process. Initially set to false to prevent premature sends.
+	 * Set _clearToSend to true to allow the discovery packet to process. Initially set to false to prevent premature sends!
 	 */
 	startDiscovery() {
 		this._clearToSend = true
