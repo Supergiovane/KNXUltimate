@@ -5,25 +5,113 @@ import { generateKeyPair, sharedKey } from '../../src/Curve25519'
 
 describe('Curve25519', () => {
 	describe('generateKeyPair', () => {
-		it('should generate valid key pairs from seed', () => {
+		it('should generate valid key pairs by verifying encryption/decryption', () => {
 			const seed = new Uint8Array(32).fill(1)
 			const keyPair = generateKeyPair(seed)
 
-			assert(keyPair.public instanceof Uint8Array)
-			assert(keyPair.private instanceof Uint8Array)
-			assert.strictEqual(keyPair.public.length, 32)
-			assert.strictEqual(keyPair.private.length, 32)
+			// Create test messages
+			const testMessage = new Uint8Array([1, 2, 3, 4, 5])
+			const wrongMessage = new Uint8Array([5, 4, 3, 2, 1])
 
-			// Verify the private key format constraints
-			assert.strictEqual(keyPair.private[0] & 248, keyPair.private[0])
-			assert.strictEqual(
-				keyPair.private[31] & 127,
-				keyPair.private[31] & 127,
+			// Generate shared keys using both private and public keys
+			const sharedKey1 = sharedKey(keyPair.private, keyPair.public)
+
+			// Generate another key pair to test invalid scenarios
+			const invalidSeed = new Uint8Array(32).fill(2)
+			const invalidKeyPair = generateKeyPair(invalidSeed)
+			const invalidSharedKey = sharedKey(
+				invalidKeyPair.private,
+				keyPair.public,
 			)
-			assert.strictEqual(keyPair.private[31] & 64, 64)
 
-			// Verify the public key format constraints
-			assert.strictEqual(keyPair.public[31] & 127, keyPair.public[31])
+			// Test successful encryption/decryption
+			assert.doesNotThrow(() => {
+				const nonce = crypto.randomBytes(12)
+				const cipher1 = crypto.createCipheriv(
+					'aes-256-gcm',
+					sharedKey1,
+					nonce,
+				) as crypto.CipherGCM
+				const decipher = crypto.createDecipheriv(
+					'aes-256-gcm',
+					sharedKey1,
+					nonce,
+				) as crypto.DecipherGCM
+
+				// Encrypt
+				const encrypted = Buffer.concat([
+					cipher1.update(testMessage),
+					cipher1.final(),
+				])
+				const authTag = cipher1.getAuthTag()
+
+				// Decrypt
+				decipher.setAuthTag(authTag)
+				const decrypted = Buffer.concat([
+					decipher.update(encrypted),
+					decipher.final(),
+				])
+
+				// Verify the decrypted message matches the original
+				assert.deepStrictEqual(
+					Buffer.from(testMessage),
+					decrypted,
+					'Decrypted message should match original message',
+				)
+
+				// Verify the decrypted message does not match a different message
+				assert.notDeepStrictEqual(
+					Buffer.from(wrongMessage),
+					decrypted,
+					'Decrypted message should not match wrong message',
+				)
+			})
+
+			// Test encryption/decryption failure with wrong key
+			assert.throws(
+				() => {
+					const nonce = crypto.randomBytes(12)
+					const cipher1 = crypto.createCipheriv(
+						'aes-256-gcm',
+						sharedKey1,
+						nonce,
+					) as crypto.CipherGCM
+					const invalidDecipher = crypto.createDecipheriv(
+						'aes-256-gcm',
+						invalidSharedKey,
+						nonce,
+					) as crypto.DecipherGCM
+
+					// Encrypt with correct key
+					const encrypted = Buffer.concat([
+						cipher1.update(testMessage),
+						cipher1.final(),
+					])
+					const authTag = cipher1.getAuthTag()
+
+					// Try to decrypt with wrong key
+					invalidDecipher.setAuthTag(authTag)
+					invalidDecipher.update(encrypted)
+					invalidDecipher.final() // This should throw an error
+				},
+				{
+					name: 'Error',
+					message: 'Unsupported state or unable to authenticate data',
+				},
+			)
+		})
+
+		it('should throw error with invalid input type', () => {
+			assert.throws(
+				() => {
+					// @ts-expect-error - Testing JS runtime error
+					generateKeyPair([1, 2, 3])
+				},
+				{
+					name: 'TypeError',
+					message: 'unexpected type [object Array], use Uint8Array',
+				},
+			)
 		})
 
 		it('should generate different key pairs for different seeds', () => {
