@@ -146,6 +146,8 @@ export enum KNXTimer {
 	DISCONNECT = 'disconnect',
 	/** Waits for discovery responses */
 	DISCOVERY = 'discovery',
+	/** Waits for the gateway description gather responses */
+	GATEWAYDESCRIPTION = 'GatewayDescription',
 }
 
 export type SnifferPacket = {
@@ -296,17 +298,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		if (this._options.hostProtocol === 'TunnelUDP') {
 			this._clientSocket = dgram.createSocket({
 				type: 'udp4',
-				reuseAddr: false,
+				reuseAddr: true,
 			}) as UDPSocket
-
-			const Port =
-				this._options.ipPort === undefined ||
-				this._options.ipPort === ''
-					? null
-					: Number(this._options.ipPort)
+			this._clientSocket.on(
+				SocketEvents.message,
+				this.processInboundMessage.bind(this),
+			)
+			this._clientSocket.on(SocketEvents.error, (error) =>
+				this.emit(KNXClientEvents.error, error),
+			)
+			this._clientSocket.on(SocketEvents.close, () =>
+				this.emit(KNXClientEvents.close),
+			)
 			this._clientSocket.bind(
 				{
-					port: Port,
+					port: this._peerPort,
 					address: this._options.localIPAddress,
 				},
 				() => {
@@ -323,16 +329,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						)
 					}
 				},
-			)
-			this._clientSocket.on(
-				SocketEvents.message,
-				this.processInboundMessage.bind(this),
-			)
-			this._clientSocket.on(SocketEvents.error, (error) =>
-				this.emit(KNXClientEvents.error, error),
-			)
-			this._clientSocket.on(SocketEvents.close, () =>
-				this.emit(KNXClientEvents.close),
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
 			this._clientSocket = new net.Socket()
@@ -364,10 +360,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.emit(KNXClientEvents.close),
 			)
 			this._clientSocket.bind(this._peerPort, () => {
-				const client = this._clientSocket as UDPSocket
 				try {
-					client.setMulticastTTL(250)
-					client.setMulticastInterface(this._options.localIPAddress)
+					;(this._clientSocket as UDPSocket).setMulticastTTL(250)
+					;(this._clientSocket as UDPSocket).setMulticastInterface(
+						this._options.localIPAddress,
+					)
 				} catch (error) {
 					this.sysLogger.error(
 						`Multicast: Error setting SetTTL ${error.message}` ||
@@ -375,7 +372,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)
 				}
 				try {
-					client.addMembership(
+					;(this._clientSocket as UDPSocket).addMembership(
 						this._peerHost,
 						this._options.localIPAddress,
 					)
@@ -1084,16 +1081,70 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return discovered
 	}
 
-	getGatewayDescription() {
-		if (this._clientSocket === null) {
-			throw new Error('No client socket defined')
+	/**
+	 * Returns true if the gw description's gatherer is running
+	 */
+	isGatewayDescriptionRunning() {
+		return this.timers.has(KNXTimer.GATEWAYDESCRIPTION)
+	}
+
+	/**
+	 * Send a get description message to the KNX bus and wait for responses
+	 * Set _clearToSend to true to allow the gatherer packet to process. Initially set to false to prevent premature sends.
+	 */
+	startGatewayDescription() {
+		this._clearToSend = true
+		if (this.isGatewayDescriptionRunning()) {
+			throw new Error('GatewayDescription gather is already running')
 		}
-		if (this._connectionState !== ConncetionState.CONNECTED) {
-			throw new Error(
-				'Socket is not connected during getGatewayDescription.',
-			)
-		}
+		this.setTimer(
+			KNXTimer.GATEWAYDESCRIPTION,
+			() => {},
+			1000 * KNX_CONSTANTS.SEARCH_TIMEOUT,
+		)
 		this.sendDescriptionRequestMessage()
+	}
+
+	/**
+	 * Stop the process
+	 */
+	stopGatewayDescription() {
+		this.clearTimer(KNXTimer.GATEWAYDESCRIPTION)
+	}
+
+	/**
+	 * Returns an array of "search_responses" from the KNX interfaces in the format of a KNX descriptionResponse
+	 */
+	public static async getGatewayDescription(
+		ipAddr,
+		ipPort,
+		eth?: string | number,
+		timeout = 5000,
+	) {
+		if (typeof eth === 'number') {
+			timeout = eth
+			eth = undefined
+		}
+
+		const client = new KNXClient({
+			ipAddr,
+			ipPort,
+			interface: eth as string,
+			hostProtocol: 'TunnelUDP',
+		})
+
+		const descriptions = []
+
+		client.on(KNXClientEvents.descriptionResponse, (searchResponse) => {
+			descriptions.push(searchResponse)
+		})
+
+		client.startGatewayDescription()
+
+		await wait(timeout)
+		await client.Disconnect()
+
+		return descriptions
 	}
 
 	/**
@@ -1128,6 +1179,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const timeoutError = new Error(
 				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
 			)
+			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
+			this._clientTunnelSeqNumber = -1
 			this.setTimer(
 				KNXTimer.CONNECTION,
 				() => {
@@ -1135,8 +1188,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 				1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
 			)
-			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
-			this._clientTunnelSeqNumber = -1
 			// 27/06/2023, leave some time to the dgram, to do the bind and read local ip and local port
 			this.setTimer(
 				KNXTimer.CONNECT_REQUEST,
@@ -1441,7 +1492,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					}
 				}
 			}
-
 			// 26/12/2021 ROUTING LOST MESSAGE OR BUSY
 			if (knxHeader.service_type === KNX_CONSTANTS.ROUTING_LOST_MESSAGE) {
 				this.emit(
