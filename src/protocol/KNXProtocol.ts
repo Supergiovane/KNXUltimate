@@ -14,9 +14,21 @@ import KNXTunnellingAck from './KNXTunnellingAck'
 import KNXRoutingIndication from './KNXRoutingIndication'
 import HPAI from './HPAI'
 import { KNX_CONSTANTS } from './KNXConstants'
+import { KNX_SECURE } from '../secure/SecureConstants'
 import TunnelCRI from './TunnelCRI'
 import CEMIMessage from './cEMI/CEMIMessage'
 
+import {
+	SessionRequest,
+	SessionResponse,
+	SessionAuthenticate,
+	SessionStatus,
+} from '../secure/messages/SessionMessages'
+import SecureWrapper from '../secure/messages/SecureWrapper'
+
+/**
+ * Types for different KNX message categories
+ */
 export type KnxResponse =
 	| KNXConnectResponse
 	| KNXSearchResponse
@@ -36,11 +48,26 @@ export type KnxRequest =
 
 export type KnxMessage = KnxResponse | KnxRequest
 
+export type SecureMessage =
+	| SessionRequest
+	| SessionResponse
+	| SessionAuthenticate
+	| SessionStatus
+	| SecureWrapper
+
+/**
+ * KNXProtocol class handles creation and parsing of KNX messages
+ * including secure tunnelling messages according to ISO 22510:2019
+ */
 export default class KNXProtocol {
+	/**
+	 * Parse standard KNX message from buffer
+	 */
 	static parseMessage(buffer: Buffer) {
 		const knxHeader: KNXHeader = KNXHeader.createFromBuffer(buffer)
 		const knxData: Buffer = buffer.subarray(knxHeader.headerLength)
 		let knxMessage: KnxMessage
+
 		switch (knxHeader.service_type) {
 			case KNX_CONSTANTS.SEARCH_REQUEST:
 				knxMessage = KNXSearchRequest.createFromBuffer(knxData)
@@ -84,10 +111,49 @@ export default class KNXProtocol {
 				break
 			case KNX_CONSTANTS.ROUTING_LOST_MESSAGE:
 				break
+			default:
+				throw new Error(
+					`Unknown service type: ${knxHeader.service_type}`,
+				)
 		}
+
 		return { knxHeader, knxMessage, knxData }
 	}
 
+	/**
+	 * Parse secure KNX message from buffer
+	 */
+	static parseSecureMessage(buffer: Buffer) {
+		const knxHeader = KNXHeader.createFromBuffer(buffer)
+		const knxData = buffer.subarray(knxHeader.headerLength)
+		let secureMessage: SecureMessage
+
+		switch (knxHeader.service_type) {
+			case KNX_SECURE.SERVICE_TYPE.SESSION_REQUEST:
+				secureMessage = SessionRequest.createFromBuffer(knxData)
+				break
+			case KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE:
+				secureMessage = SessionResponse.createFromBuffer(knxData)
+				break
+			case KNX_SECURE.SERVICE_TYPE.SESSION_AUTHENTICATE:
+				secureMessage = SessionAuthenticate.createFromBuffer(knxData)
+				break
+			case KNX_SECURE.SERVICE_TYPE.SESSION_STATUS:
+				secureMessage = SessionStatus.createFromBuffer(knxData)
+				break
+			case KNX_SECURE.SERVICE_TYPE.SECURE_WRAPPER:
+				secureMessage = SecureWrapper.createFromBuffer(knxData)
+				break
+			default:
+				throw new Error(
+					`Unknown secure service type: ${knxHeader.service_type}`,
+				)
+		}
+
+		return { knxHeader, secureMessage, knxData }
+	}
+
+	// Factory methods for standard KNX messages
 	static newKNXSearchRequest(hpai: HPAI) {
 		return new KNXSearchRequest(hpai)
 	}
@@ -140,5 +206,92 @@ export default class KNXProtocol {
 
 	static newKNXRoutingIndication(cEMIMessage: CEMIMessage) {
 		return new KNXRoutingIndication(cEMIMessage)
+	}
+
+	// Factory methods for secure KNX messages
+	static newSessionRequest(hpai: HPAI, publicKey: Buffer) {
+		return new SessionRequest(hpai, publicKey)
+	}
+
+	static newSessionResponse(
+		sessionId: number,
+		publicKey: Buffer,
+		deviceAuthCode: Buffer,
+		clientPublicKey: Buffer,
+		serialNumber: number,
+	) {
+		return SessionResponse.create(
+			sessionId,
+			publicKey,
+			clientPublicKey,
+			deviceAuthCode,
+			serialNumber,
+		)
+	}
+
+	static newSessionAuthenticate(
+		userId: number,
+		clientPublicKey: Buffer,
+		serverPublicKey: Buffer,
+		passwordHash: Buffer,
+		serialNumber: number,
+	) {
+		return SessionAuthenticate.create(
+			userId,
+			clientPublicKey,
+			serverPublicKey,
+			passwordHash,
+			serialNumber,
+		)
+	}
+
+	static newSecureConnectRequest(
+		cri: TunnelCRI,
+		sessionId: number,
+		sequenceNumber: number,
+		serialNumber: number,
+		messageTag: number,
+		sessionKey: Buffer,
+	) {
+		const connectRequest = this.newKNXConnectRequest(cri)
+		const header = connectRequest.header
+		const data = Buffer.concat([
+			header.toBuffer(),
+			connectRequest.toBuffer(),
+		])
+
+		return SecureWrapper.wrap(
+			data,
+			sessionId,
+			sequenceNumber,
+			serialNumber,
+			messageTag,
+			sessionKey,
+		)
+	}
+
+	static newSecureDisconnectRequest(
+		channelId: number,
+		sessionId: number,
+		sequenceNumber: number,
+		serialNumber: number,
+		messageTag: number,
+		sessionKey: Buffer,
+	) {
+		const disconnectRequest = this.newKNXDisconnectRequest(channelId)
+		const header = disconnectRequest.header
+		const data = Buffer.concat([
+			header.toBuffer(),
+			disconnectRequest.toBuffer(),
+		])
+
+		return SecureWrapper.wrap(
+			data,
+			sessionId,
+			sequenceNumber,
+			serialNumber,
+			messageTag,
+			sessionKey,
+		)
 	}
 }
