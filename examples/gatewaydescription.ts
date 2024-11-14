@@ -2,52 +2,40 @@
 
 import { setTimeout } from 'timers'
 import { KNXClient, KNXClientEvents } from '../src'
-import { KNX_CONSTANTS } from '../src/protocol/KNXConstants'
-
-let client: KNXClient
 
 async function initClient() {
-	const knxGateways = await KNXClient.discover()
 
+	// Discover all gateways
+	const knxGateways = await KNXClient.discover(5000)
 	if(knxGateways.length === 0) {
 		console.log('No gateway found')
 		return
 	}
 	console.log('Discovered gateways:', knxGateways)
 
-	const [ip, port] = knxGateways[0].split(':') // For simplicity, takes only the first gateway found.
+	// For each discovered gateway, get all possible device descriptions (usually only one)
+	// A description is a JSON object containing all details of the device and also what type of connection (Multicast, unicast, etc), it suppports
+	for (let index = 0; index < knxGateways.length; index++) {
 
-	console.log('Connecting to', ip, port)
-
-	client = new KNXClient({
-		ipAddr: ip,
-		ipPort: port,
-		loglevel: 'info',
-		suppress_ack_ldatareq: false,
-		hostProtocol: 'TunnelUDP'
-	})
-	
-	client.on(KNXClientEvents.connected, info => {
-		// The client is connected
-		console.log('On Duty', info);
-		console.log('----------');
-        console.log('Connected!');
-        console.log('----------');
-		client.getGatewayDescription();	
+		const element = knxGateways[index];
+		const [ip, port] = element.split(':')
+		console.log('Gathering info of', ip,port)
 		
-	})
+		const descriptionsJSON = await KNXClient.getGatewayDescription(ip,port,5000)
+		if(descriptionsJSON.length === 0) {
+			console.log('No description found found for this device.')
+		}
 
-	client.on(KNXClientEvents.descriptionResponse, (datagram) => {
-		// This function is called whenever a KNX telegram arrives from BUS
-		 console.log("****DESCRIPTION RESPONSE***", JSON.stringify(datagram));
-	 });
-	client.Connect()
+		for (let index = 0; index < descriptionsJSON.length; index++) {
+			const element = descriptionsJSON[index];
+			console.log(element)
+		}
+
+	}
 }
-
-   
 
 initClient();
 
 setTimeout(() => {
     process.exit(0);
-}, 20000);
+}, 30000);
