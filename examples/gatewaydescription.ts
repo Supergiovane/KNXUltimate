@@ -1,7 +1,7 @@
 // Get the gateway description of each gatewau found
 
 import { setTimeout } from 'timers'
-import { KNXClient, KNXClientEvents } from '../src'
+import { KNXClient, KNXClientEvents, KNXDescriptionResponse } from '../src'
 
 async function initClient() {
 
@@ -27,7 +27,7 @@ async function initClient() {
 		}
 
 		for (let index = 0; index < descriptionsJSON.length; index++) {
-			const element = descriptionsJSON[index];
+			const element = descriptionsJSON[index] as KNXDescriptionResponse;
 			console.log(element)
 		}
 

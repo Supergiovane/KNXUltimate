@@ -480,7 +480,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// use dedicated methods where possible
 		this.stopDiscovery()
 		this.stopHeartBeat()
-
+		this.stopGatewayDescription()
 		// clear all other timers
 		for (const timer of this.timers.keys()) {
 			this.clearTimer(timer)
