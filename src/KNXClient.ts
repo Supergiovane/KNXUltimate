@@ -65,12 +65,7 @@ export interface KNXClientEventCallbacks {
 		header: KNXHeader,
 		message: KNXSearchResponse,
 	) => void
-	getGatewayDescription: (
-		ipAddr: string,
-		ipPort: number,
-		eth?: string | number,
-		timeout?: number,
-	) => void
+	getGatewayDescription: (searchResponse: KNXDescriptionResponse) => void
 	indication: (packet: KNXRoutingIndication, echoed: boolean) => void
 	connected: (options: KNXClientOptions) => void
 	ready: () => void
