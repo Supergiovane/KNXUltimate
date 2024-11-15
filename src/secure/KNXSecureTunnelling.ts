@@ -117,13 +117,7 @@ export default class KNXSecureTunnelling extends EventEmitter {
 		}
 
 		request.seqCounter = this.sequenceNumber
-
-		const header = new KNXHeader(
-			request.header.service_type,
-			request.toBuffer().length,
-		)
-		const data = Buffer.concat([header.toBuffer(), request.toBuffer()])
-
+		const data = request.toBuffer()
 		const wrapper = this.session.wrapData(data, this.sequenceNumber)
 
 		this.sequenceNumber++
@@ -184,11 +178,7 @@ export default class KNXSecureTunnelling extends EventEmitter {
 			| KNXTunnellingRequest
 			| KNXDisconnectRequest,
 	): void {
-		const header = new KNXHeader(
-			request.header.service_type,
-			request.toBuffer().length,
-		)
-		const data = Buffer.concat([header.toBuffer(), request.toBuffer()])
+		const data = request.toBuffer()
 
 		// Wrap request in secure wrapper
 		const wrapper = this.session.wrapData(data)
