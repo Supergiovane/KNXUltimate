@@ -15,9 +15,20 @@
 		"preserveSymlinks": true,
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
-		"typeRoots": ["node_modules/@types", "src/types"],
-		"types": ["node"]
+		"typeRoots": [
+			"node_modules/@types",
+			"src/types"
+		],
+		"types": [
+			"node"
+		]
 	},
-	"include": ["src", "examples", "test"],
-	"exclude": ["node_modules"]
+	"include": [
+		"src",
+		"examples",
+		"test"
+	],
+	"exclude": [
+		"node_modules"
+	]
 }
