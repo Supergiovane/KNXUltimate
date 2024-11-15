@@ -18,6 +18,6 @@
 		"typeRoots": ["node_modules/@types", "src/types"],
 		"types": ["node"]
 	},
-	"include": ["src", "examples"],
+	"include": ["src", "examples", "test"],
 	"exclude": ["node_modules"]
 }
