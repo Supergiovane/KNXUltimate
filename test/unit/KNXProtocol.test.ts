@@ -65,7 +65,6 @@ describe('KNXProtocol', () => {
 				const mockBuffer = Buffer.from([
 					0x06, 0x10, 0xff, 0xff, 0x00, 0x0e,
 				])
-				console.log('Test input buffer:', mockBuffer.toString('hex'))
 				const result = KNXProtocol.parseMessage(mockBuffer)
 				assert(result.knxHeader instanceof KNXHeader)
 				assert(result.knxMessage === undefined)
