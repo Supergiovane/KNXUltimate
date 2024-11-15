@@ -1,5 +1,12 @@
 
 
+# [4.0.0-beta.4](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.3...v4.0.0-beta.4) (2024-11-15)
+
+
+### Bug Fixes
+
+* fix multicast socket, by removing the local ip interface from the binding ([ca01449](https://github.com/Supergiovane/KNXUltimate/commit/ca01449873f94f6c5791d42fa5d4ff7967b42d5b))
+
 # [4.0.0-beta.3](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.2...v4.0.0-beta.3) (2024-11-15)
 
 
