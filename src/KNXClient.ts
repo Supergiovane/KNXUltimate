@@ -332,6 +332,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
+			// November 2024 - DIRTY function, to be checked
 			this._clientSocket = new net.Socket()
 			// this._clientSocket.removeAllListeners()
 			this._clientSocket.on(SocketEvents.data, (data) => {
@@ -360,7 +361,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._clientSocket.on(SocketEvents.close, () =>
 				this.emit(KNXClientEvents.close),
 			)
-			this._clientSocket.bind(this._peerPort, () => {
+			// The multicast traffic is not sent to a specific local IP, so we cannot set the this._options.localIPAddress in the bind
+			// otherwise the socket will never ever receive a packet.
+			this._clientSocket.bind(this._peerPort, '0.0.0.0', () => {
 				try {
 					;(this._clientSocket as UDPSocket).setMulticastTTL(250)
 					;(this._clientSocket as UDPSocket).setMulticastInterface(
