@@ -25,7 +25,11 @@ describe('KNXProtocol', () => {
 	let mockCEMIMessage: CEMIMessage
 	let mockSessionKey: Buffer
 	let mockPublicKey: Buffer
+	let mockClientPublicKey: Buffer
+	let mockServerPublicKey: Buffer
 	let mockSerialNumber: number
+	let mockDeviceAuthCode: Buffer
+	let mockPasswordHash: Buffer
 
 	beforeEach(() => {
 		mockHPAI = new HPAI('192.168.1.1', 3671, KNX_CONSTANTS.IPV4_UDP)
@@ -33,7 +37,11 @@ describe('KNXProtocol', () => {
 		mockCEMIMessage = {} as CEMIMessage
 		mockSessionKey = Buffer.alloc(16, 1) // 16 byte key
 		mockPublicKey = Buffer.alloc(32, 2) // 32 byte Curve25519 key
+		mockClientPublicKey = Buffer.alloc(32, 2)
+		mockServerPublicKey = Buffer.alloc(32, 3)
+		mockPasswordHash = Buffer.alloc(16, 4)
 		mockSerialNumber = 12345678
+		mockDeviceAuthCode = Buffer.alloc(16, 3)
 	})
 
 	describe('Standard KNX Messages', () => {
@@ -219,43 +227,46 @@ describe('KNXProtocol', () => {
 
 		describe('Secure Message Creation', () => {
 			it('should create SecureConnectRequest', () => {
-				console.log('Test mock values:', {
-					mockTunnelCRI,
-					mockSessionKey: mockSessionKey.toString('hex'),
-				})
-
-				const baseRequest =
-					KNXProtocol.newKNXConnectRequest(mockTunnelCRI)
-				console.log('Base request created:', baseRequest)
+				const sessionId = 1
+				const sequenceNumber = 1
+				const messageTag = 0
 
 				const result = KNXProtocol.newSecureConnectRequest(
 					mockTunnelCRI,
-					1,
-					1,
+					sessionId,
+					sequenceNumber,
 					mockSerialNumber,
-					0,
+					messageTag,
 					mockSessionKey,
 				)
-				console.log('Secure wrapper result:', {
-					buffer: result.toBuffer().toString('hex'),
-				})
 
 				assert(result instanceof SecureWrapper)
+
+				// Unwrap and verify connect request
 				const unwrapped = SecureWrapper.unwrap(result, mockSessionKey)
-				console.log('Unwrapped data:', unwrapped.toString('hex'))
-				const connectRequest = KNXConnectRequest.createFromBuffer(
-					unwrapped.subarray(6),
-				)
+
+				const header = KNXHeader.createFromBuffer(unwrapped)
+
+				const remaining = unwrapped.subarray(header.headerLength)
+
+				const hpai1 = HPAI.createFromBuffer(remaining)
+
+				const hpai2 = HPAI.createFromBuffer(remaining.subarray(8))
+
+				const connectRequest =
+					KNXConnectRequest.createFromBuffer(remaining)
+
 				assert(connectRequest instanceof KNXConnectRequest)
+				assert.deepStrictEqual(
+					connectRequest.hpaiControl,
+					HPAI.NULLHPAI,
+				)
+				assert.deepStrictEqual(connectRequest.hpaiData, HPAI.NULLHPAI)
 				assert.deepStrictEqual(connectRequest.cri, mockTunnelCRI)
 			})
 
 			it('should create SecureDisconnectRequest', () => {
 				const channelId = 1
-				console.log(
-					'Creating disconnect request for channel:',
-					channelId,
-				)
 
 				const result = KNXProtocol.newSecureDisconnectRequest(
 					channelId,
@@ -265,18 +276,62 @@ describe('KNXProtocol', () => {
 					0,
 					mockSessionKey,
 				)
-				console.log('Secure wrapper result:', {
-					buffer: result.toBuffer().toString('hex'),
-				})
 
 				assert(result instanceof SecureWrapper)
 				const unwrapped = SecureWrapper.unwrap(result, mockSessionKey)
-				console.log('Unwrapped data:', unwrapped.toString('hex'))
 				const disconnectRequest = KNXDisconnectRequest.createFromBuffer(
 					unwrapped.subarray(6),
 				)
 				assert(disconnectRequest instanceof KNXDisconnectRequest)
 				assert.strictEqual(disconnectRequest.channelID, channelId)
+			})
+
+			it('should create and validate SessionResponse', () => {
+				const result = KNXProtocol.newSessionResponse(
+					1,
+					mockPublicKey,
+					mockDeviceAuthCode,
+					mockPublicKey,
+					mockSerialNumber,
+				)
+				assert(
+					result.verifyMAC(
+						mockDeviceAuthCode,
+						mockPublicKey,
+						mockSerialNumber,
+					),
+				)
+			})
+
+			it('should create and validate SessionAuthenticate', () => {
+				const result = KNXProtocol.newSessionAuthenticate(
+					1,
+					mockClientPublicKey,
+					mockServerPublicKey,
+					mockPasswordHash,
+					mockSerialNumber,
+				)
+				assert(
+					result.verifyMAC(
+						mockPasswordHash,
+						mockClientPublicKey,
+						mockServerPublicKey,
+						mockSerialNumber,
+					),
+				)
+			})
+
+			it('should fail MAC verification with wrong session key', () => {
+				const wrongKey = Buffer.alloc(16, 0xff)
+				const wrapper = KNXProtocol.newSecureConnectRequest(
+					mockTunnelCRI,
+					1,
+					1,
+					mockSerialNumber,
+					0,
+					mockSessionKey,
+				)
+				assert.throws(() => SecureWrapper.unwrap(wrapper, wrongKey))
 			})
 		})
 	})
