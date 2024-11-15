@@ -260,7 +260,7 @@ export default class KNXProtocol {
 		serialNumber: number,
 		messageTag: number,
 		sessionKey: Buffer,
-	) {
+	): SecureWrapper {
 		console.log('Creating secure connect request with:', {
 			cri,
 			sessionId,
@@ -276,21 +276,15 @@ export default class KNXProtocol {
 			buffer: connectRequest.toBuffer().toString('hex'),
 		})
 
-		const header = connectRequest.header
-		const data = Buffer.concat([
-			header.toBuffer(),
-			connectRequest.toBuffer(),
-		])
-		console.log('Combined data buffer:', data.toString('hex'))
-
 		const wrapper = SecureWrapper.wrap(
-			data,
+			connectRequest.toBuffer(),
 			sessionId,
 			sequenceNumber,
 			serialNumber,
 			messageTag,
 			sessionKey,
 		)
+
 		console.log('Created secure wrapper:', {
 			sessionId: wrapper.sessionId,
 			sequenceInfo: wrapper.sequenceInfo,
@@ -307,7 +301,7 @@ export default class KNXProtocol {
 		serialNumber: number,
 		messageTag: number,
 		sessionKey: Buffer,
-	) {
+	): SecureWrapper {
 		console.log('Creating secure disconnect request with:', {
 			channelId,
 			sessionId,
@@ -322,20 +316,19 @@ export default class KNXProtocol {
 			buffer: disconnectRequest.toBuffer().toString('hex'),
 		})
 
-		const header = disconnectRequest.header
-		const data = Buffer.concat([
-			header.toBuffer(),
+		const wrapper = SecureWrapper.wrap(
 			disconnectRequest.toBuffer(),
-		])
-		console.log('Combined data buffer:', data.toString('hex'))
-
-		return SecureWrapper.wrap(
-			data,
 			sessionId,
 			sequenceNumber,
 			serialNumber,
 			messageTag,
 			sessionKey,
 		)
+
+		console.log('Secure wrapper result:', {
+			buffer: wrapper.toBuffer().toString('hex'),
+		})
+
+		return wrapper
 	}
 }

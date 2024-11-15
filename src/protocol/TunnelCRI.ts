@@ -95,11 +95,6 @@ export default class TunnelCRI extends CRI {
 	 * @param offset - Optional offset in buffer
 	 */
 	static createFromBuffer(buffer: Buffer, offset: number = 0): TunnelCRI {
-		// Validate minimum buffer length
-		if (buffer.length - offset < TUNNEL_CRI_LENGTH) {
-			throw new Error('Buffer too small for TunnelCRI')
-		}
-
 		const knxLayer = buffer.readUInt8(offset++) as TunnelTypes
 		const flags = buffer.readUInt8(offset) as TunnelFlags
 
