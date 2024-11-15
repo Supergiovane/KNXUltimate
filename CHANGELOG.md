@@ -1,5 +1,21 @@
 
 
+# [4.0.0-beta.3](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.2...v4.0.0-beta.3) (2024-11-15)
+
+
+### Bug Fixes
+
+* fix missing "test" folder ([821e398](https://github.com/Supergiovane/KNXUltimate/commit/821e39820f936e3b568c05573565a0dc8be1cbb3))
+* removed the "test" folder from the include array ([742a028](https://github.com/Supergiovane/KNXUltimate/commit/742a028fec4a122f7d049c766b819ba6fc5308bf))
+* the tunnel socket creation function (createSocket), adding reusable option and specifying the port. This will likely prevent some UDP packets not arriving at the socket,  due to operating system routing restrictions. ([3fdd938](https://github.com/Supergiovane/KNXUltimate/commit/3fdd9383191bd3a842bf165448714784fc89a52b))
+
+
+### Features
+
+* added getGatewayDescription method, to gather infos of the connected gateway ([88b883a](https://github.com/Supergiovane/KNXUltimate/commit/88b883a5226cddbeea22864a2c848a249b7b6789))
+* added the gatewaydescription.ts sample ([41b1f66](https://github.com/Supergiovane/KNXUltimate/commit/41b1f66679098f9c61fa162640ca83fdc887e585))
+* added the KNX/IP Gateway description gatherer, wich contains the gateway's name, tunneling/routing modes etc.. ([f99170f](https://github.com/Supergiovane/KNXUltimate/commit/f99170ff63216ec0453a21aa51106c23dc622974))
+
 # [4.0.0-beta.2](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.1...v4.0.0-beta.2) (2024-10-17)
 
 # [4.0.0-beta.1](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.0...v4.0.0-beta.1) (2024-10-17)
