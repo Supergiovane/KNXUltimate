@@ -1,7 +1,6 @@
 // Get the gateway description of each gatewau found
-
 import { setTimeout } from 'timers'
-import { KNXClient, KNXClientEvents, KNXDescriptionResponse } from '../src'
+import { KNXClient, KNXDescriptionResponse } from '../src'
 
 async function initClient() {
 
