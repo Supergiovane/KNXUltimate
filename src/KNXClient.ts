@@ -314,7 +314,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._clientSocket.bind(
 				{
 					// port: this._peerPort, // Local port shall be assigned by the socket.
-					address: this._options.localIPAddress,
+					address: this._options.localIPAddress, // Force UDP to be heard trough this interface
 				},
 				() => {
 					try {
