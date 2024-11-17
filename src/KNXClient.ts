@@ -313,12 +313,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 			this._clientSocket.bind(
 				{
-					port: this._peerPort,
+					// port: this._peerPort, // Local port shall be assigned by the socket.
 					address: this._options.localIPAddress,
 				},
 				() => {
 					try {
-						;(this._clientSocket as UDPSocket).setTTL(250)
+						;(this._clientSocket as UDPSocket).setTTL(10)
 						if (this._options.localSocketAddress === undefined) {
 							this._options.localSocketAddress = (
 								this._clientSocket as UDPSocket
@@ -365,7 +365,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// otherwise the socket will never ever receive a packet.
 			this._clientSocket.bind(this._peerPort, '0.0.0.0', () => {
 				try {
-					;(this._clientSocket as UDPSocket).setMulticastTTL(250)
+					;(this._clientSocket as UDPSocket).setMulticastTTL(10)
 					;(this._clientSocket as UDPSocket).setMulticastInterface(
 						this._options.localIPAddress,
 					)
