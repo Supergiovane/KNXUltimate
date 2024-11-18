@@ -1,17 +1,22 @@
 import KNXHeader from '../../protocol/KNXHeader'
 import HPAI from '../../protocol/HPAI'
 import { KNX_SECURE, SecureSessionStatus } from '../SecureConstants'
+import KNXPacket from '../../protocol/KNXPacket'
 import {
 	SecurityUtils,
 	MessageType,
 	SecureWrapperData,
 } from '../crypto/SecurityUtils'
 
-export class SessionRequest {
+export class SessionRequest extends KNXPacket {
 	constructor(
 		public readonly controlEndpoint: HPAI,
 		public readonly publicKey: Buffer, // Client's ECDH public value X (32 bytes)
 	) {
+		// Calculate total length and call parent constructor with type and length
+		const length = controlEndpoint.length + publicKey.length
+		super(KNX_SECURE.SERVICE_TYPE.SESSION_REQUEST, length)
+
 		if (publicKey.length !== 32) {
 			throw new Error(KNX_SECURE.ERROR.INVALID_KEY_LENGTH)
 		}
@@ -30,23 +35,23 @@ export class SessionRequest {
 	}
 
 	toBuffer(): Buffer {
-		return Buffer.concat([this.controlEndpoint.toBuffer(), this.publicKey])
-	}
-
-	toHeader(): KNXHeader {
-		return new KNXHeader(
-			KNX_SECURE.SERVICE_TYPE.SESSION_REQUEST,
-			this.toBuffer().length,
-		)
+		return Buffer.concat([
+			this.header.toBuffer(),
+			this.controlEndpoint.toBuffer(),
+			this.publicKey,
+		])
 	}
 }
 
-export class SessionResponse {
+export class SessionResponse extends KNXPacket {
 	constructor(
-		public readonly sessionId: number, // 16-bit session identifier
-		public readonly publicKey: Buffer, // Server's ECDH public value Y (32 bytes)
-		public readonly messageAuthenticationCode: Buffer, // 16 bytes MAC
+		public readonly sessionId: number,
+		public readonly publicKey: Buffer,
+		public readonly messageAuthenticationCode: Buffer,
 	) {
+		// Fixed length: sessionId(2) + publicKey(32) + MAC(16)
+		super(KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE, 50)
+
 		if (publicKey.length !== 32) {
 			throw new Error(KNX_SECURE.ERROR.INVALID_KEY_LENGTH)
 		}
@@ -65,20 +70,17 @@ export class SessionResponse {
 		deviceAuthCode: Buffer,
 		serialNumber: number,
 	): SessionResponse {
-		const header = new KNXHeader(
-			KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE,
-			50, // Fixed length: sessionId(2) + publicKey(32) + MAC(16)
-		)
-
 		const secureData: SecureWrapperData = {
 			messageType: MessageType.SESSION_RESPONSE,
-			knxHeader: header.toBuffer(),
+			knxHeader: new KNXPacket(
+				KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE,
+				50,
+			).header.toBuffer(),
 			secureSessionId: Buffer.alloc(2),
 			dhPublicX: clientPublicKey,
 			dhPublicY: serverPublicKey,
 		}
 
-		// Write sessionId to secureSessionId buffer
 		secureData.secureSessionId.writeUInt16BE(sessionId, 0)
 
 		const { mac } = SecurityUtils.encrypt(secureData, deviceAuthCode, {
@@ -97,10 +99,9 @@ export class SessionResponse {
 		clientPublicKey: Buffer,
 		serialNumber: number,
 	): boolean {
-		const header = this.toHeader()
 		const secureData: SecureWrapperData = {
 			messageType: MessageType.SESSION_RESPONSE,
-			knxHeader: header.toBuffer(),
+			knxHeader: this.header.toBuffer(),
 			secureSessionId: Buffer.alloc(2),
 			dhPublicX: clientPublicKey,
 			dhPublicY: this.publicKey,
@@ -125,7 +126,6 @@ export class SessionResponse {
 
 	static createFromBuffer(buffer: Buffer): SessionResponse {
 		if (buffer.length !== 50) {
-			// Session ID (2) + Public Key (32) + MAC (16)
 			throw new Error(KNX_SECURE.ERROR.INVALID_BUFFER_LENGTH)
 		}
 
@@ -141,22 +141,18 @@ export class SessionResponse {
 		buffer.writeUInt16BE(this.sessionId, 0)
 		this.publicKey.copy(buffer, 2)
 		this.messageAuthenticationCode.copy(buffer, 34)
-		return buffer
-	}
-
-	toHeader(): KNXHeader {
-		return new KNXHeader(
-			KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE,
-			this.toBuffer().length,
-		)
+		return Buffer.concat([this.header.toBuffer(), buffer])
 	}
 }
 
-export class SessionAuthenticate {
+export class SessionAuthenticate extends KNXPacket {
 	constructor(
-		public readonly userId: number, // 8-bit user identifier
-		public readonly messageAuthenticationCode: Buffer, // 16 bytes MAC
+		public readonly userId: number,
+		public readonly messageAuthenticationCode: Buffer,
 	) {
+		// Fixed length: reserved(1) + userId(1) + MAC(16)
+		super(KNX_SECURE.SERVICE_TYPE.SESSION_AUTHENTICATE, 18)
+
 		if (messageAuthenticationCode.length !== KNX_SECURE.CRYPTO.MAC_LENGTH) {
 			throw new Error(KNX_SECURE.ERROR.INVALID_MAC_LENGTH)
 		}
@@ -175,19 +171,16 @@ export class SessionAuthenticate {
 		passwordHash: Buffer,
 		serialNumber: number,
 	): SessionAuthenticate {
-		const header = new KNXHeader(
-			KNX_SECURE.SERVICE_TYPE.SESSION_AUTHENTICATE,
-			18, // Fixed length: reserved(1) + userId(1) + MAC(16)
-		)
-
-		// Create reserved byte + userId buffer
 		const userIdBuffer = Buffer.alloc(2)
 		userIdBuffer.writeUInt8(KNX_SECURE.USER.RESERVED, 0)
 		userIdBuffer.writeUInt8(userId, 1)
 
 		const secureData: SecureWrapperData = {
 			messageType: MessageType.SESSION_AUTHENTICATE,
-			knxHeader: header.toBuffer(),
+			knxHeader: new KNXPacket(
+				KNX_SECURE.SERVICE_TYPE.SESSION_AUTHENTICATE,
+				18,
+			).header.toBuffer(),
 			secureSessionId: userIdBuffer,
 			dhPublicX: clientPublicKey,
 			dhPublicY: serverPublicKey,
@@ -211,14 +204,13 @@ export class SessionAuthenticate {
 		serverPublicKey: Buffer,
 		serialNumber: number,
 	): boolean {
-		const header = this.toHeader()
 		const userIdBuffer = Buffer.alloc(2)
 		userIdBuffer.writeUInt8(KNX_SECURE.USER.RESERVED, 0)
 		userIdBuffer.writeUInt8(this.userId, 1)
 
 		const secureData: SecureWrapperData = {
 			messageType: MessageType.SESSION_AUTHENTICATE,
-			knxHeader: header.toBuffer(),
+			knxHeader: this.header.toBuffer(),
 			secureSessionId: userIdBuffer,
 			dhPublicX: clientPublicKey,
 			dhPublicY: serverPublicKey,
@@ -242,7 +234,6 @@ export class SessionAuthenticate {
 
 	static createFromBuffer(buffer: Buffer): SessionAuthenticate {
 		if (buffer.length !== 18) {
-			// Reserved (1) + User ID (1) + MAC (16)
 			throw new Error(KNX_SECURE.ERROR.INVALID_BUFFER_LENGTH)
 		}
 
@@ -262,19 +253,14 @@ export class SessionAuthenticate {
 		buffer.writeUInt8(KNX_SECURE.USER.RESERVED, 0)
 		buffer.writeUInt8(this.userId, 1)
 		this.messageAuthenticationCode.copy(buffer, 2)
-		return buffer
-	}
-
-	toHeader(): KNXHeader {
-		return new KNXHeader(
-			KNX_SECURE.SERVICE_TYPE.SESSION_AUTHENTICATE,
-			this.toBuffer().length,
-		)
+		return Buffer.concat([this.header.toBuffer(), buffer])
 	}
 }
 
-export class SessionStatus {
-	constructor(public readonly status: SecureSessionStatus) {}
+export class SessionStatus extends KNXPacket {
+	constructor(public readonly status: SecureSessionStatus) {
+		super(KNX_SECURE.SERVICE_TYPE.SESSION_STATUS, 1)
+	}
 
 	static createFromBuffer(buffer: Buffer): SessionStatus {
 		if (buffer.length !== 1) {
@@ -292,13 +278,6 @@ export class SessionStatus {
 	toBuffer(): Buffer {
 		const buffer = Buffer.alloc(1)
 		buffer.writeUInt8(this.status, 0)
-		return buffer
-	}
-
-	toHeader(): KNXHeader {
-		return new KNXHeader(
-			KNX_SECURE.SERVICE_TYPE.SESSION_STATUS,
-			this.toBuffer().length,
-		)
+		return Buffer.concat([this.header.toBuffer(), buffer])
 	}
 }

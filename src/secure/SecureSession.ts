@@ -8,6 +8,8 @@ import {
 	SessionStatus,
 } from './messages/SessionMessages'
 import SecureWrapper from './messages/SecureWrapper'
+import KNXPacket from '../protocol/KNXPacket'
+import HPAI from '../protocol/HPAI'
 
 export enum SecureSessionState {
 	INITIAL = 'INITIAL',
@@ -82,7 +84,7 @@ export default class SecureSession extends EventEmitter {
 
 		// Create session request
 		const request = new SessionRequest(
-			null, // HPAI is set by KNXClient
+			HPAI.NULLHPAI,
 			this.clientKeyPair.publicKey,
 		)
 
@@ -171,19 +173,25 @@ export default class SecureSession extends EventEmitter {
 		this.emit('status', status)
 	}
 
-	public wrapData(data: Buffer, sequenceNumber?: number): SecureWrapper {
-		if (this.state !== SecureSessionState.AUTHENTICATED) {
+	public wrapData(
+		data: Buffer | KNXPacket,
+		seqNumber?: number,
+	): SecureWrapper {
+		if (!this.isAuthenticated) {
 			throw new Error('Session not authenticated')
 		}
 
-		return SecureWrapper.wrap(
-			data,
+		const buffer = data instanceof Buffer ? data : data.toBuffer()
+		const wrapper = SecureWrapper.wrap(
+			buffer,
 			this.sessionId,
-			sequenceNumber ?? 0,
+			seqNumber ?? this.sequenceNumber++,
 			this.options.serialNumber,
 			this.messageTag++,
 			this.sessionKey,
 		)
+
+		return wrapper
 	}
 
 	public unwrapData(wrapper: SecureWrapper): Buffer {
