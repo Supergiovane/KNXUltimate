@@ -42,7 +42,7 @@ describe('DPT222 (3x 16-Float Value)', () => {
 				// Economy missing
 			} as any)
 
-			assert.equal(result, undefined)
+			assert.equal(result, null)
 		})
 
 		test('should return undefined for out-of-range values', () => {
@@ -53,7 +53,7 @@ describe('DPT222 (3x 16-Float Value)', () => {
 					Standby: 20,
 					Economy: 14,
 				}),
-				undefined,
+				null,
 			)
 
 			// Above maximum
@@ -69,13 +69,13 @@ describe('DPT222 (3x 16-Float Value)', () => {
 
 		test('should handle non-object inputs', () => {
 			// String
-			assert.equal(DPT222.formatAPDU('invalid' as any), undefined)
+			assert.equal(DPT222.formatAPDU('invalid' as any), null)
 
 			// Array
-			assert.equal(DPT222.formatAPDU([] as any), undefined)
+			assert.equal(DPT222.formatAPDU([] as any), null)
 
 			// Number
-			assert.equal(DPT222.formatAPDU(123 as any), undefined)
+			assert.equal(DPT222.formatAPDU(123 as any), null)
 		})
 	})
 

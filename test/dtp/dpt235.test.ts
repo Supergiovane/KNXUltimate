@@ -99,7 +99,7 @@ describe('DPT235 (Tariff Active Energy)', () => {
 				{ validityTariff: true },
 				{ validityEnergy: true },
 				null,
-				undefined,
+				null,
 				'invalid',
 			]
 

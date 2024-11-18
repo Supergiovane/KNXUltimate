@@ -24,7 +24,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				standby: 21.5,
 				economy: 21,
 			}
-			assert.equal(DPT275.formatAPDU(value1), undefined)
+			assert.equal(DPT275.formatAPDU(value1), null)
 
 			// Missing comfort
 			const value2 = {
@@ -32,7 +32,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				economy: 21,
 				buildingProtection: 15,
 			}
-			assert.equal(DPT275.formatAPDU(value2), undefined)
+			assert.equal(DPT275.formatAPDU(value2), null)
 
 			// Missing economy
 			const value3 = {
@@ -40,7 +40,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				standby: 21.5,
 				buildingProtection: 15,
 			}
-			assert.equal(DPT275.formatAPDU(value3), undefined)
+			assert.equal(DPT275.formatAPDU(value3), null)
 
 			// Missing standby
 			const value4 = {
@@ -48,7 +48,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				economy: 21,
 				buildingProtection: 15,
 			}
-			assert.equal(DPT275.formatAPDU(value4), undefined)
+			assert.equal(DPT275.formatAPDU(value4), null)
 		})
 	})
 
