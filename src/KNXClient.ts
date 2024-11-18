@@ -614,6 +614,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.sysLogger.error(
 					`KNXClient: handleKNXQueue: returning from processKnxPacketQueueItem ${error.message}`,
 				)
+				// Clear the queue
+				this.commandQueue = []
 			}
 			await wait(this._options.KNXQueueSendIntervalMilliseconds)
 		}
