@@ -199,6 +199,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _clearToSend = false
 
+	private socketReady = false
+
 	private timers: Map<KNXTimer, NodeJS.Timeout>
 
 	public physAddr: KNXAddress
@@ -214,6 +216,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private sniffingPackets: SnifferPacket[]
 
 	private lastSnifferRequest: number
+
+	get udpSocket() {
+		if (this._clientSocket instanceof UDPSocket) {
+			return this._clientSocket
+		}
+		return null
+	}
+
+	get tcpSocket() {
+		if (this._clientSocket instanceof TCPSocket) {
+			return this._clientSocket
+		}
+		return null
+	}
 
 	constructor(
 		options: KNXClientOptions,
@@ -301,28 +317,37 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				type: 'udp4',
 				reuseAddr: true,
 			}) as UDPSocket
-			this._clientSocket.on(
+			this.udpSocket.on(
 				SocketEvents.message,
 				this.processInboundMessage.bind(this),
 			)
-			this._clientSocket.on(SocketEvents.error, (error) =>
-				this.emit(KNXClientEvents.error, error),
-			)
-			this._clientSocket.on(SocketEvents.close, () =>
-				this.emit(KNXClientEvents.close),
-			)
-			this._clientSocket.bind(
+			this.udpSocket.on(SocketEvents.error, (error) => {
+				this.socketReady = false
+				this.emit(KNXClientEvents.error, error)
+			})
+
+			this.udpSocket.on(SocketEvents.close, () => {
+				this.socketReady = false
+				this.exitProcessingKNXQueueLoop = true
+				this.emit(KNXClientEvents.close)
+			})
+
+			this.udpSocket.on(SocketEvents.listening, () => {
+				this.socketReady = true
+				this.handleKNXQueue()
+			})
+
+			this.udpSocket.bind(
 				{
 					// port: this._peerPort, // Local port shall be assigned by the socket.
 					address: this._options.localIPAddress, // Force UDP to be heard trough this interface
 				},
 				() => {
 					try {
-						;(this._clientSocket as UDPSocket).setTTL(5)
+						this.udpSocket.setTTL(5)
 						if (this._options.localSocketAddress === undefined) {
-							this._options.localSocketAddress = (
-								this._clientSocket as UDPSocket
-							).address().address
+							this._options.localSocketAddress =
+								this.udpSocket.address().address
 						}
 					} catch (error) {
 						this.sysLogger.error(
@@ -335,38 +360,54 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// November 2024 - DIRTY function, to be checked
 			this._clientSocket = new net.Socket()
 			// this._clientSocket.removeAllListeners()
-			this._clientSocket.on(SocketEvents.data, (data) => {
+			this.tcpSocket.on(SocketEvents.data, (data) => {
 				this.sysLogger.debug('Received message', data)
 			})
-			this._clientSocket.on(SocketEvents.error, (error) =>
-				this.emit(KNXClientEvents.error, error),
-			)
-			this._clientSocket.on(SocketEvents.close, (hadError) =>
-				this.emit(KNXClientEvents.close),
-			)
+			this.tcpSocket.on(SocketEvents.error, (error) => {
+				this.socketReady = false
+				this.emit(KNXClientEvents.error, error)
+			})
+			this.tcpSocket.on(SocketEvents.close, (hadError) => {
+				this.socketReady = false
+				this.exitProcessingKNXQueueLoop = true
+				this.emit(KNXClientEvents.close)
+			})
+
+			this.tcpSocket.on('connect', () => {
+				this.socketReady = true
+				this.handleKNXQueue()
+				this.emit(KNXClientEvents.connected, this._options)
+			})
 		} else if (this._options.hostProtocol === 'Multicast') {
 			this._clientSocket = dgram.createSocket({
 				type: 'udp4',
 				reuseAddr: true,
 			}) as UDPSocket
 			// this._clientSocket.removeAllListeners()
-			this._clientSocket.on(SocketEvents.listening, () => {})
-			this._clientSocket.on(
+			this.udpSocket.on(SocketEvents.listening, () => {
+				this.socketReady = true
+				this.handleKNXQueue()
+			})
+			this.udpSocket.on(
 				SocketEvents.message,
 				this.processInboundMessage.bind(this),
 			)
-			this._clientSocket.on(SocketEvents.error, (error) =>
-				this.emit(KNXClientEvents.error, error),
-			)
-			this._clientSocket.on(SocketEvents.close, () =>
-				this.emit(KNXClientEvents.close),
-			)
+			this.udpSocket.on(SocketEvents.error, (error) => {
+				this.socketReady = false
+				this.emit(KNXClientEvents.error, error)
+			})
+			this.udpSocket.on(SocketEvents.close, () => {
+				this.socketReady = false
+				this.exitProcessingKNXQueueLoop = true
+				this.emit(KNXClientEvents.close)
+			})
+
 			// The multicast traffic is not sent to a specific local IP, so we cannot set the this._options.localIPAddress in the bind
 			// otherwise the socket will never ever receive a packet.
-			this._clientSocket.bind(this._peerPort, '0.0.0.0', () => {
+			this.udpSocket.bind(this._peerPort, '0.0.0.0', () => {
 				try {
-					;(this._clientSocket as UDPSocket).setMulticastTTL(5)
-					;(this._clientSocket as UDPSocket).setMulticastInterface(
+					this.udpSocket.setMulticastTTL(5)
+					this.udpSocket.setMulticastInterface(
 						this._options.localIPAddress,
 					)
 				} catch (error) {
@@ -376,7 +417,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)
 				}
 				try {
-					;(this._clientSocket as UDPSocket).addMembership(
+					this.udpSocket.addMembership(
 						this._peerHost,
 						this._options.localIPAddress,
 					)
@@ -538,7 +579,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._options.hostProtocol === 'TunnelUDP'
 		) {
 			try {
-				;(this._clientSocket as UDPSocket).send(
+				this.udpSocket.send(
 					_knxPacket.toBuffer(),
 					this._peerPort,
 					this._peerHost,
@@ -565,19 +606,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			}
 		} else {
 			try {
-				;(this._clientSocket as TCPSocket).write(
-					_knxPacket.toBuffer(),
-					(error) => {
-						if (error) {
-							this.sysLogger.error(
-								`Sending KNX packet: Send TCP sending error: ${error.message}` ||
-									'Undef error',
-							)
-							this.emit(KNXClientEvents.error, error)
-							return false
-						}
-					},
-				)
+				this.tcpSocket.write(_knxPacket.toBuffer(), (error) => {
+					if (error) {
+						this.sysLogger.error(
+							`Sending KNX packet: Send TCP sending error: ${error.message}` ||
+								'Undef error',
+						)
+						this.emit(KNXClientEvents.error, error)
+						return false
+					}
+				})
 			} catch (error) {
 				this.sysLogger.error(
 					`Sending KNX packet: Send TCP Catch error: ${error.message}` ||
@@ -613,6 +651,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 				break
 			}
+
+			if (this.exitProcessingKNXQueueLoop) {
+				this.sysLogger.debug(
+					`KNXClient: handleKNXQueue: exitProcessingKNXQueueLoop is true. Exit processing queue loop`,
+				)
+				break
+			}
+
+			if (this.socketReady === false) {
+				this.sysLogger.debug(
+					`KNXClient: handleKNXQueue: Socket is not ready. Stop processing queue.`,
+				)
+				break
+			}
+
 			const item = this.commandQueue.pop()
 			this.currentItemHandledByTheQueue = item
 			if (item.ACK !== undefined) {
@@ -1220,7 +1273,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				2000,
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			this._clientSocket.connect(this._peerPort, this._peerHost, () => {
+			this.tcpSocket.connect(this._peerPort, this._peerHost, () => {
 				this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
 				this._clientTunnelSeqNumber = 0
 				if (this._options.isSecureKNXEnabled)
@@ -1250,17 +1303,23 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// already closed
 			if (!this._clientSocket) return
 
+			this.socketReady = false
+
+			const client = this._clientSocket
+
+			this._clientSocket = null
+
 			const cb = () => {
-				// this._clientSocket = null
 				resolve()
 			}
+
 			try {
-				if (this._options.hostProtocol === 'TunnelTCP') {
+				if (client instanceof TCPSocket) {
 					// use destroy instead of end here to ensure socket is closed
 					// we could try to see if `end()` works well too
-					;(this._clientSocket as TCPSocket).destroy()
+					client.destroy()
 				} else {
-					;(this._clientSocket as UDPSocket).close(cb)
+					client.close(cb)
 				}
 			} catch (error) {
 				this.sysLogger.error(
