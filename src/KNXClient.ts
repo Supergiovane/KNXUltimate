@@ -586,7 +586,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private async handleKNXQueue() {
-		if (this.queueLock) return
+		if (this.queueLock) {
+			this.sysLogger.debug(
+				`KNXClient: handleKNXQueue: HandleQueue has called, but the queue loop is already running. Exit.`,
+			)
+			return
+		}
 
 		this.sysLogger.debug(
 			`KNXClient: handleKNXQueue: Start Processing queued KNX.`,
