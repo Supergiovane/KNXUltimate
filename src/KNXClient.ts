@@ -541,6 +541,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				`Sending KNX packet: ${_knxPacket.constructor.name} Host:${this._peerHost}:${this._peerPort}`,
 			)
 		}
+
 		if (
 			_knxPacket instanceof KNXTunnelingRequest ||
 			_knxPacket instanceof KNXRoutingIndication
@@ -560,13 +561,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			sDebugString += ` srcAddress: ${_knxPacket.cEMIMessage.srcAddress.toString()}`
 			sDebugString += ` dstAddress: ${_knxPacket.cEMIMessage.dstAddress.toString()}`
 
+			const { channelID, seqCounter } = _knxPacket as KNXTunnelingRequest
+
 			this.sysLogger.debug(
 				`Sending KNX packet: ${
 					_knxPacket.constructor.name
 				} ${sDebugString} Host:${this._peerHost}:${
 					this._peerPort
-				} channelID:${(_knxPacket as KNXTunnelingRequest)?.channelID} seqCounter:${
-					(_knxPacket as KNXTunnelingRequest)?.seqCounter
+				} ${channelID ? `ChannelID:${channelID}` : ''} ${
+					seqCounter ? `SeqCounter:${seqCounter}` : ''
 				} Dest:${_knxPacket.cEMIMessage.dstAddress.toString()}`,
 				` Data:${_knxPacket.cEMIMessage.npdu.dataValue.toString(
 					'hex',
@@ -624,8 +627,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.emit(KNXClientEvents.error, error)
 				return false
 			}
-			return true
 		}
+
+		return true
 	}
 
 	private async handleKNXQueue() {
@@ -637,7 +641,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		this.sysLogger.debug(
-			`KNXClient: handleKNXQueue: Start Processing queued KNX.`,
+			`KNXClient: handleKNXQueue: Start Processing queued KNX. Found ${this.commandQueue.length} telegrams in queue.`,
 		)
 
 		// lock the queue

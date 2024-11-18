@@ -103,6 +103,8 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 			this.socket.on(SocketEvents.close, () => this.client.emit('close'))
 		}
 
+		this.client['socketReady'] = true
+
 		this.log('MockKNXServer initialized')
 	}
 
