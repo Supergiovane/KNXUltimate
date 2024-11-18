@@ -318,7 +318,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 				() => {
 					try {
-						;(this._clientSocket as UDPSocket).setTTL(3)
+						;(this._clientSocket as UDPSocket).setTTL(5)
 						if (this._options.localSocketAddress === undefined) {
 							this._options.localSocketAddress = (
 								this._clientSocket as UDPSocket
@@ -365,7 +365,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// otherwise the socket will never ever receive a packet.
 			this._clientSocket.bind(this._peerPort, '0.0.0.0', () => {
 				try {
-					;(this._clientSocket as UDPSocket).setMulticastTTL(3)
+					;(this._clientSocket as UDPSocket).setMulticastTTL(5)
 					;(this._clientSocket as UDPSocket).setMulticastInterface(
 						this._options.localIPAddress,
 					)
@@ -491,7 +491,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 	}
 
-	private processKnxPacketQueueItem(_knxPacket: KNXPacket) {
+	private processKnxPacketQueueItem(_knxPacket: KNXPacket): boolean {
 		this.sysLogger.debug(
 			`KNXClient: processKnxPacketQueueItem: Processing queued KNX. commandQueue.length: ${this.commandQueue.length} ${_knxPacket.header.service_type} ${JSON.stringify(_knxPacket)}`,
 		)
@@ -524,8 +524,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					_knxPacket.constructor.name
 				} ${sDebugString} Host:${this._peerHost}:${
 					this._peerPort
-				} channelID:${(_knxPacket as KNXTunnelingRequest).channelID} seqCounter:${
-					(_knxPacket as KNXTunnelingRequest).seqCounter
+				} channelID:${(_knxPacket as KNXTunnelingRequest)?.channelID} seqCounter:${
+					(_knxPacket as KNXTunnelingRequest)?.seqCounter
 				} Dest:${_knxPacket.cEMIMessage.dstAddress.toString()}`,
 				` Data:${_knxPacket.cEMIMessage.npdu.dataValue.toString(
 					'hex',
@@ -548,6 +548,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 								`Sending KNX packet: Send UDP sending error: ${error.message}`,
 							)
 							this.emit(KNXClientEvents.error, error)
+							return false
 						}
 					},
 				)
@@ -556,22 +557,24 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					`Sending KNX packet: Send UDP Catch error: ${
 						error.message
 					} ${typeof _knxPacket} seqCounter:${
-						(_knxPacket as any).seqCounter || ''
+						(_knxPacket as any)?.seqCounter
 					}`,
 				)
 				this.emit(KNXClientEvents.error, error)
+				return false
 			}
 		} else {
 			try {
 				;(this._clientSocket as TCPSocket).write(
 					_knxPacket.toBuffer(),
-					(err) => {
-						if (err) {
+					(error) => {
+						if (error) {
 							this.sysLogger.error(
-								`Sending KNX packet: Send TCP sending error: ${err.message}` ||
+								`Sending KNX packet: Send TCP sending error: ${error.message}` ||
 									'Undef error',
 							)
-							this.emit(KNXClientEvents.error, err)
+							this.emit(KNXClientEvents.error, error)
+							return false
 						}
 					},
 				)
@@ -581,7 +584,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						'Undef error',
 				)
 				this.emit(KNXClientEvents.error, error)
+				return false
 			}
+			return true
 		}
 	}
 
@@ -613,16 +618,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			if (item.ACK !== undefined) {
 				this.setTimerWaitingForACK(item.ACK)
 			}
-			try {
-				this.processKnxPacketQueueItem(item.knxPacket)
-			} catch (error) {
+
+			if (!this.processKnxPacketQueueItem(item.knxPacket)) {
 				this.sysLogger.error(
-					`KNXClient: handleKNXQueue: returning from processKnxPacketQueueItem ${error.message}`,
+					`KNXClient: handleKNXQueue: returning from processKnxPacketQueueItem ${JSON.stringify(item)}`,
 				)
 				// Clear the queue
 				this.commandQueue = []
 				break
 			}
+
 			await wait(this._options.KNXQueueSendIntervalMilliseconds)
 		}
 
