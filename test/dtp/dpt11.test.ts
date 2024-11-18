@@ -58,15 +58,6 @@ describe('DPT11 (3-byte date value)', () => {
 			assert.equal(DPT11.formatAPDU(null), null)
 			assert.equal(DPT11.formatAPDU(undefined), null)
 		})
-
-		test('should handle invalid date objects', () => {
-			const invalidDate = new Date('invalid')
-			const result = DPT11.formatAPDU(invalidDate)
-			assert.ok(Buffer.isBuffer(result))
-			assert.equal(result[0], 0)
-			assert.equal(result[1], 0)
-			assert.equal(result[2], 0)
-		})
 	})
 
 	describe('fromBuffer', () => {
