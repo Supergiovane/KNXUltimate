@@ -582,7 +582,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 								this.emit(KNXClientEvents.error, error)
 							}
 
-							resolve(!!error)
+							resolve(!error)
 						},
 					)
 				} catch (error) {
@@ -607,7 +607,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							this.emit(KNXClientEvents.error, error)
 						}
 
-						resolve(!!error)
+						resolve(!error)
 					})
 				} catch (error) {
 					this.sysLogger.error(
