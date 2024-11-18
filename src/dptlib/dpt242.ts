@@ -67,6 +67,7 @@ const config: DatapointConfig = {
 
 			return bufferTotal
 		}
+		return null
 	},
 
 	fromBuffer(buf) {
@@ -92,6 +93,7 @@ const config: DatapointConfig = {
 			isBrightnessValid,
 		}
 		return ret
+		return null
 	},
 	basetype: {
 		bitlength: 3 * 16,

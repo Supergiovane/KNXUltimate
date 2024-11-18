@@ -67,14 +67,14 @@ describe('DPT999 (10-bytes HEX string)', () => {
 
 		test('should handle invalid inputs', () => {
 			// String too short
-			assert.strictEqual(DPT999.formatAPDU('123456'), undefined)
+			assert.strictEqual(DPT999.formatAPDU('123456'), null)
 
 			// Non-string input
-			assert.strictEqual(DPT999.formatAPDU(12345 as any), undefined)
+			assert.strictEqual(DPT999.formatAPDU(12345 as any), null)
 
 			// Null or undefined
-			assert.strictEqual(DPT999.formatAPDU(null as any), undefined)
-			assert.strictEqual(DPT999.formatAPDU(undefined as any), undefined)
+			assert.strictEqual(DPT999.formatAPDU(null as any), null)
+			assert.strictEqual(DPT999.formatAPDU(undefined as any), null)
 		})
 	})
 

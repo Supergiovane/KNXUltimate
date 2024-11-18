@@ -135,6 +135,8 @@ export default class DeviceInfo {
 			case KNX_CONSTANTS.IP:
 				return 'IP'
 		}
+
+		return 'Unknown'
 	}
 
 	set address(address: number) {

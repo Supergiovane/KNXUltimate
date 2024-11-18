@@ -57,6 +57,7 @@ const config: DatapointConfig = {
 		Log.get().error(
 			'DPT213: Must supply a payload like, for example: {Comfort:21, Standby:20, Economy:14, BuildingProtection:8}',
 		)
+		return null
 	},
 
 	// RX from BUS

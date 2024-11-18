@@ -163,6 +163,7 @@ function griesserCommandToCommandCode(command: string) {
 			return 5
 		default:
 			Log.get().error(`not implemented yet: ${command}`)
+			return null
 	}
 }
 
@@ -184,6 +185,7 @@ function griesserCommandToCommandCodeP1(command: string) {
 			return 134
 		default:
 			Log.get().error(`unknown command: ${command}`)
+			return null
 	}
 }
 
@@ -260,31 +262,35 @@ const config: DatapointConfig = {
 	formatAPDU(value) {
 		if (!value) {
 			Log.get().error('DPT60001: cannot write null value')
-		} else {
-			if (
-				typeof value === 'object' &&
-				Object.prototype.hasOwnProperty.call(value, 'command') &&
-				Object.prototype.hasOwnProperty.call(value, 'data') &&
-				Object.prototype.hasOwnProperty.call(value, 'sectors') &&
-				value.data[0] === 'localoperation'
-			) {
-				const sectorCode = griesserSectorToSectorCode(value.sectors)
-				const commandCode = griesserCommandToCommandCode(value.command)
-				const p1 = griesserCommandToCommandCodeP1(value.data[1])
-				const bufferTotal = Buffer.alloc(6)
-				bufferTotal[0] = parseInt(toRadix(sectorCode, 2).slice(-8), 2)
-				bufferTotal[1] = parseInt(
-					toRadix(commandCode, 2).slice(-6) +
-						toRadix(sectorCode, 2).slice(-10, -8),
-					2,
-				)
-				bufferTotal[2] = parseInt(toRadix(p1, 2).slice(-8), 2)
-				return bufferTotal
-			}
-			Log.get().error(
-				'DPT60001: Must supply an value {command:"operation code", data:["localoperation", "long up"], sectors:[159]}',
-			)
+			return null
 		}
+
+		if (
+			typeof value === 'object' &&
+			Object.prototype.hasOwnProperty.call(value, 'command') &&
+			Object.prototype.hasOwnProperty.call(value, 'data') &&
+			Object.prototype.hasOwnProperty.call(value, 'sectors') &&
+			value.data[0] === 'localoperation'
+		) {
+			const sectorCode = griesserSectorToSectorCode(value.sectors)
+			const commandCode = griesserCommandToCommandCode(value.command)
+			const p1 = griesserCommandToCommandCodeP1(value.data[1])
+			const bufferTotal = Buffer.alloc(6)
+			bufferTotal[0] = parseInt(toRadix(sectorCode, 2).slice(-8), 2)
+			bufferTotal[1] = parseInt(
+				toRadix(commandCode, 2).slice(-6) +
+					toRadix(sectorCode, 2).slice(-10, -8),
+				2,
+			)
+			bufferTotal[2] = parseInt(toRadix(p1, 2).slice(-8), 2)
+			return bufferTotal
+		}
+
+		Log.get().error(
+			'DPT60001: Must supply an value {command:"operation code", data:["localoperation", "long up"], sectors:[159]}',
+		)
+
+		return null
 	},
 
 	// RX from BUS

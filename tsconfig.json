@@ -21,14 +21,14 @@
 		],
 		"types": [
 			"node"
-		],
+		]
 	},
 	"include": [
 		"src",
-		"examples", 
+		"examples",
 		"test"
 	],
 	"exclude": [
- 		"node_modules"
+		"node_modules"
 	]
 }
