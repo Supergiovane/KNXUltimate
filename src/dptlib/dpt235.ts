@@ -54,6 +54,7 @@ const config: DatapointConfig = {
 		} catch (error) {
 			Log.get().error(`DPT235: exports.formatAPDU error ${error.message}`)
 		}
+		return null
 	},
 
 	// RX from BUS
@@ -74,6 +75,7 @@ const config: DatapointConfig = {
 		} catch (error) {
 			Log.get().error(`DPT235: exports.fromBuffer error ${error.message}`)
 		}
+		return null
 	},
 
 	// DPT basetype info

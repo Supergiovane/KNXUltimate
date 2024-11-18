@@ -22,14 +22,14 @@ describe('DPT4 (8-bit character)', () => {
 
 		test('should handle invalid inputs', () => {
 			// Null and undefined
-			assert.strictEqual(DPT4.formatAPDU(null), undefined)
-			assert.strictEqual(DPT4.formatAPDU(undefined), undefined)
+			assert.strictEqual(DPT4.formatAPDU(null), null)
+			assert.strictEqual(DPT4.formatAPDU(undefined), null)
 
 			// Non-string values
-			assert.strictEqual(DPT4.formatAPDU(123 as any), undefined)
-			assert.strictEqual(DPT4.formatAPDU({} as any), undefined)
-			assert.strictEqual(DPT4.formatAPDU([] as any), undefined)
-			assert.strictEqual(DPT4.formatAPDU(true as any), undefined)
+			assert.strictEqual(DPT4.formatAPDU(123 as any), null)
+			assert.strictEqual(DPT4.formatAPDU({} as any), null)
+			assert.strictEqual(DPT4.formatAPDU([] as any), null)
+			assert.strictEqual(DPT4.formatAPDU(true as any), null)
 		})
 	})
 

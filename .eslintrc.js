@@ -24,7 +24,6 @@ module.exports = {
 		'no-restricted-syntax': 'off',
 		camelcase: 'off',
 		'default-case': 'off',
-		'consistent-return': 'off',
 		'import/order': 'off',
 		'max-classes-per-file': 'off',
 		'no-plusplus': 'off',

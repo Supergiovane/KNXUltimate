@@ -57,6 +57,7 @@ const config: DatapointConfig = {
 			bufferTotal[1] = parseInt(LSB, 2)
 			return bufferTotal
 		}
+		return null
 	},
 
 	fromBuffer: (buf) => {
@@ -91,6 +92,7 @@ const config: DatapointConfig = {
 			convertorError,
 		}
 		return ret
+		return null
 	},
 
 	basetype: {

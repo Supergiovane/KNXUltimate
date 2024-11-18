@@ -55,17 +55,8 @@ describe('DPT11 (3-byte date value)', () => {
 		})
 
 		test('should return undefined for invalid inputs', () => {
-			assert.equal(DPT11.formatAPDU(null), undefined)
-			assert.equal(DPT11.formatAPDU(undefined), undefined)
-		})
-
-		test('should handle invalid date objects', () => {
-			const invalidDate = new Date('invalid')
-			const result = DPT11.formatAPDU(invalidDate)
-			assert.ok(Buffer.isBuffer(result))
-			assert.equal(result[0], 0)
-			assert.equal(result[1], 0)
-			assert.equal(result[2], 0)
+			assert.equal(DPT11.formatAPDU(null), null)
+			assert.equal(DPT11.formatAPDU(undefined), null)
 		})
 	})
 

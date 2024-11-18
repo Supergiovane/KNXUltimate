@@ -130,16 +130,15 @@ export function resolve(dptid: string | number): DatapointConfig {
 	const dpt = dpts[dptkey]
 	if (!dpt) throw Error(`Unsupported DPT: ${dptid}`)
 
-	try {
-		const cloned_dpt = cloneDpt(dpt)
-		if (m[3]) {
-			cloned_dpt.subtypeid = m[3]
-			cloned_dpt.subtype = cloned_dpt.subtypes[m[3]]
-			return cloned_dpt
-		}
-	} catch (error) {
-		throw Error(`clone DPT: ${error.trace}`)
+	const cloned_dpt = cloneDpt(dpt)
+	const subtypeId = m[3] || '001'
+	if (cloned_dpt.subtypes[subtypeId]) {
+		cloned_dpt.subtypeid = subtypeId
+		cloned_dpt.subtype = cloned_dpt.subtypes[subtypeId]
+		return cloned_dpt
 	}
+
+	throw Error(`Unsupported subtype ${subtypeId} for DPT ${dptid}`)
 }
 /* POPULATE an APDU object from a given Javascript value for the given DPT
  * - either by a custom DPT formatAPDU function
@@ -270,7 +269,7 @@ export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
 	return value
 }
 
-const cloneDpt = (d: DatapointConfig) => {
+const cloneDpt = (d: DatapointConfig): DatapointConfig => {
 	const { fromBuffer: fb, formatAPDU: fa } = d
 	return { ...JSON.parse(JSON.stringify(d)), fromBuffer: fb, formatAPDU: fa }
 }

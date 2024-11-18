@@ -16,30 +16,30 @@ const config: DatapointConfig = {
 	formatAPDU: (value) => {
 		if (!value) {
 			Log.get().error('DPT232: cannot write null value')
-		} else {
-			if (
-				typeof value === 'object' &&
-				hasProp(value, 'red') &&
-				value.red >= 0 &&
-				value.red <= 255 &&
-				hasProp(value, 'green') &&
-				value.green >= 0 &&
-				value.green <= 255 &&
-				hasProp(value, 'blue') &&
-				value.blue >= 0 &&
-				value.blue <= 255
-			) {
-			} else {
-				Log.get().error(
-					'DPT232: Must supply an value {red:0-255, green:0-255, blue:0-255}',
-				)
-			}
+			return null
+		}
+		if (
+			typeof value === 'object' &&
+			hasProp(value, 'red') &&
+			value.red >= 0 &&
+			value.red <= 255 &&
+			hasProp(value, 'green') &&
+			value.green >= 0 &&
+			value.green <= 255 &&
+			hasProp(value, 'blue') &&
+			value.blue >= 0 &&
+			value.blue <= 255
+		) {
 			return Buffer.from([
 				Math.floor(value.red),
 				Math.floor(value.green),
 				Math.floor(value.blue),
 			])
 		}
+		Log.get().error(
+			'DPT232: Must supply an value {red:0-255, green:0-255, blue:0-255}',
+		)
+		return null
 	},
 
 	fromBuffer: (buf) => {

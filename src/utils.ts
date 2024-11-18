@@ -69,7 +69,7 @@ export function getHex(_value: number) {
 		const exp = exponent - e
 		return [(sign << 7) + (exp << 3) + (mant >> 8), mant % 256]
 	} catch (error) {
-		// noop
+		return null
 	}
 }
 /**
