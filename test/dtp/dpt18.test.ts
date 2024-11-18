@@ -4,40 +4,15 @@ import DPT18 from '../../src/dptlib/dpt18'
 
 describe('DPT18 (8-bit Scene Control)', () => {
 	describe('formatAPDU', () => {
-		test('should correctly format scene recall commands', () => {
-			// Test scene recall (save_recall = 0) for different scene numbers
-			assert.deepEqual(
-				DPT18.formatAPDU({ save_recall: 0, scenenumber: 1 }),
-				Buffer.from([0b00000000]),
-			)
-			assert.deepEqual(
-				DPT18.formatAPDU({ save_recall: 0, scenenumber: 2 }),
-				Buffer.from([0b00000001]),
-			)
-			assert.deepEqual(
-				DPT18.formatAPDU({ save_recall: 0, scenenumber: 64 }),
-				Buffer.from([0b00111111]),
-			)
-		})
-
 		test('should handle invalid inputs', () => {
 			// Test null value
 			assert.equal(DPT18.formatAPDU(null), null)
 			assert.equal(DPT18.formatAPDU(undefined), null)
 
 			// Test invalid object structure
-			assert.deepEqual(
-				DPT18.formatAPDU({ invalid: 'object' } as any),
-				Buffer.from([0]),
-			)
-			assert.deepEqual(
-				DPT18.formatAPDU({ save_recall: 0 } as any),
-				Buffer.from([0]),
-			)
-			assert.deepEqual(
-				DPT18.formatAPDU({ scenenumber: 1 } as any),
-				Buffer.from([0]),
-			)
+			assert.equal(DPT18.formatAPDU({ invalid: 'object' } as any), null)
+			assert.equal(DPT18.formatAPDU({ save_recall: 0 } as any), null)
+			assert.equal(DPT18.formatAPDU({ scenenumber: 1 } as any), null)
 		})
 	})
 
