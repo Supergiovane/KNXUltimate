@@ -83,8 +83,17 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 
 		// intercept write method to capture outgoing data
 		if (this.socket instanceof TCPSocket) {
-			this.socket.write = (data: Buffer) => {
+			this.socket.write = (data: Buffer, ...args) => {
 				this.onRequest(data)
+
+				// call callback if any
+				if (
+					args.length > 0 &&
+					typeof args[args.length - 1] === 'function'
+				) {
+					args[args.length - 1]()
+				}
+
 				return true
 			}
 		} else {
