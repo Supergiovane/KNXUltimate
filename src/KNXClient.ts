@@ -560,7 +560,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		} else if (_knxPacket instanceof KNXTunnelingAck) {
 			this.sysLogger.debug(
-				`KNXEngine: <outgoing telegram>: ACK ${this.getKNXConstantName(_knxPacket.status)} channelID: ${_knxPacket.channelID} seqCounter: ${_knxPacket.seqCounter}`,
+				`KNXEngine: <outgoing telegram>: ACK ${this.getKNXConstantName(_knxPacket.status)} channelID:${_knxPacket.channelID} seqCounter:${_knxPacket.seqCounter}`,
 			)
 		}
 
