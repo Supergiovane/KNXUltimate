@@ -616,6 +616,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 				// Clear the queue
 				this.commandQueue = []
+				break
 			}
 			await wait(this._options.KNXQueueSendIntervalMilliseconds)
 		}
