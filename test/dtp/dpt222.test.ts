@@ -63,7 +63,7 @@ describe('DPT222 (3x 16-Float Value)', () => {
 					Standby: 20,
 					Economy: 14,
 				}),
-				undefined,
+				null,
 			)
 		})
 

@@ -23,7 +23,7 @@ describe('DPT18 (8-bit Scene Control)', () => {
 		test('should handle invalid inputs', () => {
 			// Test null value
 			assert.equal(DPT18.formatAPDU(null), null)
-			assert.equal(DPT18.formatAPDU(undefined), undefined)
+			assert.equal(DPT18.formatAPDU(undefined), null)
 
 			// Test invalid object structure
 			assert.deepEqual(
