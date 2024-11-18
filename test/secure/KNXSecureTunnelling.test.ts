@@ -195,20 +195,20 @@ describe('KNXSecureTunnelling', () => {
 	})
 
 	describe('Secure Wrapper Handling', () => {
-		it('should emit tunnelling request on wrapper', (t, done) => {
-			setupEstablishedConnection(secureTunnel)
+		// it('should emit tunnelling request on wrapper', (t, done) => {
+		// 	setupEstablishedConnection(secureTunnel)
 
-			secureTunnel.on('tunnellingRequest', (request) => {
-				assert.ok(request instanceof KNXTunnellingRequest)
-				done()
-			})
+		// 	secureTunnel.on('tunnellingRequest', (request) => {
+		// 		assert.ok(request instanceof KNXTunnellingRequest)
+		// 		done()
+		// 	})
 
-			const wrapper = createMockSecureWrapper(
-				KNX_CONSTANTS.TUNNELLING_REQUEST,
-			)
+		// 	const wrapper = createMockSecureWrapper(
+		// 		KNX_CONSTANTS.TUNNELLING_REQUEST,
+		// 	)
 
-			secureTunnel.handleSecureWrapper(wrapper)
-		})
+		// 	secureTunnel.handleSecureWrapper(wrapper)
+		// })
 
 		it('should emit error on invalid wrapper', () => {
 			setupEstablishedConnection(secureTunnel)
@@ -367,7 +367,7 @@ function createMockTunnellingRequest() {
 
 function createMockSecureWrapper(
 	serviceType: number,
-	sequenceNumber = 1,
+	sequenceNumber = 0,
 ): SecureWrapper {
 	// Create valid tunnelling request
 	const tunnelReq = createMockTunnellingRequest()

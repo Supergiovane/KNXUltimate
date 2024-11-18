@@ -56,7 +56,19 @@ describe('SessionMessages', () => {
 				validPublicKey,
 			)
 			const buffer = request.toBuffer()
-			const decoded = SessionRequest.createFromBuffer(buffer)
+
+			// Verify header
+			assert.strictEqual(
+				buffer.length,
+				6 + validControlEndpoint.length + validPublicKey.length,
+			)
+			assert.strictEqual(
+				buffer.readUInt16BE(2),
+				KNX_SECURE.SERVICE_TYPE.SESSION_REQUEST,
+			)
+
+			// Skip header for parsing payload
+			const decoded = SessionRequest.createFromBuffer(buffer.subarray(6))
 
 			assert.strictEqual(
 				decoded.controlEndpoint.host,
@@ -71,7 +83,7 @@ describe('SessionMessages', () => {
 
 		it('should reject invalid buffer length', () => {
 			assert.throws(
-				() => SessionRequest.createFromBuffer(Buffer.alloc(39)),
+				() => SessionRequest.createFromBuffer(Buffer.alloc(33)),
 				new RegExp(KNX_SECURE.ERROR.INVALID_BUFFER_LENGTH),
 			)
 		})
@@ -81,15 +93,14 @@ describe('SessionMessages', () => {
 				validControlEndpoint,
 				validPublicKey,
 			)
-			const header = request.toHeader()
 
 			assert.strictEqual(
-				header.service_type,
+				request.header.service_type,
 				KNX_SECURE.SERVICE_TYPE.SESSION_REQUEST,
 			)
 			assert.strictEqual(
-				header.length,
-				KNX_CONSTANTS.HEADER_SIZE_10 + request.toBuffer().length,
+				request.header.length,
+				KNX_CONSTANTS.HEADER_SIZE_10 + request.toBuffer().length - 6, // -6 because toBuffer includes header
 			)
 		})
 	})
@@ -229,7 +240,16 @@ describe('SessionMessages', () => {
 				validMac,
 			)
 			const buffer = response.toBuffer()
-			const decoded = SessionResponse.createFromBuffer(buffer)
+
+			// Verify header
+			assert.strictEqual(buffer.length, 6 + 50) // header + fixed payload length
+			assert.strictEqual(
+				buffer.readUInt16BE(2),
+				KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE,
+			)
+
+			// Skip header for parsing payload
+			const decoded = SessionResponse.createFromBuffer(buffer.subarray(6))
 
 			assert.strictEqual(decoded.sessionId, validSessionId)
 			assert.ok(decoded.publicKey.equals(validPublicKey))
@@ -242,15 +262,13 @@ describe('SessionMessages', () => {
 				validPublicKey,
 				validMac,
 			)
-			const header = response.toHeader()
-
 			assert.strictEqual(
-				header.service_type,
+				response.header.service_type,
 				KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE,
 			)
 			assert.strictEqual(
-				header.length,
-				KNX_CONSTANTS.HEADER_SIZE_10 + response.toBuffer().length,
+				response.header.length,
+				KNX_CONSTANTS.HEADER_SIZE_10 + response.toBuffer().length - 6,
 			)
 		})
 	})
@@ -353,13 +371,22 @@ describe('SessionMessages', () => {
 					KNX_SECURE.USER.MANAGEMENT,
 					Buffer.alloc(16).fill(1),
 				)
+				// Generate complete buffer including KNX header
 				const buffer = auth.toBuffer()
-				const decoded = SessionAuthenticate.createFromBuffer(buffer)
-				assert.deepStrictEqual(decoded, auth)
+				// Skip header (6 bytes) for createFromBuffer
+				const payload = buffer.subarray(6)
+				const decoded = SessionAuthenticate.createFromBuffer(payload)
+
+				// Compare fields instead of full objects since decoded won't have header
+				assert.strictEqual(decoded.userId, auth.userId)
+				assert.deepStrictEqual(
+					decoded.messageAuthenticationCode,
+					auth.messageAuthenticationCode,
+				)
 			})
 
 			it('should reject invalid buffer sizes', () => {
-				const tooSmall = Buffer.alloc(17) // Deve essere 18 bytes
+				const tooSmall = Buffer.alloc(17)
 				assert.throws(
 					() => SessionAuthenticate.createFromBuffer(tooSmall),
 					new RegExp(KNX_SECURE.ERROR.INVALID_BUFFER_LENGTH),
@@ -368,7 +395,7 @@ describe('SessionMessages', () => {
 
 			it('should reject non-zero reserved byte', () => {
 				const buffer = Buffer.alloc(18)
-				buffer[0] = 1 // Il byte riservato deve essere 0
+				buffer[0] = 1
 				assert.throws(
 					() => SessionAuthenticate.createFromBuffer(buffer),
 					new RegExp(KNX_SECURE.ERROR.RESERVED_BYTE),
@@ -392,7 +419,18 @@ describe('SessionMessages', () => {
 		it('should serialize and deserialize correctly', () => {
 			const auth = new SessionAuthenticate(validUserId, validMac)
 			const buffer = auth.toBuffer()
-			const decoded = SessionAuthenticate.createFromBuffer(buffer)
+
+			// Verify header
+			assert.strictEqual(buffer.length, 6 + 18) // header + fixed payload length
+			assert.strictEqual(
+				buffer.readUInt16BE(2),
+				KNX_SECURE.SERVICE_TYPE.SESSION_AUTHENTICATE,
+			)
+
+			// Skip header for parsing payload
+			const decoded = SessionAuthenticate.createFromBuffer(
+				buffer.subarray(6),
+			)
 
 			assert.strictEqual(decoded.userId, validUserId)
 			assert.ok(decoded.messageAuthenticationCode.equals(validMac))
@@ -400,15 +438,14 @@ describe('SessionMessages', () => {
 
 		it('should create correct KNX header', () => {
 			const auth = new SessionAuthenticate(validUserId, validMac)
-			const header = auth.toHeader()
 
 			assert.strictEqual(
-				header.service_type,
+				auth.header.service_type,
 				KNX_SECURE.SERVICE_TYPE.SESSION_AUTHENTICATE,
 			)
 			assert.strictEqual(
-				header.length,
-				KNX_CONSTANTS.HEADER_SIZE_10 + auth.toBuffer().length,
+				auth.header.length,
+				KNX_CONSTANTS.HEADER_SIZE_10 + auth.toBuffer().length - 6,
 			)
 		})
 	})
@@ -428,7 +465,16 @@ describe('SessionMessages', () => {
 				KNX_SECURE.SESSION_STATUS.AUTHENTICATION_SUCCESS,
 			)
 			const buffer = original.toBuffer()
-			const decoded = SessionStatus.createFromBuffer(buffer)
+
+			// Verify header
+			assert.strictEqual(buffer.length, 6 + 1) // header + status byte
+			assert.strictEqual(
+				buffer.readUInt16BE(2),
+				KNX_SECURE.SERVICE_TYPE.SESSION_STATUS,
+			)
+
+			// Skip header for parsing payload
+			const decoded = SessionStatus.createFromBuffer(buffer.subarray(6))
 
 			assert.strictEqual(
 				decoded.status,
@@ -454,15 +500,14 @@ describe('SessionMessages', () => {
 			const status = new SessionStatus(
 				KNX_SECURE.SESSION_STATUS.AUTHENTICATION_SUCCESS,
 			)
-			const header = status.toHeader()
 
 			assert.strictEqual(
-				header.service_type,
+				status.header.service_type,
 				KNX_SECURE.SERVICE_TYPE.SESSION_STATUS,
 			)
 			assert.strictEqual(
-				header.length,
-				KNX_CONSTANTS.HEADER_SIZE_10 + status.toBuffer().length,
+				status.header.length,
+				KNX_CONSTANTS.HEADER_SIZE_10 + status.toBuffer().length - 6,
 			)
 		})
 	})
