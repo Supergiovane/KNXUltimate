@@ -654,7 +654,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		while (this.commandQueue.length > 0) {
 			if (!this.clearToSend) {
 				this.sysLogger.debug(
-					`KNXClient: handleKNXQueue: Pause processing queue.`,
+					`KNXClient: handleKNXQueue: Clear to send is false. Pause processing queue.`,
 				)
 				break
 			}
@@ -1561,7 +1561,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 			// Composing debug string
 			sProcessInboundLog = `peerHost:${this._peerHost}:${this._peerPort}`
-			sProcessInboundLog += ` srcAddress: ${JSON.stringify(rinfo)}`
+			sProcessInboundLog += ` srcAddress: ${rinfo?.address}:${rinfo?.port}`
 			sProcessInboundLog += ` channelID:${this._channelID === null || this._channelID === undefined ? 'None' : this._channelID}`
 			sProcessInboundLog += ` service_type:${this.getKNXConstantName(knxHeader?.service_type)}`
 			sProcessInboundLog += ` knxHeader: ${JSON.stringify(knxHeader)} knxMessage: ${JSON.stringify(knxMessage)}`
@@ -1596,17 +1596,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					new Error('ROUTING_LOST_MESSAGE'),
 				)
 				// this._setDisconnected("Routing Lost Message"); // 31/03/2022 Commented, because it doesn't matter. Non need to disconnect.
-				this.sysLogger.warn(
-					`KNXEngine: processInboundMessage received ROUTING_LOST_MESSAGE: ${sProcessInboundLog}`,
-				)
 				return
 			}
 			if (knxHeader.service_type === KNX_CONSTANTS.ROUTING_BUSY) {
 				this.emit(KNXClientEvents.error, new Error('ROUTING_BUSY'))
 				// this._setDisconnected("Routing Busy"); // 31/03/2022 Commented, because it doesn't matter. Non need to disconnect.
-				this.sysLogger.warn(
-					`KNXEngine: processInboundMessage received ROUTING_BUSY: ${sProcessInboundLog}`,
-				)
 				return
 			}
 
@@ -1624,6 +1618,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			) {
 				const knxDescriptionResponse =
 					knxMessage as KNXDescriptionResponse
+
+				this.sysLogger.debug(
+					`Received KNX packet: TUNNELING: DESCRIPTION_RESPONSE, ChannelID:${this._channelID} DescriptionResponse:${JSON.stringify(knxDescriptionResponse)} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+				)
 				this.emit(
 					KNXClientEvents.descriptionResponse,
 					knxDescriptionResponse,
