@@ -534,9 +534,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private processKnxPacketQueueItem(_knxPacket: KNXPacket): Promise<boolean> {
 		return new Promise((resolve) => {
+			// Prepare the debug log ************************
 			if (
-				_knxPacket instanceof KNXTunnelingRequest ||
-				_knxPacket instanceof KNXRoutingIndication
+				this.sysLogger.level === 'debug' &&
+				(_knxPacket instanceof KNXTunnelingRequest ||
+					_knxPacket instanceof KNXRoutingIndication)
 			) {
 				// Composing debug string
 				let sTPCI = ''
@@ -559,11 +561,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.sysLogger.debug(
 					`KNXEngine: <outgoing telegram>: ${sDebugString} `,
 				)
-			} else if (_knxPacket instanceof KNXTunnelingAck) {
+			} else if (
+				this.sysLogger.level === 'debug' &&
+				_knxPacket instanceof KNXTunnelingAck
+			) {
 				this.sysLogger.debug(
 					`KNXEngine: <outgoing telegram ACK>:${this.getKNXConstantName(_knxPacket.status)} channelID:${_knxPacket.channelID} seqCounter:${_knxPacket.seqCounter}`,
 				)
 			}
+			// End Prepare the debug log ************************
 
 			if (
 				this._options.hostProtocol === 'Multicast' ||
@@ -1546,10 +1552,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 			// Composing debug string
 			sProcessInboundLog = `peerHost:${this._peerHost}:${this._peerPort}`
-			sProcessInboundLog += ` srcAddress: ${rinfo?.address}:${rinfo?.port}`
+			sProcessInboundLog += ` srcAddress:${rinfo?.address}:${rinfo?.port}`
 			sProcessInboundLog += ` channelID:${this._channelID === null || this._channelID === undefined ? 'None' : this._channelID}`
 			sProcessInboundLog += ` service_type:${this.getKNXConstantName(knxHeader?.service_type)}`
-			sProcessInboundLog += ` knxHeader: ${JSON.stringify(knxHeader)} knxMessage: ${JSON.stringify(knxMessage)}`
+			sProcessInboundLog += ` knxHeader:${JSON.stringify(knxHeader)} knxMessage:${JSON.stringify(knxMessage)}`
 			sProcessInboundLog += ` raw: ${msg.toString('hex')}`
 			this.sysLogger.debug(
 				`KNXEngine: <incoming telegram>: ${sProcessInboundLog} `,
