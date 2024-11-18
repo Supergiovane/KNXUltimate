@@ -20,6 +20,7 @@ const config: DatapointConfig = {
 			}
 			Log.get().warn('DPT4: Must supply a character or string')
 		}
+		return null
 	},
 	fromBuffer: (buf: Buffer) => {
 		if (buf.length !== 1) {

@@ -29,33 +29,35 @@ import Log from '../KnxLog'
 const config: DatapointConfig = {
 	id: 'DPT18',
 	formatAPDU: (value) => {
-		if (!value) Log.get().warn('DPT18: cannot write null value')
-		else {
-			const apdu_data = Buffer.alloc(1)
-			if (
-				typeof value === 'object' &&
-				hasProp(value, 'save_recall') &&
-				hasProp(value, 'scenenumber')
-			) {
-				if (value.scenenumber - 1 > 64 || value.scenenumber - 1 < 1) {
-					Log.get().error('DPT18: scenenumber must between 1 and 64')
-				} else {
-					const sSceneNumberbinary = (
-						(value.scenenumber - 1) >>>
-						0
-					).toString(2)
-					const sVal = `${
-						value.save_recall
-					}0${sSceneNumberbinary.padStart(6, '0')}`
-					apdu_data[0] = parseInt(sVal, 2) // 0b10111111;
-				}
-			} else {
-				Log.get().error(
-					'DPT18: Must supply a value object of {save_recall, scenenumber}',
-				)
+		if (!value) {
+			Log.get().warn('DPT18: cannot write null value')
+			return null
+		}
+		const apdu_data = Buffer.alloc(1)
+		if (
+			typeof value === 'object' &&
+			hasProp(value, 'save_recall') &&
+			hasProp(value, 'scenenumber')
+		) {
+			if (value.scenenumber - 1 > 64 || value.scenenumber - 1 < 1) {
+				Log.get().error('DPT18: scenenumber must between 1 and 64')
+				return null
 			}
+			const sSceneNumberbinary = ((value.scenenumber - 1) >>> 0).toString(
+				2,
+			)
+			const sVal = `${
+				value.save_recall
+			}0${sSceneNumberbinary.padStart(6, '0')}`
+			apdu_data[0] = parseInt(sVal, 2) // 0b10111111;
 			return apdu_data
 		}
+		Log.get().error(
+			'DPT18: Must supply a value object of {save_recall, scenenumber}',
+		)
+		return null
+
+		return null
 	},
 
 	fromBuffer: (buf) => {
@@ -73,6 +75,7 @@ const config: DatapointConfig = {
 			save_recall: Number(sBit.substring(0, 1)),
 			scenenumber: parseInt(sBit.substring(2), 2) + 1,
 		}
+		return null
 	},
 
 	// DPT18 basetype info

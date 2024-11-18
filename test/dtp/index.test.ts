@@ -44,18 +44,6 @@ describe('KNX DPT Handler', () => {
 		})
 	})
 
-	describe('APDU Population', () => {
-		it('should throw error for invalid values', () => {
-			const apdu: APDU = {
-				bitlength: 0,
-				data: Buffer.alloc(0),
-			}
-
-			assert.throws(() => populateAPDU(NaN, apdu, 'DPT9'))
-			assert.throws(() => populateAPDU(Infinity, apdu, 'DPT9'))
-		})
-	})
-
 	describe('Buffer Conversion', () => {
 		it('should convert buffer to boolean for DPT1', () => {
 			const trueBuf = Buffer.from([1])

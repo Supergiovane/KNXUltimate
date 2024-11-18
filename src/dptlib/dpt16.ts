@@ -41,6 +41,7 @@ const config: DatapointConfig = {
 		}
 		if (this.subtypeid === '001') return buf.toString('latin1')
 		if (this.subtypeid === '000') return buf.toString('ascii')
+		return null
 	},
 
 	// DPT16 basetype info

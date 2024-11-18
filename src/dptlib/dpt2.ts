@@ -12,22 +12,21 @@ const config: DatapointConfig = {
 	formatAPDU: (value: { priority: boolean; data: boolean }) => {
 		if (!value) {
 			Log.get().error('DPT2: cannot write null value')
-		} else {
-			let apdu_data
-			if (
-				typeof value === 'object' &&
-				hasProp(value, 'priority') &&
-				hasProp(value, 'data')
-			) {
-				apdu_data =
-					((value.priority ? 1 : 0) << 1) | (value.data ? 1 : 0)
-			} else {
-				Log.get().error(
-					'DPT2: Must supply a value {priority:<bool>, data:<bool>}',
-				)
-			}
+			return null
+		}
+		let apdu_data
+		if (
+			typeof value === 'object' &&
+			hasProp(value, 'priority') &&
+			hasProp(value, 'data')
+		) {
+			apdu_data = ((value.priority ? 1 : 0) << 1) | (value.data ? 1 : 0)
 			return Buffer.from([apdu_data])
 		}
+		Log.get().error(
+			'DPT2: Must supply a value {priority:<bool>, data:<bool>}',
+		)
+		return null
 	},
 	fromBuffer: (buf: Buffer) => {
 		if (buf.length !== 1) {

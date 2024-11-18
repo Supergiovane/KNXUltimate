@@ -13,42 +13,43 @@ import { hasProp } from '../utils'
 const config: DatapointConfig = {
 	id: 'DPT11',
 	formatAPDU: (value) => {
-		if (!value) Log.get().error('cannot write null value for DPT11')
-		else {
-			const apdu_data = Buffer.alloc(3)
-
-			switch (typeof value) {
-				case 'string':
-				case 'number':
-					value = new Date(value)
-					break
-				case 'object':
-					// this expects the month property to be zero-based (January = 0, etc.)
-					if (
-						value.constructor.name !== 'Date' &&
-						hasProp(value, 'day') &&
-						hasProp(value, 'month') &&
-						hasProp(value, 'year')
-					) {
-						value = new Date(
-							parseInt(value.year),
-							parseInt(value.month),
-							parseInt(value.day),
-						)
-					}
-			}
-			if (isNaN(value.getDate())) {
-				Log.get().error(
-					'Must supply a numeric timestamp, Date or String object for DPT11 Date',
-				)
-			} else {
-				apdu_data[0] = value.getDate()
-				apdu_data[1] = value.getMonth() + 1
-				const year = value.getFullYear()
-				apdu_data[2] = year - (year >= 2000 ? 2000 : 1900)
-			}
-			return apdu_data
+		if (!value) {
+			Log.get().error('cannot write null value for DPT11')
+			return null
 		}
+		const apdu_data = Buffer.alloc(3)
+
+		switch (typeof value) {
+			case 'string':
+			case 'number':
+				value = new Date(value)
+				break
+			case 'object':
+				// this expects the month property to be zero-based (January = 0, etc.)
+				if (
+					value.constructor.name !== 'Date' &&
+					hasProp(value, 'day') &&
+					hasProp(value, 'month') &&
+					hasProp(value, 'year')
+				) {
+					value = new Date(
+						parseInt(value.year),
+						parseInt(value.month),
+						parseInt(value.day),
+					)
+				}
+		}
+		if (isNaN(value.getDate())) {
+			Log.get().error(
+				'Must supply a numeric timestamp, Date or String object for DPT11 Date',
+			)
+			return null
+		}
+		apdu_data[0] = value.getDate()
+		apdu_data[1] = value.getMonth() + 1
+		const year = value.getFullYear()
+		apdu_data[2] = year - (year >= 2000 ? 2000 : 1900)
+		return apdu_data
 	},
 
 	fromBuffer: (buf) => {
@@ -81,6 +82,7 @@ const config: DatapointConfig = {
 		)
 		// return new Date(1990, 01, 01);
 		throw new Error('Error converting date buffer to Date object.')
+		return null
 	},
 
 	// DPT11 base type info

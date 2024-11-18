@@ -38,6 +38,7 @@ const config: DatapointConfig = {
 		Log.get().error(
 			'DPT275.formatAPDU: Must supply all values, for example {comfort:22, standby:21.5, economy:21, buildingProtection:15}',
 		)
+		return null
 	},
 	fromBuffer(buf) {
 		// Get the telegram from the KNX bus and create a javascript object.
@@ -58,6 +59,7 @@ const config: DatapointConfig = {
 			economy,
 			buildingProtection,
 		}
+		return null
 	},
 
 	// DPT275 basetype info

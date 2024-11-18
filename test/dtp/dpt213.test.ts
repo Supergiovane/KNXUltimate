@@ -39,7 +39,7 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 			}
 
 			const result = DPT213.formatAPDU(invalidTemp)
-			assert.equal(result, undefined)
+			assert.equal(result, null)
 
 			const invalidTemp2 = {
 				Comfort: 21.4,
@@ -49,7 +49,7 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 			}
 
 			const result2 = DPT213.formatAPDU(invalidTemp2)
-			assert.equal(result2, undefined)
+			assert.equal(result2, null)
 		})
 
 		test('should return undefined for invalid object structure', () => {
@@ -60,7 +60,7 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				Economy: 18.2,
 				// BuildingProtection missing
 			})
-			assert.equal(result1, undefined)
+			assert.equal(result1, null)
 
 			// Test wrong property names
 			const result2 = DPT213.formatAPDU({
@@ -69,7 +69,7 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				economy: 18.2,
 				buildingProtection: -1,
 			} as any)
-			assert.equal(result2, undefined)
+			assert.equal(result2, null)
 		})
 	})
 

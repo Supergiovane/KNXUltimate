@@ -28,10 +28,10 @@ describe('DPT60001 (Griesser Object)', () => {
 
 		test('should handle invalid inputs', () => {
 			// Null value
-			assert.equal(DPT60001.formatAPDU(null), undefined)
+			assert.equal(DPT60001.formatAPDU(null), null)
 
 			// Missing required properties
-			assert.equal(DPT60001.formatAPDU({} as any), undefined)
+			assert.equal(DPT60001.formatAPDU({} as any), null)
 
 			// Invalid data array
 			assert.equal(
@@ -40,7 +40,7 @@ describe('DPT60001 (Griesser Object)', () => {
 					data: ['invalid', 'long up'],
 					sectors: [159],
 				}),
-				undefined,
+				null,
 			)
 
 			// Missing sectors
@@ -49,7 +49,7 @@ describe('DPT60001 (Griesser Object)', () => {
 					command: 'operation code',
 					data: ['localoperation', 'long up'],
 				} as any),
-				undefined,
+				null,
 			)
 		})
 	})
