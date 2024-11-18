@@ -722,8 +722,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.handleKNXQueue()
 
 		this.sysLogger.debug(
-			`KNXClient: ADDED TELEGRAM TO COMMANDQUEUE. Len: ${this.commandQueue.length}, Priority: ${_priority}`,
-			toBeAdded,
+			`KNXClient: <added telegram to queue> queueLength:${this.commandQueue.length} priority:${_priority} type:${this.getKNXConstantName(toBeAdded.knxPacket.type)} channelID:${toBeAdded.ACK?.channelID || 'filled later'} seqCounter:${toBeAdded.ACK?.seqCounter || 'filled later'}`,
 		)
 	}
 
