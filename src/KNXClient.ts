@@ -542,12 +542,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					_knxPacket.toBuffer(),
 					this._peerPort,
 					this._peerHost,
-					(err) => {
-						if (err) {
+					(error) => {
+						if (error) {
 							this.sysLogger.error(
-								`Sending KNX packet: Send UDP sending error: ${err.message}`,
+								`Sending KNX packet: Send UDP sending error: ${error.message}`,
 							)
-							this.emit(KNXClientEvents.error, err)
+							this.emit(KNXClientEvents.error, error)
 						}
 					},
 				)
@@ -608,7 +608,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			if (item.ACK !== undefined) {
 				this.setTimerWaitingForACK(item.ACK)
 			}
-			this.processKnxPacketQueueItem(item.knxPacket)
+			try {
+				this.processKnxPacketQueueItem(item.knxPacket)
+			} catch (error) {
+				this.sysLogger.error(
+					`KNXClient: handleKNXQueue: returning from processKnxPacketQueueItem ${error.message}`,
+				)
+			}
 			await wait(this._options.KNXQueueSendIntervalMilliseconds)
 		}
 
