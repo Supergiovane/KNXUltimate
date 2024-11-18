@@ -534,19 +534,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private processKnxPacketQueueItem(_knxPacket: KNXPacket): Promise<boolean> {
 		return new Promise((resolve) => {
-			this.sysLogger.debug(
-				`KNXClient: processKnxPacketQueueItem: Processing queued KNX. commandQueue.length: ${this.commandQueue.length} ${_knxPacket.header.service_type} ${JSON.stringify(_knxPacket)}`,
-			)
-			if (_knxPacket instanceof KNXConnectRequest) {
-				this.sysLogger.debug(
-					`Sending KNX packet: ${_knxPacket.constructor.name} Host:${this._peerHost}:${this._peerPort}`,
-				)
-			}
-
 			if (
 				_knxPacket instanceof KNXTunnelingRequest ||
 				_knxPacket instanceof KNXRoutingIndication
 			) {
+				// Composing debug string
 				let sTPCI = ''
 				if (_knxPacket.cEMIMessage.npdu.isGroupRead) {
 					sTPCI = 'Read'
@@ -557,25 +549,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				if (_knxPacket.cEMIMessage.npdu.isGroupWrite) {
 					sTPCI = 'Write'
 				}
-
-				let sDebugString = `Data: ${JSON.stringify(_knxPacket.cEMIMessage.npdu)}`
-				sDebugString += ` srcAddress: ${_knxPacket.cEMIMessage.srcAddress.toString()}`
+				let sDebugString = ''
+				sDebugString = `peerHost:${this._peerHost}:${this._peerPort}`
 				sDebugString += ` dstAddress: ${_knxPacket.cEMIMessage.dstAddress.toString()}`
-
-				const { channelID, seqCounter } =
-					_knxPacket as KNXTunnelingRequest
-
+				sDebugString += ` channelID:${this._channelID === null || this._channelID === undefined ? 'None' : this._channelID}`
+				sDebugString += ` npdu: ${sTPCI}`
+				sDebugString += ` knxHeader: ${_knxPacket.constructor.name}`
+				sDebugString += ` raw: ${JSON.stringify(_knxPacket)}`
 				this.sysLogger.debug(
-					`Sending KNX packet: ${
-						_knxPacket.constructor.name
-					} ${sDebugString} Host:${this._peerHost}:${
-						this._peerPort
-					} ${channelID ? `ChannelID:${channelID}` : ''} ${
-						seqCounter ? `SeqCounter:${seqCounter}` : ''
-					} Dest:${_knxPacket.cEMIMessage.dstAddress.toString()}`,
-					` Data:${_knxPacket.cEMIMessage.npdu.dataValue.toString(
-						'hex',
-					)} TPCI:${sTPCI}`,
+					`KNXEngine: <outgoing telegram>: ${sDebugString} `,
+				)
+			} else if (_knxPacket instanceof KNXTunnelingAck) {
+				this.sysLogger.debug(
+					`KNXEngine: <outgoing telegram>: ACK ${this.getKNXConstantName(_knxPacket.status)} channelID: ${_knxPacket.channelID} seqCounter: ${_knxPacket.seqCounter}`,
 				)
 			}
 
