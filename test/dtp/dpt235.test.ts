@@ -99,13 +99,13 @@ describe('DPT235 (Tariff Active Energy)', () => {
 				{ validityTariff: true },
 				{ validityEnergy: true },
 				null,
-				undefined,
+				null,
 				'invalid',
 			]
 
 			invalidInputs.forEach((input) => {
 				const result = DPT235.formatAPDU(input)
-				assert.equal(result, undefined)
+				assert.equal(result, null)
 			})
 		})
 	})

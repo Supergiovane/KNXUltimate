@@ -448,7 +448,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	set clearToSend(val: boolean) {
 		this._clearToSend = val
-		if (val && !this.queueLock) {
+		if (val) {
 			this.handleKNXQueue()
 		}
 	}
@@ -532,90 +532,93 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 	}
 
-	private processKnxPacketQueueItem(_knxPacket: KNXPacket): boolean {
-		if (
-			_knxPacket instanceof KNXTunnelingRequest ||
-			_knxPacket instanceof KNXRoutingIndication
-		) {
-			// Composing debug string
-			let sTPCI = ''
-			if (_knxPacket.cEMIMessage.npdu.isGroupRead) {
-				sTPCI = 'Read'
+	private processKnxPacketQueueItem(_knxPacket: KNXPacket): Promise<boolean> {
+		return new Promise((resolve) => {
+			if (
+				_knxPacket instanceof KNXTunnelingRequest ||
+				_knxPacket instanceof KNXRoutingIndication
+			) {
+				// Composing debug string
+				let sTPCI = ''
+				if (_knxPacket.cEMIMessage.npdu.isGroupRead) {
+					sTPCI = 'Read'
+				}
+				if (_knxPacket.cEMIMessage.npdu.isGroupResponse) {
+					sTPCI = 'Response'
+				}
+				if (_knxPacket.cEMIMessage.npdu.isGroupWrite) {
+					sTPCI = 'Write'
+				}
+				let sDebugString = ''
+				sDebugString = `peerHost:${this._peerHost}:${this._peerPort}`
+				sDebugString += ` dstAddress: ${_knxPacket.cEMIMessage.dstAddress.toString()}`
+				sDebugString += ` channelID:${this._channelID === null || this._channelID === undefined ? 'None' : this._channelID}`
+				sDebugString += ` npdu: ${sTPCI}`
+				sDebugString += ` knxHeader: ${_knxPacket.constructor.name}`
+				sDebugString += ` raw: ${JSON.stringify(_knxPacket)}`
+				this.sysLogger.debug(
+					`KNXEngine: <outgoing telegram>: ${sDebugString} `,
+				)
+			} else if (_knxPacket instanceof KNXTunnelingAck) {
+				this.sysLogger.debug(
+					`KNXEngine: <outgoing telegram>: ACK ${this.getKNXConstantName(_knxPacket.status)} channelID: ${_knxPacket.channelID} seqCounter: ${_knxPacket.seqCounter}`,
+				)
 			}
-			if (_knxPacket.cEMIMessage.npdu.isGroupResponse) {
-				sTPCI = 'Response'
-			}
-			if (_knxPacket.cEMIMessage.npdu.isGroupWrite) {
-				sTPCI = 'Write'
-			}
-			let sDebugString = ''
-			sDebugString = `peerHost:${this._peerHost}:${this._peerPort}`
-			sDebugString += ` dstAddress: ${_knxPacket.cEMIMessage.dstAddress.toString()}`
-			sDebugString += ` channelID:${this._channelID === null || this._channelID === undefined ? 'None' : this._channelID}`
-			sDebugString += ` npdu: ${sTPCI}`
-			sDebugString += ` knxHeader: ${_knxPacket.constructor.name}`
-			sDebugString += ` raw: ${JSON.stringify(_knxPacket)}`
-			this.sysLogger.debug(
-				`KNXEngine: <outgoing telegram>: ${sDebugString} `,
-			)
-		} else if (_knxPacket instanceof KNXTunnelingAck) {
-			this.sysLogger.debug(
-				`KNXEngine: <outgoing telegram>: ACK ${this.getKNXConstantName(_knxPacket.status)} channelID:${_knxPacket.channelID} seqCounter:${_knxPacket.seqCounter}`,
-			)
-		}
 
-		if (
-			this._options.hostProtocol === 'Multicast' ||
-			this._options.hostProtocol === 'TunnelUDP'
-		) {
-			try {
-				this.udpSocket.send(
-					_knxPacket.toBuffer(),
-					this._peerPort,
-					this._peerHost,
-					(error) => {
+			if (
+				this._options.hostProtocol === 'Multicast' ||
+				this._options.hostProtocol === 'TunnelUDP'
+			) {
+				try {
+					this.udpSocket.send(
+						_knxPacket.toBuffer(),
+						this._peerPort,
+						this._peerHost,
+						(error) => {
+							if (error) {
+								this.sysLogger.error(
+									`Sending KNX packet: Send UDP sending error: ${error.message}`,
+								)
+								this.emit(KNXClientEvents.error, error)
+							}
+
+							resolve(!error)
+						},
+					)
+				} catch (error) {
+					this.sysLogger.error(
+						`Sending KNX packet: Send UDP Catch error: ${
+							error.message
+						} ${typeof _knxPacket} seqCounter:${
+							(_knxPacket as any)?.seqCounter
+						}`,
+					)
+					this.emit(KNXClientEvents.error, error)
+					resolve(false)
+				}
+			} else {
+				try {
+					this.tcpSocket.write(_knxPacket.toBuffer(), (error) => {
 						if (error) {
 							this.sysLogger.error(
-								`Sending KNX packet: Send UDP sending error: ${error.message}`,
+								`Sending KNX packet: Send TCP sending error: ${error.message}` ||
+									'Undef error',
 							)
 							this.emit(KNXClientEvents.error, error)
-							return false
 						}
-					},
-				)
-			} catch (error) {
-				this.sysLogger.error(
-					`Sending KNX packet: Send UDP Catch error: ${
-						error.message
-					} ${typeof _knxPacket} seqCounter:${
-						(_knxPacket as any)?.seqCounter
-					}`,
-				)
-				this.emit(KNXClientEvents.error, error)
-				return false
+
+						resolve(!error)
+					})
+				} catch (error) {
+					this.sysLogger.error(
+						`Sending KNX packet: Send TCP Catch error: ${error.message}` ||
+							'Undef error',
+					)
+					this.emit(KNXClientEvents.error, error)
+					resolve(false)
+				}
 			}
-		} else {
-			try {
-				this.tcpSocket.write(_knxPacket.toBuffer(), (error) => {
-					if (error) {
-						this.sysLogger.error(
-							`Sending KNX packet: Send TCP sending error: ${error.message}` ||
-								'Undef error',
-						)
-						this.emit(KNXClientEvents.error, error)
-						return false
-					}
-				})
-			} catch (error) {
-				this.sysLogger.error(
-					`Sending KNX packet: Send TCP Catch error: ${error.message}` ||
-						'Undef error',
-				)
-				this.emit(KNXClientEvents.error, error)
-				return false
-			}
-		}
-		return true
+		})
 	}
 
 	private async handleKNXQueue() {
@@ -662,7 +665,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.setTimerWaitingForACK(item.ACK)
 			}
 
-			if (!this.processKnxPacketQueueItem(item.knxPacket)) {
+			if (!(await this.processKnxPacketQueueItem(item.knxPacket))) {
 				this.sysLogger.error(
 					`KNXClient: handleKNXQueue: returning from processKnxPacketQueueItem ${JSON.stringify(item)}`,
 				)

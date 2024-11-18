@@ -42,6 +42,7 @@ const config: DatapointConfig = {
 		//  return null
 		// }
 		if (this.subtypeid === '001') return buf.toString('utf-8')
+		return null
 	},
 
 	// DPT28 basetype info

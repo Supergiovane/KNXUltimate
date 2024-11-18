@@ -71,6 +71,7 @@ const config: DatapointConfig = {
 				Math.floor(bitVal),
 			])
 		}
+		return null
 	},
 	fromBuffer(buf) {
 		if (buf.length !== 6) {
@@ -92,6 +93,7 @@ const config: DatapointConfig = {
 			mW: parseInt(valByte[3]) || 0,
 		}
 		return ret
+		return null
 	},
 	basetype: {
 		bitlength: 6 * 8,

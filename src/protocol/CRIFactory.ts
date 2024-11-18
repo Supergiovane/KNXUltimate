@@ -16,5 +16,7 @@ export default class CRIFactory {
 			case KNX_CONSTANTS.TUNNEL_CONNECTION:
 				return TunnelCRI.createFromBuffer(buffer, offset)
 		}
+
+		throw new Error('Unknown CRI type')
 	}
 }

@@ -111,7 +111,7 @@ describe('DPT28 (ASCII string UTF-8)', () => {
 			const dpt = { ...DPT28, subtypeid: '002' }
 			const buffer = Buffer.alloc(14)
 			buffer.write('test', 'utf-8')
-			assert.equal(dpt.fromBuffer(buffer), undefined)
+			assert.equal(dpt.fromBuffer(buffer), null)
 		})
 	})
 })
