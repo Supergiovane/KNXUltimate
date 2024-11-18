@@ -90,6 +90,14 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 		} else {
 			this.socket.send = (data: Buffer, ...args: any[]) => {
 				this.onRequest(data)
+
+				// call callback if any
+				if (
+					args.length > 0 &&
+					typeof args[args.length - 1] === 'function'
+				) {
+					args[args.length - 1]()
+				}
 			}
 
 			this.socket.on(SocketEvents.message, (buf) => {
