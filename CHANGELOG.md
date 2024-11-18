@@ -1,5 +1,14 @@
 
 
+# [4.0.0-beta.6](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.5...v4.0.0-beta.6) (2024-11-18)
+
+
+### Bug Fixes
+
+* clear the queueitem in case of errors ([393b818](https://github.com/Supergiovane/KNXUltimate/commit/393b818b9f33aac3771523e7c793d905eed4bdf6))
+* exiting the queue loop after error ([0bb3c19](https://github.com/Supergiovane/KNXUltimate/commit/0bb3c193abcecba3554e6ff96b3f0e383c7e14cf))
+* fixed an uncaught exception ([b48a5b1](https://github.com/Supergiovane/KNXUltimate/commit/b48a5b1665e4446bf89062f5fbc9ab5f1e4af61d))
+
 # [4.0.0-beta.5](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.4...v4.0.0-beta.5) (2024-11-17)
 
 # [4.0.0-beta.4](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.3...v4.0.0-beta.4) (2024-11-15)
