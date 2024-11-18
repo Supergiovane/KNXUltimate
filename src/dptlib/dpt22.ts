@@ -44,73 +44,68 @@ const config: DatapointConfig = {
 		const apdu_data = Buffer.alloc(2)
 		if (!value) {
 			Log.get().error('DPT232: cannot write null value')
-		} else {
-			if (typeof value === 'object') {
-				if (!hasProp(value, 'Fault')) value.Fault = false
-				if (!hasProp(value, 'StatusEcoH')) value.StatusEcoH = false
-				if (!hasProp(value, 'TempFlowLimit'))
-					value.TempFlowLimit = false
-				if (!hasProp(value, 'TempReturnLimit'))
-					value.TempReturnLimit = false
-				if (!hasProp(value, 'StatusMorningBoostH'))
-					value.StatusMorningBoostH = false
-				if (!hasProp(value, 'StatusStartOptim'))
-					value.StatusStartOptim = false
-				if (!hasProp(value, 'StatusStopOptim'))
-					value.StatusStopOptim = false
-				if (!hasProp(value, 'HeatingDisabled'))
-					value.HeatingDisabled = false
-				if (!hasProp(value, 'HeatCoolMode')) value.HeatCoolMode = false
-				if (!hasProp(value, 'StatusEcoC')) value.StatusEcoC = false
-				if (!hasProp(value, 'StatusPreCool'))
-					value.StatusPreCool = false
-				if (!hasProp(value, 'CoolingDisabled'))
-					value.CoolingDisabled = false
-				if (!hasProp(value, 'DewPointStatus'))
-					value.DewPointStatus = false
-				if (!hasProp(value, 'FrostAlarm')) value.FrostAlarm = false
-				if (!hasProp(value, 'OverheatAlarm'))
-					value.OverheatAlarm = false
-				if (!hasProp(value, 'reserved')) value.reserved = true
-			} else {
-				Log.get().error(
-					'DPT22: Must supply a correct payload. See wiki.',
-				)
-			}
-			let firstHex = ''
-			let secondHex = ''
-			firstHex = firstHex.concat(
-				...[
-					value.Fault,
-					value.StatusEcoH,
-					value.TempFlowLimit,
-					value.TempReturnLimit,
-					value.StatusMorningBoostH,
-					value.StatusStartOptim,
-					value.StatusStopOptim,
-					value.HeatingDisabled,
-				].map((v) => {
-					return Number(v).toString()
-				}),
-			)
-			secondHex = secondHex.concat(
-				...[
-					value.HeatCoolMode,
-					value.StatusEcoC,
-					value.StatusPreCool,
-					value.CoolingDisabled,
-					value.DewPointStatus,
-					value.FrostAlarm,
-					value.OverheatAlarm,
-					value.reserved,
-				].map((v) => {
-					return Number(v).toString()
-				}),
-			)
-			apdu_data[0] = parseInt(reverseString(secondHex), 2)
-			apdu_data[1] = parseInt(reverseString(firstHex), 2)
-			return apdu_data
+			return null
 		}
+		if (typeof value === 'object') {
+			if (!hasProp(value, 'Fault')) value.Fault = false
+			if (!hasProp(value, 'StatusEcoH')) value.StatusEcoH = false
+			if (!hasProp(value, 'TempFlowLimit')) value.TempFlowLimit = false
+			if (!hasProp(value, 'TempReturnLimit'))
+				value.TempReturnLimit = false
+			if (!hasProp(value, 'StatusMorningBoostH'))
+				value.StatusMorningBoostH = false
+			if (!hasProp(value, 'StatusStartOptim'))
+				value.StatusStartOptim = false
+			if (!hasProp(value, 'StatusStopOptim'))
+				value.StatusStopOptim = false
+			if (!hasProp(value, 'HeatingDisabled'))
+				value.HeatingDisabled = false
+			if (!hasProp(value, 'HeatCoolMode')) value.HeatCoolMode = false
+			if (!hasProp(value, 'StatusEcoC')) value.StatusEcoC = false
+			if (!hasProp(value, 'StatusPreCool')) value.StatusPreCool = false
+			if (!hasProp(value, 'CoolingDisabled'))
+				value.CoolingDisabled = false
+			if (!hasProp(value, 'DewPointStatus')) value.DewPointStatus = false
+			if (!hasProp(value, 'FrostAlarm')) value.FrostAlarm = false
+			if (!hasProp(value, 'OverheatAlarm')) value.OverheatAlarm = false
+			if (!hasProp(value, 'reserved')) value.reserved = true
+		} else {
+			Log.get().error('DPT22: Must supply a correct payload. See wiki.')
+			return null
+		}
+		let firstHex = ''
+		let secondHex = ''
+		firstHex = firstHex.concat(
+			...[
+				value.Fault,
+				value.StatusEcoH,
+				value.TempFlowLimit,
+				value.TempReturnLimit,
+				value.StatusMorningBoostH,
+				value.StatusStartOptim,
+				value.StatusStopOptim,
+				value.HeatingDisabled,
+			].map((v) => {
+				return Number(v).toString()
+			}),
+		)
+		secondHex = secondHex.concat(
+			...[
+				value.HeatCoolMode,
+				value.StatusEcoC,
+				value.StatusPreCool,
+				value.CoolingDisabled,
+				value.DewPointStatus,
+				value.FrostAlarm,
+				value.OverheatAlarm,
+				value.reserved,
+			].map((v) => {
+				return Number(v).toString()
+			}),
+		)
+		apdu_data[0] = parseInt(reverseString(secondHex), 2)
+		apdu_data[1] = parseInt(reverseString(firstHex), 2)
+		return apdu_data
 	},
 	fromBuffer: (buf) => {
 		// RX from BUS

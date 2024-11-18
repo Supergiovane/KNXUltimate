@@ -22,25 +22,21 @@ const config: DatapointConfig = {
 	formatAPDU: (value) => {
 		if (!value) {
 			Log.get().error('DPT21: cannot write null value')
-		} else {
-			if (
-				typeof value === 'object' &&
-				hasProp(value, 'outOfService') &&
-				typeof value.outOfService === 'boolean' &&
-				hasProp(value, 'fault') &&
-				typeof value.fault === 'boolean' &&
-				hasProp(value, 'overridden') &&
-				typeof value.overridden === 'boolean' &&
-				hasProp(value, 'inAlarm') &&
-				typeof value.inAlarm === 'boolean' &&
-				hasProp(value, 'alarmUnAck') &&
-				typeof value.alarmUnAck === 'boolean'
-			) {
-			} else {
-				Log.get().error(
-					'DPT21: Must supply a right payload: {outOfService:true-false, fault:true-false, overridden:true-false, inAlarm:true-false, alarmUnAck:true-false}',
-				)
-			}
+			return null
+		}
+		if (
+			typeof value === 'object' &&
+			hasProp(value, 'outOfService') &&
+			typeof value.outOfService === 'boolean' &&
+			hasProp(value, 'fault') &&
+			typeof value.fault === 'boolean' &&
+			hasProp(value, 'overridden') &&
+			typeof value.overridden === 'boolean' &&
+			hasProp(value, 'inAlarm') &&
+			typeof value.inAlarm === 'boolean' &&
+			hasProp(value, 'alarmUnAck') &&
+			typeof value.alarmUnAck === 'boolean'
+		) {
 			const bitVal = parseInt(
 				`0000${value.alarmUnAck ? '1' : '0'}${
 					value.inAlarm ? '1' : '0'
@@ -51,6 +47,10 @@ const config: DatapointConfig = {
 			)
 			return Buffer.from([bitVal])
 		}
+		Log.get().error(
+			'DPT21: Must supply a right payload: {outOfService:true-false, fault:true-false, overridden:true-false, inAlarm:true-false, alarmUnAck:true-false}',
+		)
+		return null
 	},
 
 	fromBuffer: (buf) => {

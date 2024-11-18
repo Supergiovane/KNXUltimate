@@ -16,20 +16,22 @@ const config: DatapointConfig = {
 	formatAPDU: (value) => {
 		if (typeof value !== 'object' || value.constructor.name !== 'Date') {
 			Log.get().error('DPT19: Must supply a Date object')
-		} else {
-			// Sunday is 0 in Javascript, but 7 in KNX.
-			const day = value.getDay() === 0 ? 7 : value.getDay()
-			const apdu_data = Buffer.alloc(8)
-			apdu_data[0] = value.getFullYear() - 1900
-			apdu_data[1] = value.getMonth() + 1
-			apdu_data[2] = value.getDate()
-			apdu_data[3] = (day << 5) + value.getHours()
-			apdu_data[4] = value.getMinutes()
-			apdu_data[5] = value.getSeconds()
-			apdu_data[6] = 0
-			apdu_data[7] = 0
-			return apdu_data
+			return null
 		}
+		// Sunday is 0 in Javascript, but 7 in KNX.
+		const day = value.getDay() === 0 ? 7 : value.getDay()
+		const apdu_data = Buffer.alloc(8)
+		apdu_data[0] = value.getFullYear() - 1900
+		apdu_data[1] = value.getMonth() + 1
+		apdu_data[2] = value.getDate()
+		apdu_data[3] = (day << 5) + value.getHours()
+		apdu_data[4] = value.getMinutes()
+		apdu_data[5] = value.getSeconds()
+		apdu_data[6] = 0
+		apdu_data[7] = 0
+		return apdu_data
+
+		return null
 	},
 
 	fromBuffer: (buf) => {
@@ -49,6 +51,7 @@ const config: DatapointConfig = {
 			buf[5],
 		)
 		return d
+		return null
 	},
 
 	basetype: {
