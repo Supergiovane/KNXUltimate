@@ -192,4 +192,8 @@ export default class KNXSecureTunnelling extends EventEmitter {
 	public get secureSessionId(): number {
 		return this.session.currentSessionId
 	}
+
+	public getChannelId(): number {
+		return this.channelId
+	}
 }
