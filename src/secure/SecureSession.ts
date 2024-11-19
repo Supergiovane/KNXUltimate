@@ -33,7 +33,30 @@ export interface SecureSessionEvents {
 	status: (status: SessionStatus) => void
 }
 
-export default class SecureSession extends EventEmitter {
+// Add type-safe event handling
+interface ISecureSession {
+	on<K extends keyof SecureSessionEvents>(
+		event: K,
+		listener: SecureSessionEvents[K],
+	): this
+	once<K extends keyof SecureSessionEvents>(
+		event: K,
+		listener: SecureSessionEvents[K],
+	): this
+	emit<K extends keyof SecureSessionEvents>(
+		event: K,
+		...args: Parameters<SecureSessionEvents[K]>
+	): boolean
+	off<K extends keyof SecureSessionEvents>(
+		event: K,
+		listener: SecureSessionEvents[K],
+	): this
+}
+
+export default class SecureSession
+	extends EventEmitter
+	implements ISecureSession
+{
 	private state: SecureSessionState = SecureSessionState.INITIAL
 
 	private sessionId: number = 0
