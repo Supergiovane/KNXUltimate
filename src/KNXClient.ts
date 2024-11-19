@@ -1174,7 +1174,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.setTimer(
 			KNXTimer.GATEWAYDESCRIPTION,
 			() => {},
-			1000 * KNX_CONSTANTS.SEARCH_TIMEOUT,
+			1000 * KNX_CONSTANTS.DEVICE_CONFIGURATION_REQUEST_TIMEOUT,
 		)
 		this.sendDescriptionRequestMessage()
 	}
