@@ -744,6 +744,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		_priority: boolean,
 		_expectedSeqNumberForACK: number,
 	): void {
+		if (
+			this._options.secure &&
+			_knxPacket instanceof KNXTunnellingRequest
+		) {
+			this.sendSecureTunnellingRequest(_knxPacket)
+			return
+		}
+
 		const toBeAdded: KNXQueueItem = {
 			knxPacket: _knxPacket,
 			ACK: _ACK,
@@ -1468,6 +1476,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			console.log('Sniffing mode is enabled. Dumping sniffing buffers...')
 			console.log(this.sniffingPackets)
 		}
+
+		if (this._secureTunnel?.isEstablished) {
+			this._secureTunnel.close()
+		}
 	}
 
 	/**
@@ -2049,5 +2061,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			true,
 			this.getSeqNumber(),
 		)
+	}
+
+	private sendSecureTunnellingRequest(packet: KNXPacket): void {
+		if (this._secureTunnel?.isEstablished) {
+			// Lascia che sia KNXSecureTunnelling a occuparsi del wrapping
+			this._secureTunnel.sendTunnellingRequest(
+				packet as KNXTunnellingRequest,
+			)
+		} else {
+			throw new Error('Secure tunnel not established')
+		}
 	}
 }
