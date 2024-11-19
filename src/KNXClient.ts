@@ -2065,7 +2065,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private sendSecureTunnellingRequest(packet: KNXPacket): void {
 		if (this._secureTunnel?.isEstablished) {
-			// Lascia che sia KNXSecureTunnelling a occuparsi del wrapping
 			this._secureTunnel.sendTunnellingRequest(
 				packet as KNXTunnellingRequest,
 			)
