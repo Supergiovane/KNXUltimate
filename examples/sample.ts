@@ -76,9 +76,7 @@ let knxUltimateClientProperties: KNXClientOptions = {
     physAddr: "1.1.100",
     suppress_ack_ldatareq: false,
     loglevel: "error", // 'disable', 'error', 'warn', 'info', 'debug'
-    hostProtocol: "Multicast", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
-    isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
-    jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
+    hostProtocol: "Multicast", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
     KNXQueueSendIntervalMilliseconds:25 // Optrional. Queue interval between each KNX telegram. Default is 1 telegram each 25ms
 };
@@ -152,7 +150,7 @@ knxUltimateClient.on(KNXClientEvents.close, () => {
     console.log("Closed")
 });
 knxUltimateClient.on(KNXClientEvents.ackReceived, (knxMessage, info) => {
-    // In -->tunneling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
+    // In -->tunnelling mode<-- (in ROUTING mode there is no ACK event), signals wether the last KNX telegram has been acknowledge or not
     // knxMessage: contains the telegram sent.
     // info is true it the last telegram has been acknowledge, otherwise false.
     console.log("Last telegram acknowledge", knxMessage, info)

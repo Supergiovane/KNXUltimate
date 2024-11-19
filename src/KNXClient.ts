@@ -17,13 +17,21 @@ import KnxLog, { KNXLoggerOptions } from './KnxLog'
 import { KNXDescriptionResponse, KNXPacket } from './protocol'
 import KNXRoutingIndication from './protocol/KNXRoutingIndication'
 import KNXConnectRequest from './protocol/KNXConnectRequest'
-import KNXTunnelingRequest from './protocol/KNXTunnelingRequest'
+import KNXTunnellingRequest from './protocol/KNXTunnellingRequest'
 import { TypedEventEmitter } from './TypedEmitter'
 import KNXHeader from './protocol/KNXHeader'
-import KNXTunnelingAck from './protocol/KNXTunnelingAck'
+import KNXTunnellingAck from './protocol/KNXTunnellingAck'
 import KNXSearchResponse from './protocol/KNXSearchResponse'
 import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
 import { wait } from './utils'
+import { KNX_SECURE } from './secure/SecureConstants'
+import KNXSecureTunnelling from './secure/KNXSecureTunnelling'
+import SecureWrapper from './secure/messages/SecureWrapper'
+import {
+	SessionResponse,
+	SessionStatus,
+} from './secure/messages/SessionMessages'
+import { SecureSessionOptions } from './secure/SecureSession'
 
 export enum ConncetionState {
 	STARTED = 'STARTED',
@@ -72,14 +80,15 @@ export interface KNXClientEventCallbacks {
 	response: (host: string, header: KNXHeader, message: KnxResponse) => void
 	connecting: (options: KNXClientOptions) => void
 	ackReceived: (
-		packet: KNXTunnelingAck | KNXTunnelingRequest,
+		packet: KNXTunnellingAck | KNXTunnellingRequest,
 		ack: boolean,
 	) => void
 	close: () => void
 	descriptionResponse: (packet: KNXDescriptionResponse) => void
+	secureSessionEstablished: () => void
+	secureSessionClosed: (reason: string) => void
+	secureTunnellingRequest: (req: KNXTunnellingRequest) => void
 }
-
-const jKNXSecureKeyring: string = ''
 
 export type KNXClientOptions = {
 	/** The physical address to be identified in the KNX bus */
@@ -90,26 +99,28 @@ export type KNXClientOptions = {
 	ipAddr?: string
 	/** The port, default is "3671" */
 	ipPort?: number | string
-	/** Default: "TunnelUDP". "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces, or "TunnelTCP" for secure KNX Interfaces (not yet implemented) */
+	/** Default: "TunnelUDP". "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces */
 	hostProtocol?: KNXClientProtocol
-	/** True: Enables the secure connection. Leave false until KNX-Secure has been released. */
-	isSecureKNXEnabled?: boolean
 	/** Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true */
 	suppress_ack_ldatareq?: boolean
 	/** Leave true forever. This is used only in Node-Red KNX-Ultimate node */
-	localEchoInTunneling?: boolean
+	localEchoInTunnelling?: boolean
 	/** The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate */
 	localIPAddress?: string
 	/** Specifies the local eth interface to be used to connect to the KNX Bus. */
 	interface?: string
-	/** ETS Keyring JSON file content (leave blank until KNX-Secure has been released) */
-	jKNXSecureKeyring?: any
 	/** Local socket address. Automatically filled by KNXClient */
 	localSocketAddress?: string
 	// ** Local queue interval between each KNX telegram. Default is 1 telegram each 25ms
 	KNXQueueSendIntervalMilliseconds?: number
 	/** Enables sniffing mode to monitor KNX */
 	sniffingMode?: boolean
+	secure?: {
+		deviceAuthCode: string
+		userId: number
+		password: string
+		serialNumber: number
+	}
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
@@ -118,18 +129,12 @@ const optionsDefaults: KNXClientOptions = {
 	ipAddr: '224.0.23.12',
 	ipPort: 3671,
 	hostProtocol: 'Multicast',
-	isSecureKNXEnabled: false,
 	suppress_ack_ldatareq: false,
 	loglevel: 'info',
-	localEchoInTunneling: true,
+	localEchoInTunnelling: true,
 	localIPAddress: '',
 	interface: '',
-	jKNXSecureKeyring: {},
 	KNXQueueSendIntervalMilliseconds: 25,
-}
-
-export function getDecodedKeyring() {
-	return jKNXSecureKeyring
 }
 
 export enum KNXTimer {
@@ -164,7 +169,7 @@ export type SnifferPacket = {
 
 interface KNXQueueItem {
 	knxPacket: KNXPacket
-	ACK: KNXTunnelingRequest
+	ACK: KNXTunnellingRequest
 	expectedSeqNumberForACK: number
 }
 
@@ -195,8 +200,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private sysLogger: any
 
-	private jKNXSecureKeyring: any
-
 	private _clearToSend = false
 
 	private socketReady = false
@@ -216,6 +219,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private sniffingPackets: SnifferPacket[]
 
 	private lastSnifferRequest: number
+
+	private _secureTunnel: KNXSecureTunnelling
 
 	get udpSocket() {
 		if (this._clientSocket instanceof UDPSocket) {
@@ -270,7 +275,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.max_HeartbeatFailures = 3
 		this._awaitingResponseType = null
 		this._clientSocket = null
-		this.jKNXSecureKeyring = this._options.jKNXSecureKeyring
 		// Configure the limiter
 		try {
 			if (Number(this._options.KNXQueueSendIntervalMilliseconds) < 20) {
@@ -309,6 +313,53 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		} else {
 			this.createSocket()
 		}
+
+		if (this._options.secure) {
+			this.initSecureTunnel()
+		}
+	}
+
+	private initSecureTunnel() {
+		if (!this._options.secure) return
+
+		this._secureTunnel = new KNXSecureTunnelling({
+			deviceAuthCode: this._options.secure.deviceAuthCode,
+			userId: this._options.secure.userId,
+			password: this._options.secure.password,
+			serialNumber: this._options.secure.serialNumber,
+		})
+
+		// Gestione degli eventi del tunnel sicuro
+		this._secureTunnel.on('established', () => {
+			this._channelID = this._secureTunnel.getChannelId()
+			this._connectionState = ConncetionState.CONNECTED
+			this.emit(KNXClientEvents.connected, this._options)
+			this.startHeartBeat()
+		})
+
+		this._secureTunnel.on('error', (err: Error) => {
+			this.sysLogger.error(`Secure tunnel error: ${err.message}`)
+			this.emit(KNXClientEvents.error, err)
+		})
+
+		this._secureTunnel.on('closed', (reason: string) => {
+			this.sysLogger.debug(`Secure tunnel closed: ${reason}`)
+			this.setDisconnected(reason)
+		})
+
+		this._secureTunnel.on(
+			'tunnellingRequest',
+			(req: KNXTunnellingRequest) => {
+				this.sysLogger.debug(
+					`Received secure tunnelling request: ${req.toString()}`,
+				)
+				this.emit(KNXClientEvents.indication, req, false)
+			},
+		)
+
+		this._secureTunnel.on('send', (wrapper: SecureWrapper) => {
+			this.send(wrapper as any, undefined, true, 0) // Cast to any per compatibilità con il tipo KNXPacket
+		})
 	}
 
 	private createSocket() {
@@ -535,7 +586,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private processKnxPacketQueueItem(_knxPacket: KNXPacket): Promise<boolean> {
 		return new Promise((resolve) => {
 			if (
-				_knxPacket instanceof KNXTunnelingRequest ||
+				_knxPacket instanceof KNXTunnellingRequest ||
 				_knxPacket instanceof KNXRoutingIndication
 			) {
 				// Composing debug string
@@ -559,7 +610,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.sysLogger.debug(
 					`KNXEngine: <outgoing telegram>: ${sDebugString} `,
 				)
-			} else if (_knxPacket instanceof KNXTunnelingAck) {
+			} else if (_knxPacket instanceof KNXTunnellingAck) {
 				this.sysLogger.debug(
 					`KNXEngine: <outgoing telegram>: ACK ${this.getKNXConstantName(_knxPacket.status)} channelID: ${_knxPacket.channelID} seqCounter: ${_knxPacket.seqCounter}`,
 				)
@@ -689,10 +740,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	send(
 		_knxPacket: KNXPacket,
-		_ACK: KNXTunnelingRequest,
+		_ACK: KNXTunnellingRequest,
 		_priority: boolean,
 		_expectedSeqNumberForACK: number,
 	): void {
+		if (
+			this._options.secure &&
+			_knxPacket instanceof KNXTunnellingRequest
+		) {
+			this.sendSecureTunnellingRequest(_knxPacket)
+			return
+		}
+
 		const toBeAdded: KNXQueueItem = {
 			knxPacket: _knxPacket,
 			ACK: _ACK,
@@ -770,7 +829,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
 			// 06/12/2021 Multivast automaticalli echoes telegrams
 		} else {
-			// Tunneling
+			// Tunnelling
 			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
 				'write',
 				srcAddress,
@@ -784,7 +843,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
 			const seqNum: number = this.incSeqNumber() // 26/12/2021
-			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+			const knxPacketRequest = KNXProtocol.newKNXTunnellingRequest(
 				this._channelID,
 				seqNum,
 				cEMIMessage,
@@ -805,7 +864,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			if (this._options.localEchoInTunneling)
+			if (this._options.localEchoInTunnelling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
@@ -854,7 +913,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
 			// 06/12/2021 Multivast automatically echoes telegrams
 		} else {
-			// Tunneling
+			// Tunnelling
 			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
 				'response',
 				srcAddress,
@@ -868,7 +927,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
 			const seqNum: number = this.incSeqNumber() // 26/12/2021
-			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+			const knxPacketRequest = KNXProtocol.newKNXTunnellingRequest(
 				this._channelID,
 				seqNum,
 				cEMIMessage,
@@ -889,7 +948,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			if (this._options.localEchoInTunneling)
+			if (this._options.localEchoInTunnelling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
@@ -928,7 +987,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
 			// 06/12/2021 Multivast automaticalli echoes telegrams
 		} else {
-			// Tunneling
+			// Tunnelling
 			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
 				'read',
 				srcAddress,
@@ -942,7 +1001,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
 			const seqNum: number = this.incSeqNumber() // 26/12/2021
-			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+			const knxPacketRequest = KNXProtocol.newKNXTunnellingRequest(
 				this._channelID,
 				seqNum,
 				cEMIMessage,
@@ -963,7 +1022,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			if (this._options.localEchoInTunneling) {
+			if (this._options.localEchoInTunnelling) {
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 			}
 		}
@@ -1037,7 +1096,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
 			// 06/12/2021 Multivast automaticalli echoes telegrams
 		} else {
-			// Tunneling
+			// Tunnelling
 			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
 				'write',
 				srcAddress,
@@ -1052,7 +1111,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
 			const seqNum: number = this.incSeqNumber() // 26/12/2021
-			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+			const knxPacketRequest = KNXProtocol.newKNXTunnellingRequest(
 				this._channelID,
 				seqNum,
 				cEMIMessage,
@@ -1073,7 +1132,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			if (this._options.localEchoInTunneling)
+			if (this._options.localEchoInTunnelling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
@@ -1217,39 +1276,85 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/**
-	 * Connect to the KNX bus
+	 * Connect to the KNX bus.
+	 * For secure connections, TCP is required and secure options must be provided
 	 */
 	Connect(knxLayer = TunnelTypes.TUNNEL_LINKLAYER) {
 		if (this._clientSocket === null) {
 			throw new Error('No client socket defined')
 		}
+
 		if (this._connectionState === ConncetionState.DISCONNECTING) {
 			throw new Error(
 				'Socket is disconnecting. Please wait until disconnected.',
 			)
 		}
+
 		if (this._connectionState === ConncetionState.CONNECTING) {
 			throw new Error(
 				'Socket is connecting. Please wait until connected.',
 			)
 		}
+
 		if (this._connectionState === ConncetionState.CONNECTED) {
 			throw new Error('Socket is already connected. Disconnect first.')
 		}
 
+		// Change state and reset counters
 		this._connectionState = ConncetionState.CONNECTING
-		this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
-		this.clearToSend = true // 26/12/2021 allow to send
+		this._numFailedTelegramACK = 0
+		this.clearToSend = true
 		this.clearTimer(KNXTimer.CONNECTION)
-		// Emit connecting
+
+		// Emit connecting event
 		this.emit(KNXClientEvents.connecting, this._options)
-		if (this._options.hostProtocol === 'TunnelUDP') {
-			// Unicast, need to explicitly create the connection
+
+		// Handle secure tunneling over TCP
+		if (
+			this._options.hostProtocol === 'TunnelTCP' &&
+			this._options.secure
+		) {
+			try {
+				// Configure TCP socket
+				;(this._clientSocket as TCPSocket).connect({
+					host: this._peerHost,
+					port: this._peerPort,
+				})
+
+				// Set connection timeout
+				this.setTimer(
+					KNXTimer.CONNECTION,
+					() => {
+						const timeoutError = new Error(
+							`Connection timeout to ${this._peerHost}:${this._peerPort}`,
+						)
+						this.emit(KNXClientEvents.error, timeoutError)
+					},
+					1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
+				)
+
+				// Initialize secure tunnel when TCP connects
+				this._clientSocket.once('connect', () => {
+					// Initialize secure tunnel if not already done
+					if (!this._secureTunnel) {
+						this.initSecureTunnel()
+					}
+
+					// Start secure session
+					const sessionRequest = this._secureTunnel.connect(knxLayer)
+					this.send(sessionRequest, undefined, true, 0)
+				})
+			} catch (error) {
+				this.emit(KNXClientEvents.error, error)
+				this._connectionState = ConncetionState.DISCONNECTED
+			}
+		}
+		// Handle UDP tunneling (non-secure)
+		else if (this._options.hostProtocol === 'TunnelUDP') {
+			// Set connection timeout
 			const timeoutError = new Error(
 				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
 			)
-			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
-			this._clientTunnelSeqNumber = -1
 			this.setTimer(
 				KNXTimer.CONNECTION,
 				() => {
@@ -1257,33 +1362,36 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 				1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
 			)
-			// 27/06/2023, leave some time to the dgram, to do the bind and read local ip and local port
+
+			// Reset sequence number and set awaiting response
+			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
+			this._clientTunnelSeqNumber = -1
+
+			// Send connect request after a short delay to allow socket binding
 			this.setTimer(
 				KNXTimer.CONNECT_REQUEST,
 				() => {
-					this.sendConnectRequestMessage(new TunnelCRI(knxLayer))
+					const cri = new TunnelCRI(knxLayer)
+					this.sendConnectRequestMessage(cri)
 				},
 				2000,
 			)
-		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			this.tcpSocket.connect(this._peerPort, this._peerHost, () => {
-				this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
-				this._clientTunnelSeqNumber = 0
-				if (this._options.isSecureKNXEnabled)
-					this.sendSecureSessionRequestMessage(
-						new TunnelCRI(knxLayer),
-					)
-			})
-		} else {
-			// Multicast
+		}
+		// Handle multicast (non-secure)
+		else if (this._options.hostProtocol === 'Multicast') {
+			// Multicast connections are immediately considered connected
 			this._connectionState = ConncetionState.CONNECTED
 
-			// 16/03/2022 These two are referring to tunneling connection, but i set it here as well. Non si sa mai.
-			this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
-			this.clearToSend = true // 26/12/2021 allow to send
-
+			// Reset counters
+			this._numFailedTelegramACK = 0
+			this.clearToSend = true
 			this._clientTunnelSeqNumber = -1
+
 			this.emit(KNXClientEvents.connected, this._options)
+		} else {
+			throw new Error(
+				`Unsupported protocol: ${this._options.hostProtocol}`,
+			)
 		}
 	}
 
@@ -1368,6 +1476,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			console.log('Sniffing mode is enabled. Dumping sniffing buffers...')
 			console.log(this.sniffingPackets)
 		}
+
+		if (this._secureTunnel?.isEstablished) {
+			this._secureTunnel.close()
+		}
 	}
 
 	/**
@@ -1449,7 +1561,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/**
-	 * Get actual tunneling sequence number
+	 * Get actual tunnelling sequence number
 	 */
 	private getSeqNumber() {
 		return this._clientTunnelSeqNumber
@@ -1460,7 +1572,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/**
-	 * Increment the tunneling sequence number
+	 * Increment the tunnelling sequence number
 	 */
 	private incSeqNumber() {
 		this._clientTunnelSeqNumber++
@@ -1471,16 +1583,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/**
-	 * Setup a timer while waiting for an ACK of `knxTunnelingRequest`
+	 * Setup a timer while waiting for an ACK of `knxTunnellingRequest`
 	 */
-	private setTimerWaitingForACK(knxTunnelingRequest: KNXTunnelingRequest) {
+	private setTimerWaitingForACK(knxTunnellingRequest: KNXTunnellingRequest) {
 		this.clearToSend = false // 26/12/2021 stop sending until ACK received
 		const timeoutErr = new errors.RequestTimeoutError(
-			`seqCounter:${knxTunnelingRequest.seqCounter}, DestAddr:${
-				knxTunnelingRequest.cEMIMessage.dstAddress.toString() ||
+			`seqCounter:${knxTunnellingRequest.seqCounter}, DestAddr:${
+				knxTunnellingRequest.cEMIMessage.dstAddress.toString() ||
 				'Non definito'
 			},  AckRequested:${
-				knxTunnelingRequest.cEMIMessage.control.ack
+				knxTunnellingRequest.cEMIMessage.control.ack
 			}, timed out waiting telegram acknowledge by ${
 				this._options.ipAddr || 'No Peer host detected'
 			}`,
@@ -1494,7 +1606,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					// 08/04/2022 Emits the event informing that the last ACK has not been acknowledge.
 					this.emit(
 						KNXClientEvents.ackReceived,
-						knxTunnelingRequest,
+						knxTunnellingRequest,
 						false,
 					)
 					this.clearToSend = true
@@ -1502,7 +1614,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.sysLogger.error(
 						`KNXClient: _setTimerWaitingForACK: ${
 							timeoutErr.message || 'Undef error'
-						} no ACK received. ABORT sending datagram with seqNumber ${this.getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
+						} no ACK received. ABORT sending datagram with seqNumber ${this.getSeqNumber()} from ${knxTunnellingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnellingRequest.cEMIMessage.dstAddress.toString()}`,
 					)
 				} else {
 					// 26/12/2021 // If no ACK received, resend the datagram once with the same sequence number
@@ -1512,18 +1624,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						} no ACK received. Retransmit datagram with seqNumber ${
 							this.currentItemHandledByTheQueue
 								.expectedSeqNumberForACK
-						} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
+						} from ${knxTunnellingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnellingRequest.cEMIMessage.dstAddress.toString()}`,
 					)
 					this.send(
-						knxTunnelingRequest,
-						knxTunnelingRequest,
+						knxTunnellingRequest,
+						knxTunnellingRequest,
 						true,
 						this.currentItemHandledByTheQueue
 							.expectedSeqNumberForACK,
 					)
 				}
 			},
-			KNX_CONSTANTS.TUNNELING_REQUEST_TIMEOUT * 1000,
+			KNX_CONSTANTS.TUNNELLING_REQUEST_TIMEOUT * 1000,
 		)
 	}
 
@@ -1543,9 +1655,55 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
 		let sProcessInboundLog = ''
 		try {
+			// Composing debug string
+			sProcessInboundLog = `Data received: ${msg.toString('hex')}`
+			sProcessInboundLog += ` srcAddress: ${JSON.stringify(rinfo)}`
+			this.sysLogger.debug(
+				`KNXEngine: processInboundMessage prior to processing: ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+			)
+
+			// Handle secure messages if secure mode is enabled
+			if (this._options.secure) {
+				const { knxHeader, secureMessage } =
+					KNXProtocol.parseSecureMessage(msg)
+
+				switch (knxHeader.service_type) {
+					case KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE: {
+						const sessionAuth =
+							this._secureTunnel.handleSessionResponse(
+								secureMessage as SessionResponse,
+							)
+						if (sessionAuth) {
+							this.send(
+								sessionAuth,
+								undefined,
+								true,
+								this.getSeqNumber(),
+							)
+						}
+						return
+					}
+
+					case KNX_SECURE.SERVICE_TYPE.SESSION_STATUS: {
+						this._secureTunnel.handleSessionStatus(
+							secureMessage as SessionStatus,
+						)
+						return
+					}
+
+					case KNX_SECURE.SERVICE_TYPE.SECURE_WRAPPER: {
+						this._secureTunnel.handleSecureWrapper(
+							secureMessage as SecureWrapper,
+						)
+						return
+					}
+				}
+			}
+
+			// Standard message parsing
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(msg)
 
-			// Composing debug string
+			// Existing debug logging
 			sProcessInboundLog = `peerHost:${this._peerHost}:${this._peerPort}`
 			sProcessInboundLog += ` srcAddress: ${rinfo?.address}:${rinfo?.port}`
 			sProcessInboundLog += ` channelID:${this._channelID === null || this._channelID === undefined ? 'None' : this._channelID}`
@@ -1681,19 +1839,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					1000,
 				)
 			} else if (
-				knxHeader.service_type === KNX_CONSTANTS.TUNNELING_REQUEST
+				knxHeader.service_type === KNX_CONSTANTS.TUNNELLING_REQUEST
 			) {
-				const knxTunnelingRequest = knxMessage as KNXTunnelingRequest
-				if (knxTunnelingRequest.channelID !== this._channelID) {
+				const knxTunnellingRequest = knxMessage as KNXTunnellingRequest
+				if (knxTunnellingRequest.channelID !== this._channelID) {
 					this.sysLogger.debug(
-						`Received KNX packet: TUNNELING: L_DATA_IND, NOT FOR ME: MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnelingRequest.channelID} ReceivedPacketseqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+						`Received KNX packet: TUNNELLING: L_DATA_IND, NOT FOR ME: MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnellingRequest.channelID} ReceivedPacketseqCounter:${knxTunnellingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 					return
 				}
 				try {
-					const knxTunnelAck = KNXProtocol.newKNXTunnelingACK(
-						knxTunnelingRequest.channelID,
-						knxTunnelingRequest.seqCounter,
+					const knxTunnelAck = KNXProtocol.newKNXTunnellingACK(
+						knxTunnellingRequest.channelID,
+						knxTunnellingRequest.seqCounter,
 						KNX_CONSTANTS.E_NO_ERROR,
 					)
 					this.send(
@@ -1704,37 +1862,53 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)
 				} catch (error) {
 					this.sysLogger.error(
-						`Received KNX packet: TUNNELING: L_DATA_IND, ERROR BUILDING THE TUNNELINK ACK: ${error.message}`,
+						`Received KNX packet: TUNNELLING: L_DATA_IND, ERROR BUOLDING THE TUNNELINK ACK: ${error.message} MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnellingRequest.channelID} ReceivedPacketseqCounter:${knxTunnellingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 				}
 
 				if (
-					knxTunnelingRequest.cEMIMessage.msgCode ===
+					knxTunnellingRequest.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_IND
 				) {
+					// Composing debug string
+					let sDebugString = `Data: ${JSON.stringify(
+						knxTunnellingRequest.cEMIMessage.npdu,
+					)}`
+					sDebugString += ` srcAddress: ${knxTunnellingRequest.cEMIMessage.srcAddress.toString()}`
+					sDebugString += ` dstAddress: ${knxTunnellingRequest.cEMIMessage.dstAddress.toString()}`
+					this.sysLogger.debug(
+						`Received KNX packet: TUNNELLING: L_DATA_IND, ${sDebugString} ChannelID:${this._channelID} seqCounter:${knxTunnellingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+					)
+
 					this.emit(
 						KNXClientEvents.indication,
-						knxTunnelingRequest,
+						knxTunnellingRequest,
 						false,
 					)
 				} else if (
-					knxTunnelingRequest.cEMIMessage.msgCode ===
+					knxTunnellingRequest.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_CON
 				) {
 					this.sysLogger.debug(
-						`Received KNX packet: TUNNELING: L_DATA_CON, dont' care.`,
+						`Received KNX packet: TUNNELLING: L_DATA_CON, ChannelID:${this._channelID} seqCounter:${knxTunnellingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 				}
-			} else if (knxHeader.service_type === KNX_CONSTANTS.TUNNELING_ACK) {
-				const knxTunnelingAck = knxMessage as KNXTunnelingAck
-				if (knxTunnelingAck.channelID !== this._channelID) {
+			} else if (
+				knxHeader.service_type === KNX_CONSTANTS.TUNNELLING_ACK
+			) {
+				const knxTunnellingAck = knxMessage as KNXTunnellingAck
+				if (knxTunnellingAck.channelID !== this._channelID) {
 					return
 				}
+
+				this.sysLogger.debug(
+					`Received KNX packet: TUNNELLING: TUNNELLING_ACK, ChannelID:${this._channelID} seqCounter:${knxTunnellingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+				)
 
 				// Check the received ACK sequence number
 				if (!this._options.suppress_ack_ldatareq) {
 					if (
-						knxTunnelingAck.seqCounter ===
+						knxTunnellingAck.seqCounter ===
 						this.getCurrentItemHandledByTheQueue()
 					) {
 						this.clearTimer(KNXTimer.ACK)
@@ -1743,18 +1917,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						// 08/04/2022 Emits the event informing that the last ACK has been acknowledge.
 						this.emit(
 							KNXClientEvents.ackReceived,
-							knxTunnelingAck,
+							knxTunnellingAck,
 							true,
 						)
 						this.sysLogger.debug(
-							`Received KNX packet: TUNNELING: DELETED_TUNNELING_ACK FROM PENDING ACK's, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+							`Received KNX packet: TUNNELLING: DELETED_TUNNELLING_ACK FROM PENDING ACK's, ChannelID:${this._channelID} seqCounter:${knxTunnellingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 						)
 					} else {
 						// Inform that i received an ACK with an unexpected sequence number. It should be handled as error, but for now, only log.
 						this.sysLogger.error(
-							`Received KNX packet: TUNNELING: Unexpected Tunnel Ack with seqCounter = ${knxTunnelingAck.seqCounter}, expecting ${this.getSeqNumber()}`,
+							`Received KNX packet: TUNNELLING: Unexpected Tunnel Ack with seqCounter = ${knxTunnellingAck.seqCounter}, expecting ${this.getSeqNumber()}`,
 						)
-						// this.emit(KNXClientEvents.error, `Unexpected Tunnel Ack ${knxTunnelingAck.seqCounter}`);
+						// this.emit(KNXClientEvents.error, `Unexpected Tunnel Ack ${knxTunnellingAck.seqCounter}`);
 					}
 				} else {
 					this.clearToSend = true // I'm ready to send a new datagram now
@@ -1889,19 +2063,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 	}
 
-	private sendSecureSessionRequestMessage(cri: TunnelCRI) {
-		const oHPAI = new HPAI(
-			'0.0.0.0',
-			0,
-			this._options.hostProtocol === 'TunnelTCP'
-				? KNX_CONSTANTS.IPV4_TCP
-				: KNX_CONSTANTS.IPV4_UDP,
-		)
-		this.send(
-			KNXProtocol.newKNXSecureSessionRequest(cri, oHPAI),
-			undefined,
-			true,
-			this.getSeqNumber(),
-		)
+	private sendSecureTunnellingRequest(packet: KNXPacket): void {
+		if (this._secureTunnel?.isEstablished) {
+			this._secureTunnel.sendTunnellingRequest(
+				packet as KNXTunnellingRequest,
+			)
+		} else {
+			throw new Error('Secure tunnel not established')
+		}
 	}
 }
