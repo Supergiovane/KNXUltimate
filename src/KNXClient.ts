@@ -24,6 +24,14 @@ import KNXTunnellingAck from './protocol/KNXTunnellingAck'
 import KNXSearchResponse from './protocol/KNXSearchResponse'
 import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
 import { wait } from './utils'
+import { KNX_SECURE } from './secure/SecureConstants'
+import KNXSecureTunnelling from './secure/KNXSecureTunnelling'
+import SecureWrapper from './secure/messages/SecureWrapper'
+import {
+	SessionResponse,
+	SessionStatus,
+} from './secure/messages/SessionMessages'
+import { SecureSessionOptions } from './secure/SecureSession'
 
 export enum ConncetionState {
 	STARTED = 'STARTED',
@@ -77,6 +85,9 @@ export interface KNXClientEventCallbacks {
 	) => void
 	close: () => void
 	descriptionResponse: (packet: KNXDescriptionResponse) => void
+	secureSessionEstablished: () => void
+	secureSessionClosed: (reason: string) => void
+	secureTunnellingRequest: (req: KNXTunnellingRequest) => void
 }
 
 export type KNXClientOptions = {
@@ -104,6 +115,12 @@ export type KNXClientOptions = {
 	KNXQueueSendIntervalMilliseconds?: number
 	/** Enables sniffing mode to monitor KNX */
 	sniffingMode?: boolean
+	secure?: {
+		deviceAuthCode: string
+		userId: number
+		password: string
+		serialNumber: number
+	}
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
@@ -203,6 +220,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private lastSnifferRequest: number
 
+	private _secureTunnel: KNXSecureTunnelling
+
 	get udpSocket() {
 		if (this._clientSocket instanceof UDPSocket) {
 			return this._clientSocket
@@ -294,6 +313,53 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		} else {
 			this.createSocket()
 		}
+
+		if (this._options.secure) {
+			this.initSecureTunnel()
+		}
+	}
+
+	private initSecureTunnel() {
+		if (!this._options.secure) return
+
+		this._secureTunnel = new KNXSecureTunnelling({
+			deviceAuthCode: this._options.secure.deviceAuthCode,
+			userId: this._options.secure.userId,
+			password: this._options.secure.password,
+			serialNumber: this._options.secure.serialNumber,
+		})
+
+		// Gestione degli eventi del tunnel sicuro
+		this._secureTunnel.on('established', () => {
+			this._channelID = this._secureTunnel.getChannelId()
+			this._connectionState = ConncetionState.CONNECTED
+			this.emit(KNXClientEvents.connected, this._options)
+			this.startHeartBeat()
+		})
+
+		this._secureTunnel.on('error', (err: Error) => {
+			this.sysLogger.error(`Secure tunnel error: ${err.message}`)
+			this.emit(KNXClientEvents.error, err)
+		})
+
+		this._secureTunnel.on('closed', (reason: string) => {
+			this.sysLogger.debug(`Secure tunnel closed: ${reason}`)
+			this.setDisconnected(reason)
+		})
+
+		this._secureTunnel.on(
+			'tunnellingRequest',
+			(req: KNXTunnellingRequest) => {
+				this.sysLogger.debug(
+					`Received secure tunnelling request: ${req.toString()}`,
+				)
+				this.emit(KNXClientEvents.indication, req, false)
+			},
+		)
+
+		this._secureTunnel.on('send', (wrapper: SecureWrapper) => {
+			this.send(wrapper as any, undefined, true, 0) // Cast to any per compatibilità con il tipo KNXPacket
+		})
 	}
 
 	private createSocket() {
@@ -1202,39 +1268,85 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/**
-	 * Connect to the KNX bus
+	 * Connect to the KNX bus.
+	 * For secure connections, TCP is required and secure options must be provided
 	 */
 	Connect(knxLayer = TunnelTypes.TUNNEL_LINKLAYER) {
 		if (this._clientSocket === null) {
 			throw new Error('No client socket defined')
 		}
+
 		if (this._connectionState === ConncetionState.DISCONNECTING) {
 			throw new Error(
 				'Socket is disconnecting. Please wait until disconnected.',
 			)
 		}
+
 		if (this._connectionState === ConncetionState.CONNECTING) {
 			throw new Error(
 				'Socket is connecting. Please wait until connected.',
 			)
 		}
+
 		if (this._connectionState === ConncetionState.CONNECTED) {
 			throw new Error('Socket is already connected. Disconnect first.')
 		}
 
+		// Change state and reset counters
 		this._connectionState = ConncetionState.CONNECTING
-		this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
-		this.clearToSend = true // 26/12/2021 allow to send
+		this._numFailedTelegramACK = 0
+		this.clearToSend = true
 		this.clearTimer(KNXTimer.CONNECTION)
-		// Emit connecting
+
+		// Emit connecting event
 		this.emit(KNXClientEvents.connecting, this._options)
-		if (this._options.hostProtocol === 'TunnelUDP') {
-			// Unicast, need to explicitly create the connection
+
+		// Handle secure tunneling over TCP
+		if (
+			this._options.hostProtocol === 'TunnelTCP' &&
+			this._options.secure
+		) {
+			try {
+				// Configure TCP socket
+				;(this._clientSocket as TCPSocket).connect({
+					host: this._peerHost,
+					port: this._peerPort,
+				})
+
+				// Set connection timeout
+				this.setTimer(
+					KNXTimer.CONNECTION,
+					() => {
+						const timeoutError = new Error(
+							`Connection timeout to ${this._peerHost}:${this._peerPort}`,
+						)
+						this.emit(KNXClientEvents.error, timeoutError)
+					},
+					1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
+				)
+
+				// Initialize secure tunnel when TCP connects
+				this._clientSocket.once('connect', () => {
+					// Initialize secure tunnel if not already done
+					if (!this._secureTunnel) {
+						this.initSecureTunnel()
+					}
+
+					// Start secure session
+					const sessionRequest = this._secureTunnel.connect(knxLayer)
+					this.send(sessionRequest, undefined, true, 0)
+				})
+			} catch (error) {
+				this.emit(KNXClientEvents.error, error)
+				this._connectionState = ConncetionState.DISCONNECTED
+			}
+		}
+		// Handle UDP tunneling (non-secure)
+		else if (this._options.hostProtocol === 'TunnelUDP') {
+			// Set connection timeout
 			const timeoutError = new Error(
 				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
 			)
-			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
-			this._clientTunnelSeqNumber = -1
 			this.setTimer(
 				KNXTimer.CONNECTION,
 				() => {
@@ -1242,33 +1354,36 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 				1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
 			)
-			// 27/06/2023, leave some time to the dgram, to do the bind and read local ip and local port
+
+			// Reset sequence number and set awaiting response
+			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
+			this._clientTunnelSeqNumber = -1
+
+			// Send connect request after a short delay to allow socket binding
 			this.setTimer(
 				KNXTimer.CONNECT_REQUEST,
 				() => {
-					this.sendConnectRequestMessage(new TunnelCRI(knxLayer))
+					const cri = new TunnelCRI(knxLayer)
+					this.sendConnectRequestMessage(cri)
 				},
 				2000,
 			)
-		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			this.tcpSocket.connect(this._peerPort, this._peerHost, () => {
-				this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
-				this._clientTunnelSeqNumber = 0
-				// if (this._options.isSecureKNXEnabled)
-				// 	this.sendSecureSessionRequestMessage(
-				// 		new TunnelCRI(knxLayer),
-				// 	)
-			})
-		} else {
-			// Multicast
+		}
+		// Handle multicast (non-secure)
+		else if (this._options.hostProtocol === 'Multicast') {
+			// Multicast connections are immediately considered connected
 			this._connectionState = ConncetionState.CONNECTED
 
-			// 16/03/2022 These two are referring to tunnelling connection, but i set it here as well. Non si sa mai.
-			this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
-			this.clearToSend = true // 26/12/2021 allow to send
-
+			// Reset counters
+			this._numFailedTelegramACK = 0
+			this.clearToSend = true
 			this._clientTunnelSeqNumber = -1
+
 			this.emit(KNXClientEvents.connected, this._options)
+		} else {
+			throw new Error(
+				`Unsupported protocol: ${this._options.hostProtocol}`,
+			)
 		}
 	}
 
@@ -1528,9 +1643,55 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
 		let sProcessInboundLog = ''
 		try {
+			// Composing debug string
+			sProcessInboundLog = `Data received: ${msg.toString('hex')}`
+			sProcessInboundLog += ` srcAddress: ${JSON.stringify(rinfo)}`
+			this.sysLogger.debug(
+				`KNXEngine: processInboundMessage prior to processing: ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+			)
+
+			// Handle secure messages if secure mode is enabled
+			if (this._options.secure) {
+				const { knxHeader, secureMessage } =
+					KNXProtocol.parseSecureMessage(msg)
+
+				switch (knxHeader.service_type) {
+					case KNX_SECURE.SERVICE_TYPE.SESSION_RESPONSE: {
+						const sessionAuth =
+							this._secureTunnel.handleSessionResponse(
+								secureMessage as SessionResponse,
+							)
+						if (sessionAuth) {
+							this.send(
+								sessionAuth,
+								undefined,
+								true,
+								this.getSeqNumber(),
+							)
+						}
+						return
+					}
+
+					case KNX_SECURE.SERVICE_TYPE.SESSION_STATUS: {
+						this._secureTunnel.handleSessionStatus(
+							secureMessage as SessionStatus,
+						)
+						return
+					}
+
+					case KNX_SECURE.SERVICE_TYPE.SECURE_WRAPPER: {
+						this._secureTunnel.handleSecureWrapper(
+							secureMessage as SecureWrapper,
+						)
+						return
+					}
+				}
+			}
+
+			// Standard message parsing
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(msg)
 
-			// Composing debug string
+			// Existing debug logging
 			sProcessInboundLog = `peerHost:${this._peerHost}:${this._peerPort}`
 			sProcessInboundLog += ` srcAddress: ${rinfo?.address}:${rinfo?.port}`
 			sProcessInboundLog += ` channelID:${this._channelID === null || this._channelID === undefined ? 'None' : this._channelID}`
