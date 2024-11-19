@@ -12,6 +12,7 @@
     "url": "https://github.com/Supergiovane/KNXUltimate"
   },
   "scripts": {
+    "buildall": "npm run clean && npm run build && npm run buildexamples",
     "build": "tsc -p tsconfig.build.json",
     "buildexamples": "tsc -p tsconfig.examples.json",
     "lint": "eslint --ext .ts .",
@@ -20,7 +21,8 @@
     "test:coverage": "nyc npm run test",
     "test-connection": "",
     "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it",
-    "betarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it patch --preRelease=beta"
+    "betarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it patch --preRelease=beta",
+    "clean": "node -e \"require('fs').rmdirSync('build/', { recursive: true }); process.exit(0);\""
   },
   "release-it": {
     "github": {
