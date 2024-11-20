@@ -1,4 +1,6 @@
 // eslint-disable-next-line import/prefer-default-export
+import { performance } from 'perf_hooks'
+
 export function hasProp(obj: any, prop: string): boolean {
 	return Object.prototype.hasOwnProperty.call(obj, prop)
 }
@@ -83,9 +85,17 @@ export function getFloat(_value0: number, _value1: number) {
 	return parseFloat(ldexp(0.01 * mantissa, exponent).toPrecision(15))
 }
 
-export function wait(ms: number) {
-	return new Promise<void>((r) => {
-		setTimeout(r, ms)
+export function wait(ms: number): Promise<void> {
+	return new Promise<void>((resolve) => {
+		const start = performance.now()
+		function check() {
+			if (performance.now() - start >= ms) {
+				resolve()
+			} else {
+				setImmediate(check) // Not to block the event loop
+			}
+		}
+		check()
 	})
 }
 
