@@ -362,7 +362,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// this._clientSocket.removeAllListeners()
 			this.tcpSocket.on(SocketEvents.data, (data) => {
 				this.sysLogger.debug(
-					`[${getTimestamp()}] ` + 'Received message',
+					`[${getTimestamp()}] Received message`,
 					data,
 				)
 			})
