@@ -105,3 +105,13 @@ export function wait(ms: number): Promise<void> {
 export function round(value: number, decimals: number) {
 	return Number(`${Math.round(Number(`${value}e${decimals}`))}e-${decimals}`)
 }
+
+/**
+ * Get current timestamp. Used for debug level logging, at telegram's level.
+ */
+export function getTimestamp() {
+	const now = new Date()
+	const seconds = now.getSeconds().toString().padStart(2, '0') // Secondi con due cifre
+	const milliseconds = now.getMilliseconds().toString().padStart(3, '0') // Millisecondi con tre cifre
+	return `${seconds}.${milliseconds}`
+}

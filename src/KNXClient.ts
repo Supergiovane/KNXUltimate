@@ -23,7 +23,7 @@ import KNXHeader from './protocol/KNXHeader'
 import KNXTunnelingAck from './protocol/KNXTunnelingAck'
 import KNXSearchResponse from './protocol/KNXSearchResponse'
 import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
-import { wait } from './utils'
+import { wait, getTimestamp } from './utils'
 
 export enum ConncetionState {
 	STARTED = 'STARTED',
@@ -361,7 +361,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._clientSocket = new net.Socket()
 			// this._clientSocket.removeAllListeners()
 			this.tcpSocket.on(SocketEvents.data, (data) => {
-				this.sysLogger.debug('Received message', data)
+				this.sysLogger.debug(
+					`[${getTimestamp()}] ` + 'Received message',
+					data,
+				)
 			})
 			this.tcpSocket.on(SocketEvents.error, (error) => {
 				this.socketReady = false
@@ -466,9 +469,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const isSixBits: boolean = adpu.bitlength <= 6
 
 		this.sysLogger.debug(
-			`isSixBits:${isSixBits} Includes (should be = isSixBits):${[
-				1, 2, 3, 5, 9, 10, 11, 14, 18,
-			].includes(iDatapointType)} ADPU BitLength:${adpu.bitlength}`,
+			`[${getTimestamp()}] ` +
+				`isSixBits:${isSixBits} Includes (should be = isSixBits):${[
+					1, 2, 3, 5, 9, 10, 11, 14, 18,
+				].includes(iDatapointType)} ADPU BitLength:${adpu.bitlength}`,
 		)
 
 		const datapoint: IDataPoint = {
@@ -559,14 +563,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				sDebugString += ` knxHeader: ${_knxPacket.constructor.name}`
 				sDebugString += ` raw: ${JSON.stringify(_knxPacket)}`
 				this.sysLogger.debug(
-					`KNXEngine: <outgoing telegram>: ${sDebugString} `,
+					`[${getTimestamp()}] ` +
+						`KNXEngine: <outgoing telegram>: ${sDebugString} `,
 				)
 			} else if (
 				this.sysLogger.level === 'debug' &&
 				_knxPacket instanceof KNXTunnelingAck
 			) {
 				this.sysLogger.debug(
-					`KNXEngine: <outgoing telegram ACK>:${this.getKNXConstantName(_knxPacket.status)} channelID:${_knxPacket.channelID} seqCounter:${_knxPacket.seqCounter}`,
+					`[${getTimestamp()}] ` +
+						`KNXEngine: <outgoing telegram ACK>:${this.getKNXConstantName(_knxPacket.status)} channelID:${_knxPacket.channelID} seqCounter:${_knxPacket.seqCounter}`,
 				)
 			}
 			// End Prepare the debug log ************************
@@ -630,13 +636,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private async handleKNXQueue() {
 		if (this.queueLock) {
 			this.sysLogger.debug(
-				`KNXClient: handleKNXQueue: HandleQueue has called, but the queue loop is already running. Exit.`,
+				`[${getTimestamp()}] ` +
+					`KNXClient: handleKNXQueue: HandleQueue has called, but the queue loop is already running. Exit.`,
 			)
 			return
 		}
 
 		this.sysLogger.debug(
-			`KNXClient: handleKNXQueue: Start Processing queued KNX. Found ${this.commandQueue.length} telegrams in queue.`,
+			`[${getTimestamp()}] ` +
+				`KNXClient: handleKNXQueue: Start Processing queued KNX. Found ${this.commandQueue.length} telegrams in queue.`,
 		)
 
 		// lock the queue
@@ -646,21 +654,24 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		while (this.commandQueue.length > 0) {
 			if (!this.clearToSend) {
 				this.sysLogger.debug(
-					`KNXClient: handleKNXQueue: Clear to send is false. Pause processing queue.`,
+					`[${getTimestamp()}] ` +
+						`KNXClient: handleKNXQueue: Clear to send is false. Pause processing queue.`,
 				)
 				break
 			}
 
 			if (this.exitProcessingKNXQueueLoop) {
 				this.sysLogger.debug(
-					`KNXClient: handleKNXQueue: exitProcessingKNXQueueLoop is true. Exit processing queue loop`,
+					`[${getTimestamp()}] ` +
+						`KNXClient: handleKNXQueue: exitProcessingKNXQueueLoop is true. Exit processing queue loop`,
 				)
 				break
 			}
 
 			if (this.socketReady === false) {
 				this.sysLogger.debug(
-					`KNXClient: handleKNXQueue: Socket is not ready. Stop processing queue.`,
+					`[${getTimestamp()}] ` +
+						`KNXClient: handleKNXQueue: Socket is not ready. Stop processing queue.`,
 				)
 				break
 			}
@@ -686,7 +697,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.queueLock = false
 
 		this.sysLogger.debug(
-			`KNXClient: handleKNXQueue: End Processing queued KNX.`,
+			`[${getTimestamp()}] ` +
+				`KNXClient: handleKNXQueue: End Processing queued KNX.`,
 		)
 	}
 
@@ -728,7 +740,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.handleKNXQueue()
 
 		this.sysLogger.debug(
-			`KNXClient: <added telegram to queue> queueLength:${this.commandQueue.length} priority:${_priority} type:${this.getKNXConstantName(toBeAdded.knxPacket.type)} channelID:${toBeAdded.ACK?.channelID || 'filled later'} seqCounter:${toBeAdded.ACK?.seqCounter || 'filled later'}`,
+			`[${getTimestamp()}] ` +
+				`KNXClient: <added telegram to queue> queueLength:${this.commandQueue.length} priority:${_priority} type:${this.getKNXConstantName(toBeAdded.knxPacket.type)} channelID:${toBeAdded.ACK?.channelID || 'filled later'} seqCounter:${toBeAdded.ACK?.seqCounter || 'filled later'}`,
 		)
 	}
 
@@ -1350,7 +1363,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		if (this._channelID === null) {
 			// 11/10/2022 Close the socket
 			this.sysLogger.debug(
-				`KNXClient: into Disconnect(), channel id is not defined so skip disconnect packet and close socket`,
+				`[${getTimestamp()}] ` +
+					`KNXClient: into Disconnect(), channel id is not defined so skip disconnect packet and close socket`,
 			)
 			await this.closeSocket()
 			return
@@ -1387,7 +1401,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private async setDisconnected(_sReason = '') {
 		this.sysLogger.debug(
-			`KNXClient: called _setDisconnected ${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
+			`[${getTimestamp()}] ` +
+				`KNXClient: called _setDisconnected ${this._options.ipAddr}:${this._options.ipPort} ${_sReason}`,
 		)
 		this._connectionState = ConncetionState.DISCONNECTED
 
@@ -1558,7 +1573,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			sProcessInboundLog += ` knxHeader:${JSON.stringify(knxHeader)} knxMessage:${JSON.stringify(knxMessage)}`
 			sProcessInboundLog += ` raw: ${msg.toString('hex')}`
 			this.sysLogger.debug(
-				`KNXEngine: <incoming telegram>: ${sProcessInboundLog} `,
+				`[${getTimestamp()}] ` +
+					`KNXEngine: <incoming telegram>: ${sProcessInboundLog} `,
 			)
 
 			if (this._options.sniffingMode) {
@@ -1611,7 +1627,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					knxMessage as KNXDescriptionResponse
 
 				this.sysLogger.debug(
-					`Received KNX packet: TUNNELING: DESCRIPTION_RESPONSE, ChannelID:${this._channelID} DescriptionResponse:${JSON.stringify(knxDescriptionResponse)} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+					`[${getTimestamp()}] ` +
+						`Received KNX packet: TUNNELING: DESCRIPTION_RESPONSE, ChannelID:${this._channelID} DescriptionResponse:${JSON.stringify(knxDescriptionResponse)} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 				)
 				this.emit(
 					KNXClientEvents.descriptionResponse,
@@ -1691,7 +1708,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				const knxTunnelingRequest = knxMessage as KNXTunnelingRequest
 				if (knxTunnelingRequest.channelID !== this._channelID) {
 					this.sysLogger.debug(
-						`Received KNX packet: TUNNELING: L_DATA_IND, NOT FOR ME: MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnelingRequest.channelID} ReceivedPacketseqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+						`[${getTimestamp()}] ` +
+							`Received KNX packet: TUNNELING: L_DATA_IND, NOT FOR ME: MyChannelID:${this._channelID} ReceivedPacketChannelID: ${knxTunnelingRequest.channelID} ReceivedPacketseqCounter:${knxTunnelingRequest.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 					)
 					return
 				}
@@ -1727,7 +1745,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					CEMIConstants.L_DATA_CON
 				) {
 					this.sysLogger.debug(
-						`Received KNX packet: TUNNELING: L_DATA_CON, dont' care.`,
+						`[${getTimestamp()}] ` +
+							`Received KNX packet: TUNNELING: L_DATA_CON, dont' care.`,
 					)
 				}
 			} else if (knxHeader.service_type === KNX_CONSTANTS.TUNNELING_ACK) {
@@ -1752,7 +1771,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							true,
 						)
 						this.sysLogger.debug(
-							`Received KNX packet: TUNNELING: DELETED_TUNNELING_ACK FROM PENDING ACK's, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+							`[${getTimestamp()}] ` +
+								`Received KNX packet: TUNNELING: DELETED_TUNNELING_ACK FROM PENDING ACK's, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 						)
 					} else {
 						// Inform that i received an ACK with an unexpected sequence number. It should be handled as error, but for now, only log.
@@ -1779,7 +1799,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					CEMIConstants.L_DATA_CON
 				) {
 					this.sysLogger.debug(
-						`Received KNX packet: ROUTING: L_DATA_CON, don't care.`,
+						`[${getTimestamp()}] ` +
+							`Received KNX packet: ROUTING: L_DATA_CON, don't care.`,
 					)
 				}
 			} else {
@@ -1789,7 +1810,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						KNX_CONSTANTS.CONNECTIONSTATE_RESPONSE
 					) {
 						this.sysLogger.debug(
-							`Received KNX packet: CONNECTIONSTATE_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
+							`[${getTimestamp()}] ` +
+								`Received KNX packet: CONNECTIONSTATE_RESPONSE, ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}`,
 						)
 
 						const knxConnectionStateResponse =
