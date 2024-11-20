@@ -1190,8 +1190,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Returns an array of "search_responses" from the KNX interfaces in the format of a KNX descriptionResponse
 	 */
 	public static async getGatewayDescription(
-		ipAddr,
-		ipPort,
+		ipAddr: string,
+		ipPort: string,
 		eth?: string | number,
 		timeout = 5000,
 	) {
