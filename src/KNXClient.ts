@@ -1157,7 +1157,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const discovered: string[] = []
 
 		client.on(KNXClientEvents.discover, (host, header, searchResponse) => {
-			discovered.push(`${host}:${searchResponse.deviceInfo?.name ?? ''}`)
+			discovered.push(
+				`${host}:${searchResponse.deviceInfo?.name.replace(/:/g, ' ') ?? ''}:${searchResponse.deviceInfo?.formattedAddress ?? ''}`,
+			)
 		})
 
 		client.startDiscovery()
