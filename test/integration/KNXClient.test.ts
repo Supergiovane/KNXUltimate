@@ -204,15 +204,20 @@ describe('KNXClient Tests', () => {
 			})
 
 			// Handle successful discoveries
-			client.on(KNXClientEvents.discover, (host) => {
-				discovered.push(host)
-			})
+			client.on(
+				KNXClientEvents.discover,
+				(host, header, searchResponse) => {
+					discovered.push(
+						`${host}:${searchResponse.deviceInfo?.name.replace(/:/g, ' ') ?? ''}:${searchResponse.deviceInfo?.formattedAddress ?? ''}`,
+					)
+				},
+			)
 
 			// Advance virtual time instead of waiting
 			await clock.tickAsync(50)
 
 			// Verify discovery results
-			const expectedHost = `${MockKNXServer.host}:${MockKNXServer.port}`
+			const expectedHost = `${MockKNXServer.host}:${MockKNXServer.port}:KNX IP Secure Bridge:10.15.1`
 			assert.equal(discovered[0], expectedHost, 'Discovery should work')
 
 			await client.Disconnect()
