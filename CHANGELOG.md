@@ -1,5 +1,18 @@
 
 
+# [4.1.0-beta.1](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.6...v4.1.0-beta.1) (2024-11-21)
+
+
+### Bug Fixes
+
+* better checks of socket ready state ([#39](https://github.com/Supergiovane/KNXUltimate/issues/39)) ([92a2172](https://github.com/Supergiovane/KNXUltimate/commit/92a2172968e93ab75b22e76429f87e934b8d8979))
+* fixed base beta release ([c9dfa79](https://github.com/Supergiovane/KNXUltimate/commit/c9dfa79d5d9abbe3d1bb023bfbab74a902a011c2))
+
+
+### Features
+
+* device info in "discover", added KNXClient.getGatewayDescription ([#40](https://github.com/Supergiovane/KNXUltimate/issues/40)) ([fede7fd](https://github.com/Supergiovane/KNXUltimate/commit/fede7fd81d86b817dca44e2aaf4489de17ead511)), closes [/github.com/Supergiovane/KNXUltimate/pull/40#discussion_r1850563396](https://github.com//github.com/Supergiovane/KNXUltimate/pull/40/issues/discussion_r1850563396)
+
 # [4.0.0-beta.6](https://github.com/Supergiovane/KNXUltimate/compare/v4.0.0-beta.5...v4.0.0-beta.6) (2024-11-18)
 
 
