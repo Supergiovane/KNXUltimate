@@ -539,41 +539,39 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private processKnxPacketQueueItem(_knxPacket: KNXPacket): Promise<boolean> {
 		return new Promise((resolve) => {
 			// Prepare the debug log ************************
-			if (
-				this.sysLogger.level === 'debug' &&
-				(_knxPacket instanceof KNXTunnelingRequest ||
-					_knxPacket instanceof KNXRoutingIndication)
-			) {
-				// Composing debug string
-				let sTPCI = ''
-				if (_knxPacket.cEMIMessage.npdu.isGroupRead) {
-					sTPCI = 'Read'
+			if (this.sysLogger.level === 'debug') {
+				if (
+					_knxPacket instanceof KNXTunnelingRequest ||
+					_knxPacket instanceof KNXRoutingIndication
+				) {
+					// Composing debug string
+					let sTPCI = ''
+					if (_knxPacket.cEMIMessage.npdu.isGroupRead) {
+						sTPCI = 'Read'
+					}
+					if (_knxPacket.cEMIMessage.npdu.isGroupResponse) {
+						sTPCI = 'Response'
+					}
+					if (_knxPacket.cEMIMessage.npdu.isGroupWrite) {
+						sTPCI = 'Write'
+					}
+					let sDebugString = ''
+					sDebugString = `peerHost:${this._peerHost}:${this._peerPort}`
+					sDebugString += ` dstAddress: ${_knxPacket.cEMIMessage.dstAddress.toString()}`
+					sDebugString += ` channelID:${this._channelID === null || this._channelID === undefined ? 'None' : this._channelID}`
+					sDebugString += ` npdu: ${sTPCI}`
+					sDebugString += ` knxHeader: ${_knxPacket.constructor.name}`
+					sDebugString += ` raw: ${JSON.stringify(_knxPacket)}`
+					this.sysLogger.debug(
+						`[${getTimestamp()}] ` +
+							`KNXEngine: <outgoing telegram>: ${sDebugString} `,
+					)
+				} else if (_knxPacket instanceof KNXTunnelingAck) {
+					this.sysLogger.debug(
+						`[${getTimestamp()}] ` +
+							`KNXEngine: <outgoing telegram ACK>:${this.getKNXConstantName(_knxPacket.status)} channelID:${_knxPacket.channelID} seqCounter:${_knxPacket.seqCounter}`,
+					)
 				}
-				if (_knxPacket.cEMIMessage.npdu.isGroupResponse) {
-					sTPCI = 'Response'
-				}
-				if (_knxPacket.cEMIMessage.npdu.isGroupWrite) {
-					sTPCI = 'Write'
-				}
-				let sDebugString = ''
-				sDebugString = `peerHost:${this._peerHost}:${this._peerPort}`
-				sDebugString += ` dstAddress: ${_knxPacket.cEMIMessage.dstAddress.toString()}`
-				sDebugString += ` channelID:${this._channelID === null || this._channelID === undefined ? 'None' : this._channelID}`
-				sDebugString += ` npdu: ${sTPCI}`
-				sDebugString += ` knxHeader: ${_knxPacket.constructor.name}`
-				sDebugString += ` raw: ${JSON.stringify(_knxPacket)}`
-				this.sysLogger.debug(
-					`[${getTimestamp()}] ` +
-						`KNXEngine: <outgoing telegram>: ${sDebugString} `,
-				)
-			} else if (
-				this.sysLogger.level === 'debug' &&
-				_knxPacket instanceof KNXTunnelingAck
-			) {
-				this.sysLogger.debug(
-					`[${getTimestamp()}] ` +
-						`KNXEngine: <outgoing telegram ACK>:${this.getKNXConstantName(_knxPacket.status)} channelID:${_knxPacket.channelID} seqCounter:${_knxPacket.seqCounter}`,
-				)
 			}
 			// End Prepare the debug log ************************
 
