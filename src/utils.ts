@@ -1,6 +1,3 @@
-// eslint-disable-next-line import/prefer-default-export
-import { setTimeout as pleaseWait } from 'timers/promises'
-
 export function hasProp(obj: any, prop: string): boolean {
 	return Object.prototype.hasOwnProperty.call(obj, prop)
 }
@@ -102,6 +99,8 @@ export function getTimestamp() {
 	return `${seconds}.${milliseconds}`
 }
 
-export async function wait(ms: number) {
-	return pleaseWait(ms)
+export function wait(ms: number) {
+	return new Promise<void>((r) => {
+		setTimeout(r, ms)
+	})
 }
