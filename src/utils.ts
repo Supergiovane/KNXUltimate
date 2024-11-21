@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/prefer-default-export
 export function hasProp(obj: any, prop: string): boolean {
 	return Object.prototype.hasOwnProperty.call(obj, prop)
 }
@@ -83,15 +82,25 @@ export function getFloat(_value0: number, _value1: number) {
 	return parseFloat(ldexp(0.01 * mantissa, exponent).toPrecision(15))
 }
 
-export function wait(ms: number) {
-	return new Promise<void>((r) => {
-		setTimeout(r, ms)
-	})
-}
-
 /**
  * Round a number to a given number of decimals
  */
 export function round(value: number, decimals: number) {
 	return Number(`${Math.round(Number(`${value}e${decimals}`))}e-${decimals}`)
+}
+
+/**
+ * Get current timestamp. Used for debug level logging, at telegram's level.
+ */
+export function getTimestamp() {
+	const now = new Date()
+	const seconds = now.getSeconds().toString().padStart(2, '0') // Secondi con due cifre
+	const milliseconds = now.getMilliseconds().toString().padStart(3, '0') // Millisecondi con tre cifre
+	return `${seconds}.${milliseconds}`
+}
+
+export function wait(ms: number) {
+	return new Promise<void>((r) => {
+		setTimeout(r, ms)
+	})
 }

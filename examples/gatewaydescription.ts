@@ -17,12 +17,12 @@ async function initClient() {
 	for (let index = 0; index < knxGateways.length; index++) {
 
 		const element = knxGateways[index];
-		const [ip, port] = element.split(':')
-		console.log('Gathering info of', ip,port)
+		const [ip, port, name] = element.split(':')
+		console.log('Gathering info of', ip,port,name)
 		
 		const descriptionsJSON = await KNXClient.getGatewayDescription(ip,port,5000)
 		if(descriptionsJSON.length === 0) {
-			console.log('No description found found for this device.')
+			console.log('No description found for this device.')
 		}
 
 		for (let index = 0; index < descriptionsJSON.length; index++) {
