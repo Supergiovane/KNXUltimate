@@ -13,7 +13,7 @@ import * as ipAddressHelper from './util/ipAddressHelper'
 import KNXAddress from './protocol/KNXAddress'
 import KNXDataBuffer, { IDataPoint } from './protocol/KNXDataBuffer'
 import * as DPTLib from './dptlib'
-import KnxLog, { KNXLoggerOptions } from './KnxLog'
+import KnxLog, { KNXLogger, LogLevel, module as createLogger } from './KnxLog'
 import { KNXDescriptionResponse, KNXPacket } from './protocol'
 import KNXRoutingIndication from './protocol/KNXRoutingIndication'
 import KNXConnectRequest from './protocol/KNXConnectRequest'
@@ -110,7 +110,11 @@ export type KNXClientOptions = {
 	KNXQueueSendIntervalMilliseconds?: number
 	/** Enables sniffing mode to monitor KNX */
 	sniffingMode?: boolean
-} & KNXLoggerOptions
+	/** Log level */
+	loglevel?: LogLevel
+	/** Set Prefix for logs */
+	setPrefix?: string
+}
 
 const optionsDefaults: KNXClientOptions = {
 	physAddr: '15.15.200',
@@ -193,7 +197,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _clientSocket: UDPSocket | TCPSocket
 
-	private sysLogger: any
+	private sysLogger: KNXLogger
 
 	private jKNXSecureKeyring: any
 
@@ -253,9 +257,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		this.sniffingPackets = []
 
-		this.sysLogger = KnxLog.get({
-			loglevel: this._options.loglevel,
-		})
+		this.sysLogger = createLogger(this._options.setPrefix || 'KNXEngine')
 
 		this._channelID = null
 		this._connectionState = ConncetionState.DISCONNECTED
