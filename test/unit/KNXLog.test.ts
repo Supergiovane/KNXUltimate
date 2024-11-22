@@ -29,6 +29,7 @@ describe('KNX Logger Functionality Tests', async () => {
 		const logger1 = createLogger('Logger1')
 		const logger2 = createLogger('Logger2')
 
+		setLogLevel('error')
 		setLogLevel('debug')
 
 		assert.strictEqual(logger1.level, 'debug')
@@ -43,12 +44,41 @@ describe('KNX Logger Functionality Tests', async () => {
 		)
 	})
 
-	it('should handle error objects', () => {
+	it('should handle error objects and format stack traces correctly', () => {
 		const logger = createLogger('TestLogger')
 		const error = new Error('Test error')
-		assert.doesNotThrow(() => {
-			logger.error('Error occurred', error)
-		})
+
+		let capturedOutput = ''
+		const originalStderrWrite = process.stderr.write
+		process.stderr.write = (str: string) => {
+			capturedOutput = str
+			return true
+		}
+
+		try {
+			assert.doesNotThrow(() => {
+				logger.error('Error message', error)
+			})
+
+			assert.ok(
+				capturedOutput.includes('Test error'),
+				'Should include error message',
+			)
+			assert.ok(
+				capturedOutput.includes('Error message'),
+				'Should include custom message',
+			)
+			assert.ok(
+				capturedOutput.includes(error.stack!),
+				'Should include full stack trace',
+			)
+			assert.ok(
+				capturedOutput.includes('\n'),
+				'Stack trace should be on new line',
+			)
+		} finally {
+			process.stderr.write = originalStderrWrite
+		}
 	})
 
 	it('should handle null and undefined values', () => {
