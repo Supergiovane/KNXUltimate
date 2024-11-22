@@ -1,4 +1,5 @@
 import winston, { Container, Logform, Logger, transport } from 'winston'
+import { PassThrough } from 'stream'
 
 const { format, transports, addColors } = winston
 const { combine, timestamp, label, printf, colorize, splat } = format
@@ -8,6 +9,8 @@ const colorizer = colorize()
 const MODULES = process.env.LOG_MODULES
 	? process.env.LOG_MODULES.split(',').map((m) => m.trim().toUpperCase())
 	: null
+
+export const logStream = new PassThrough({ objectMode: true })
 
 export interface KNXLogger extends Logger {
 	module: string
@@ -76,6 +79,10 @@ export function customTransports(moduleName: string): transport[] {
 			format: combine(...formats),
 			level: process.env.LOG_LEVEL || 'info',
 			stderrLevels: ['error'],
+		}),
+		new winston.transports.Stream({
+			stream: logStream,
+			format: combine(...formats),
 		}),
 	]
 
