@@ -17,7 +17,7 @@ export interface KNXLoggerContainer extends winston.Container {
 	loggers: Map<string, KNXLogger>
 }
 
-export type LogLevel = 'disable' | 'error' | 'warn' | 'info' | 'debug'
+export type LogLevel = 'disable' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
 
 // Custom colors
 addColors({
