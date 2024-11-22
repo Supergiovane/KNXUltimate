@@ -1,8 +1,10 @@
 import KNXDataBuffer from '../KNXDataBuffer'
 import CEMIConstants from './CEMIConstants'
-import KnxLog from '../../KnxLog'
+import { module } from '../../KnxLog'
 
 // 08/04/2021 new logger to adhere to the loglevel selected in the config-window
+
+const logger = module('NPDU')
 
 export default class NPDU {
 	private _tpci: number
@@ -141,7 +143,7 @@ export default class NPDU {
 	}
 
 	static createFromBuffer(buffer: Buffer, offset: number = 0): NPDU {
-		const sysLogger = KnxLog.get()
+		const sysLogger = logger
 		if (offset > buffer.length) {
 			sysLogger.error(
 				'NPDU: createFromBuffer: offset out of buffer range ',

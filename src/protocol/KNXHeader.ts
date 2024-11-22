@@ -1,6 +1,8 @@
 import { Buffer } from 'buffer'
 import { KNX_CONSTANTS } from './KNXConstants'
-import KnxLog from '../KnxLog'
+import { module } from '../KnxLog'
+
+const logger = module('KNXHeader')
 
 export default class KNXHeader {
 	private _headerLength: number
@@ -28,7 +30,7 @@ export default class KNXHeader {
 
 	static createFromBuffer(buffer: Buffer, offset: number = 0): KNXHeader {
 		// 08/04/2021 new logger to adhere to the loglevel selected in the config-window
-		const sysLogger = KnxLog.get()
+		const sysLogger = logger
 		if (buffer.length < KNX_CONSTANTS.HEADER_SIZE_10) {
 			sysLogger.error(
 				`KNXHeader: createFromBuffer: incomplete buffer. Buffer length: ${buffer.length} expected HEADER_SIZE_10 equals to ${KNX_CONSTANTS.HEADER_SIZE_10}`,

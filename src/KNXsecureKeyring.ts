@@ -113,7 +113,7 @@
 //   }
 
 // https://support.knx.org/hc/it/articles/360001582259-Usare-keyring-al-di-fuori-di-ETS-Falcon-SDK
-import KnxLog from './KnxLog'
+import { module } from './KnxLog'
 import xml2js from 'xml2js'
 import CryptoJS from 'crypto-js'
 import { hasProp } from './utils'
@@ -122,6 +122,8 @@ const keyringSalt = '1.keyring.ets.knx.org'
 
 // Class returned by the keyring function after the load
 const _retJson: any = {}
+
+const logger = module('keyring')
 
 let signature: string = ''
 let createdHash: string = ''
@@ -166,7 +168,7 @@ const keyring = (function () {
 			})
 			return secretKey.toString(CryptoJS.enc.Base64)
 		} catch (error) {
-			KnxLog.get().error(`pbkdf2WithHmacSha256 ${error.message}`)
+			logger.error(`pbkdf2WithHmacSha256 ${error.message}`)
 			throw error
 		}
 	}
@@ -190,7 +192,7 @@ const keyring = (function () {
 		try {
 			return await pbkdf2WithHmacSha256(keyringPwd, keyringSalt)
 		} catch (error) {
-			KnxLog.get().error(`hashKeyringPwd ${error.message}`)
+			logger.error(`hashKeyringPwd ${error.message}`)
 			throw error
 		}
 	}
@@ -224,7 +226,7 @@ const keyring = (function () {
 
 				resolve(CryptoJS.enc.Hex.stringify(decrypted))
 			} catch (error) {
-				KnxLog.get().error(`aes128Cbc ${error}`)
+				logger.error(`aes128Cbc ${error}`)
 				reject(error)
 			}
 		})
@@ -464,7 +466,7 @@ const keyring = (function () {
 			created = jSonXMLKeyringFile.Keyring.$.Created
 			_retJson.ETSCreated = created
 		} catch (error) {
-			KnxLog.get().error(`load ${error.message}`)
+			logger.error(`load ${error.message}`)
 			throw error
 		}
 
@@ -473,24 +475,24 @@ const keyring = (function () {
 			passwordHash = await hashKeyringPwd(_keyringPassword)
 			_retJson.HASHkeyringPasswordBase64 = passwordHash
 		} catch (error) {
-			KnxLog.get().error(`passwordHash ${error.message}`)
+			logger.error(`passwordHash ${error.message}`)
 			throw new Error(`passwordHash ${error.message}`)
 		}
 		// Get the hash from the created tac
 		createdHash = await sha256(created)
 		_retJson.HASHCreatedBase64 = createdHash
-		KnxLog.get().debug(`createdHash ${createdHash}`) // OK !!!
+		logger.debug(`createdHash ${createdHash}`) // OK !!!
 
 		// Get the signature from the KEYRING attribute
 		signature = jSonXMLKeyringFile.Keyring.$.Signature.toString('base64')
-		KnxLog.get().debug(`signature ${signature}`) // OK !!!
+		logger.debug(`signature ${signature}`) // OK !!!
 
 		if (_keyringPassword.length > 0) {
 			try {
 				await verifySignature(passwordHash)
-				KnxLog.get().debug('verifySignature OK')
+				logger.debug('verifySignature OK')
 			} catch (error) {
-				KnxLog.get().error(
+				logger.error(
 					`signature verification failed for keyring ${_keyringPassword}`,
 				)
 				throw new Error('The password is wrong')
@@ -510,7 +512,7 @@ const keyring = (function () {
 				),
 			}
 		} catch (error) {
-			KnxLog.get().error(`KNX-Secure: Backbone details ${error.message}`)
+			logger.error(`KNX-Secure: Backbone details ${error.message}`)
 			throw new Error(`KNX-Secure: Backbone details ${error.message}`)
 		}
 
@@ -559,9 +561,7 @@ const keyring = (function () {
 				}
 			}
 		} catch (error) {
-			KnxLog.get().error(
-				`KNX-Secure: Interfaces details ${error.message}`,
-			)
+			logger.error(`KNX-Secure: Interfaces details ${error.message}`)
 			throw new Error(`KNX-Secure: Interfaces details ${error.message}`)
 		}
 
@@ -595,9 +595,7 @@ const keyring = (function () {
 				}
 			}
 		} catch (error) {
-			KnxLog.get().error(
-				`KNX-Secure: GroupAddres details ${error.message}`,
-			)
+			logger.error(`KNX-Secure: GroupAddres details ${error.message}`)
 			throw new Error(`KNX-Secure: GroupAddres details ${error.message}`)
 		}
 
@@ -668,7 +666,7 @@ const keyring = (function () {
 				}
 			}
 		} catch (error) {
-			KnxLog.get().error(`KNX-Secure: Devices details ${error.message}`)
+			logger.error(`KNX-Secure: Devices details ${error.message}`)
 			throw new Error(`KNX-Secure: Devices details ${error.message}`)
 		}
 		return _retJson
