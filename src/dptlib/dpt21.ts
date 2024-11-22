@@ -23,7 +23,7 @@ const config: DatapointConfig = {
 	id: 'DPT21',
 	formatAPDU: (value) => {
 		if (!value) {
-			logger.error('DPT21: cannot write null value')
+			logger.error('cannot write null value')
 			return null
 		}
 		if (
@@ -50,14 +50,14 @@ const config: DatapointConfig = {
 			return Buffer.from([bitVal])
 		}
 		logger.error(
-			'DPT21: Must supply a right payload: {outOfService:true-false, fault:true-false, overridden:true-false, inAlarm:true-false, alarmUnAck:true-false}',
+			'Must supply a right payload: {outOfService:true-false, fault:true-false, overridden:true-false, inAlarm:true-false, alarmUnAck:true-false}',
 		)
 		return null
 	},
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
-			logger.error('DPT21: Buffer should be 8 bit long, got', buf.length)
+			logger.error('Buffer should be 8 bit long, got', buf.length)
 			return null
 		}
 		const sBit = Array.from(

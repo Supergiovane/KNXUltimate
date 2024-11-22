@@ -32,7 +32,7 @@ const config: DatapointConfig = {
 	id: 'DPT18',
 	formatAPDU: (value) => {
 		if (!value) {
-			logger.warn('DPT18: cannot write null value')
+			logger.warn('cannot write null value')
 			return null
 		}
 		const apdu_data = Buffer.alloc(1)
@@ -42,7 +42,7 @@ const config: DatapointConfig = {
 			hasProp(value, 'scenenumber')
 		) {
 			if (value.scenenumber - 1 > 64 || value.scenenumber - 1 < 1) {
-				logger.error('DPT18: scenenumber must between 1 and 64')
+				logger.error('scenenumber must between 1 and 64')
 				return null
 			}
 			const sSceneNumberbinary = ((value.scenenumber - 1) >>> 0).toString(
@@ -54,9 +54,7 @@ const config: DatapointConfig = {
 			apdu_data[0] = parseInt(sVal, 2) // 0b10111111;
 			return apdu_data
 		}
-		logger.error(
-			'DPT18: Must supply a value object of {save_recall, scenenumber}',
-		)
+		logger.error('Must supply a value object of {save_recall, scenenumber}')
 		return null
 
 		return null
@@ -64,7 +62,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
-			logger.error('DP18: Buffer should be 1 byte long, got', buf.length)
+			logger.error('Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		const sBit = parseInt(buf.toString('hex').toUpperCase(), 16)

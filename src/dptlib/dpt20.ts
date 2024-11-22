@@ -26,7 +26,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
-			logger.warn('DPT20: Buffer should be 1 byte long, got', buf.length)
+			logger.warn('Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		const ret = buf.readUInt8(0)

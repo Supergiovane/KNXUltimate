@@ -34,7 +34,7 @@ const config: DatapointConfig = {
 	// Read from BUS
 	fromBuffer(buf) {
 		if (buf.length !== 14) {
-			logger.error('DPT6: Buffer should be 14 byte long, got', buf.length)
+			logger.error('Buffer should be 14 byte long, got', buf.length)
 			return null
 		}
 		if (this.subtypeid === '001') return buf.toString('latin1')

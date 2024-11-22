@@ -24,7 +24,7 @@ const config: DatapointConfig = {
 	id: 'DPT237',
 	formatAPDU: (value) => {
 		if (!value) {
-			logger.error('DPT237: cannot write null value')
+			logger.error('cannot write null value')
 		} else {
 			let apdu_data
 			if (
@@ -39,9 +39,7 @@ const config: DatapointConfig = {
 				value.daliAddress <= 64
 			) {
 			} else {
-				logger.error(
-					'DPT237: Must supply an valid payload. See the WIKI.',
-				)
+				logger.error('Must supply an valid payload. See the WIKI.')
 			}
 
 			// LSB
@@ -65,10 +63,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 2) {
-			logger.error(
-				'DPT237: Buffer should be 2 byte long, got',
-				buf.length,
-			)
+			logger.error('Buffer should be 2 byte long, got', buf.length)
 			return null
 		}
 

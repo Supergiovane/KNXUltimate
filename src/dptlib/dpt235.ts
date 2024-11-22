@@ -52,10 +52,10 @@ const config: DatapointConfig = {
 				return apdu_data
 			}
 			logger.error(
-				'DPT235: Must supply a payload like, for example: {activeElectricalEnergy:1540, tariff:20, validityTariff:true, validityEnergy:true}',
+				'Must supply a payload like, for example: {activeElectricalEnergy:1540, tariff:20, validityTariff:true, validityEnergy:true}',
 			)
 		} catch (error) {
-			logger.error(`DPT235: exports.formatAPDU error ${error.message}`)
+			logger.error(`exports.formatAPDU error ${error.message}`)
 		}
 		return null
 	},
@@ -76,7 +76,7 @@ const config: DatapointConfig = {
 				validityEnergy,
 			}
 		} catch (error) {
-			logger.error(`DPT235: exports.fromBuffer error ${error.message}`)
+			logger.error(`exports.fromBuffer error ${error.message}`)
 		}
 		return null
 	},

@@ -58,7 +58,7 @@ const config: DatapointConfig = {
 			return apdu_data
 		}
 		logger.error(
-			'DPT213: Must supply a payload like, for example: {Comfort:21, Standby:20, Economy:14, BuildingProtection:8}',
+			'Must supply a payload like, for example: {Comfort:21, Standby:20, Economy:14, BuildingProtection:8}',
 		)
 		return null
 	},
@@ -67,7 +67,7 @@ const config: DatapointConfig = {
 	fromBuffer(buf) {
 		if (buf.length !== 8) {
 			logger.warn(
-				'DPT213.fromBuffer: buf should be 4x2 bytes long (got %d bytes)',
+				'fromBuffer: buf should be 4x2 bytes long (got %d bytes)',
 				buf.length,
 			)
 			return null

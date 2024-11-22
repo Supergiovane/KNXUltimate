@@ -16,7 +16,7 @@ const config: DatapointConfig = {
 	id: 'DPT232',
 	formatAPDU: (value) => {
 		if (!value) {
-			logger.error('DPT232: cannot write null value')
+			logger.error('cannot write null value')
 			return null
 		}
 		if (
@@ -38,17 +38,14 @@ const config: DatapointConfig = {
 			])
 		}
 		logger.error(
-			'DPT232: Must supply an value {red:0-255, green:0-255, blue:0-255}',
+			'Must supply an value {red:0-255, green:0-255, blue:0-255}',
 		)
 		return null
 	},
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 3) {
-			logger.error(
-				'DPT232: Buffer should be 3 byte long, got',
-				buf.length,
-			)
+			logger.error('Buffer should be 3 byte long, got', buf.length)
 			return null
 		}
 		const ret = { red: buf[0], green: buf[1], blue: buf[2] }

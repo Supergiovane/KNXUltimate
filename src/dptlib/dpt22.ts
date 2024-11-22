@@ -45,7 +45,7 @@ const config: DatapointConfig = {
 		// Send to BUS
 		const apdu_data = Buffer.alloc(2)
 		if (!value) {
-			logger.error('DPT232: cannot write null value')
+			logger.error('cannot write null value')
 			return null
 		}
 		if (typeof value === 'object') {
@@ -72,7 +72,7 @@ const config: DatapointConfig = {
 			if (!hasProp(value, 'OverheatAlarm')) value.OverheatAlarm = false
 			if (!hasProp(value, 'reserved')) value.reserved = true
 		} else {
-			logger.error('DPT22: Must supply a correct payload. See wiki.')
+			logger.error('Must supply a correct payload. See wiki.')
 			return null
 		}
 		let firstHex = ''
@@ -112,7 +112,7 @@ const config: DatapointConfig = {
 	fromBuffer: (buf) => {
 		// RX from BUS
 		if (buf.length !== 2) {
-			logger.warn('DPT22: Buffer should be 2 bytes long, got', buf.length)
+			logger.warn('Buffer should be 2 bytes long, got', buf.length)
 			return null
 		}
 		const byte1 = reverseString(buf[1].toString(2).padStart(8, '0')).split(

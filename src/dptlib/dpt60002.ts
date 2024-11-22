@@ -74,7 +74,7 @@ const config: DatapointConfig = {
 	id: 'DPT60002',
 	formatAPDU(value: ShutterValue): Buffer {
 		if (!value) {
-			logger.error('DPT60002: cannot write null value')
+			logger.error('cannot write null value')
 			return null
 		}
 
@@ -89,7 +89,7 @@ const config: DatapointConfig = {
 			apduData = (mode << 2) + position
 		} else {
 			logger.error(
-				'DPT60002: Must supply a value {mode: "normal"|"priority"|"wind|alarm"|"rain|alarm"|"disabled", position: "intermediate"|"top"|"bottom"}',
+				'Must supply a value {mode: "normal"|"priority"|"wind|alarm"|"rain|alarm"|"disabled", position: "intermediate"|"top"|"bottom"}',
 			)
 		}
 		return Buffer.from([apduData])
@@ -97,9 +97,7 @@ const config: DatapointConfig = {
 
 	fromBuffer(buf: Buffer): ShutterValue {
 		if (buf.length !== 1) {
-			logger.error(
-				`DPT60002: Buffer should be 1 byte long, got ${buf.length}`,
-			)
+			logger.error(`Buffer should be 1 byte long, got ${buf.length}`)
 			return null
 		}
 

@@ -13,7 +13,7 @@ const config: DatapointConfig = {
 	id: 'DPT3',
 	formatAPDU: (value: { decr_incr: number; data: number }) => {
 		if (!value) {
-			logger.warn('DPT3: cannot write null value')
+			logger.warn('cannot write null value')
 			return null
 		}
 
@@ -32,7 +32,7 @@ const config: DatapointConfig = {
 	},
 	fromBuffer: (buf: Buffer) => {
 		if (buf.length !== 1) {
-			logger.error('DPT3: Buffer should be 1 byte long, got', buf.length)
+			logger.error('Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		return {

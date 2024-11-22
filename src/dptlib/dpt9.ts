@@ -19,7 +19,7 @@ const config: DatapointConfig = {
 		const apdu_data = Buffer.alloc(2)
 		value = Number(value) // Expect a number
 		if (!isFinite(value)) {
-			logger.warn('DPT9: cannot write non-numeric or undefined value')
+			logger.warn('cannot write non-numeric or undefined value')
 		} else {
 			value = round(value, 2) // Fix issue with float having too many decimals.
 			const arr = frexp(value)
@@ -46,7 +46,7 @@ const config: DatapointConfig = {
 	fromBuffer: (buf) => {
 		if (buf.length !== 2) {
 			logger.warn(
-				'DPT9.fromBuffer: buf should be 2 bytes long (got %d bytes)',
+				'fromBuffer: buf should be 2 bytes long (got %d bytes)',
 				buf.length,
 			)
 			return null

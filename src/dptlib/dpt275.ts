@@ -39,7 +39,7 @@ const config: DatapointConfig = {
 			])
 		}
 		logger.error(
-			'DPT275.formatAPDU: Must supply all values, for example {comfort:22, standby:21.5, economy:21, buildingProtection:15}',
+			'formatAPDU: Must supply all values, for example {comfort:22, standby:21.5, economy:21, buildingProtection:15}',
 		)
 		return null
 	},
@@ -47,7 +47,7 @@ const config: DatapointConfig = {
 		// Get the telegram from the KNX bus and create a javascript object.
 		if (buf.length !== 8) {
 			logger.warn(
-				'DPT275.fromBuffer: buf should be 8 bytes long (got %d bytes)',
+				'fromBuffer: buf should be 8 bytes long (got %d bytes)',
 				buf.length,
 			)
 			return null

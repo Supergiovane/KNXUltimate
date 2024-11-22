@@ -28,11 +28,7 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 	for (const iface in interfaces) {
 		for (const intf of interfaces[iface]) {
 			try {
-				logger.debug(
-					'ipAddressHelper.js: parsing interface: %s (%j)',
-					iface,
-					intf,
-				)
+				logger.debug('parsing interface: %s (%j)', iface, intf)
 				if (
 					intf.family !== undefined &&
 					(intf.family.toString().includes('4') ||
@@ -40,21 +36,21 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 					!intf.internal
 				) {
 					logger.debug(
-						'ipAddressHelper.js: Found suitable interface: %s (%j)',
+						'Found suitable interface: %s (%j)',
 						iface,
 						intf,
 					)
 					candidateInterfaces[iface] = intf
 				} else {
 					logger.debug(
-						'ipAddressHelper.js: Found NOT suitable interface: %s (%j)',
+						'Found NOT suitable interface: %s (%j)',
 						iface,
 						intf,
 					)
 				}
 			} catch (error) {
 				logger.error(
-					'ipAddressHelper.js: getIPv4Interfaces: error parsing the interface %s (%j)',
+					'getIPv4Interfaces: error parsing the interface %s (%j)',
 					iface,
 					intf,
 				)
@@ -66,13 +62,13 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 }
 
 export function getLocalAddress(_interface = ''): string {
-	logger.debug('ipAddressHelper.js: getLocalAddress: getting interfaces')
+	logger.debug('getLocalAddress: getting interfaces')
 
 	const candidateInterfaces = getIPv4Interfaces()
 	if (_interface !== '') {
 		if (!hasProp(candidateInterfaces, _interface)) {
 			logger.error(
-				`ipAddressHelper.js: exports.getLocalAddress: Interface ${_interface} not found or has no useful IPv4 address!`,
+				`exports.getLocalAddress: Interface ${_interface} not found or has no useful IPv4 address!`,
 			)
 			throw Error(
 				`Interface ${_interface} not found or has no useful IPv4 address!`,

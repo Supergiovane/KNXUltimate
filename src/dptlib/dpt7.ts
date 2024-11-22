@@ -17,11 +17,11 @@ const config: DatapointConfig = {
 	formatAPDU: (value) => {
 		const apdu_data = Buffer.alloc(2)
 		if (!isFinite(value)) {
-			logger.warn('DPT7: cannot write non-numeric or undefined value')
+			logger.warn('cannot write non-numeric or undefined value')
 		} else {
 			if (value < 0 || value > 65535) {
 				logger.warn(
-					'DPT7: value must be between 0 and 65535. Auto adjousting.',
+					'value must be between 0 and 65535. Auto adjousting.',
 				)
 				if (value < 0) value = 0
 				if (value > 65535) value = 65535
@@ -35,7 +35,7 @@ const config: DatapointConfig = {
 	fromBuffer: (buf) => {
 		if (buf.length !== 2) {
 			logger.warn(
-				'DPT7.fromBuffer: buf should be 2 bytes long (got %d bytes)',
+				'fromBuffer: buf should be 2 bytes long (got %d bytes)',
 				buf.length,
 			)
 			return null

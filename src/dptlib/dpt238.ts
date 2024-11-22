@@ -18,18 +18,13 @@ const config: DatapointConfig = {
 	formatAPDU: (value) => {
 		const apdu_data = Buffer.alloc(1)
 		apdu_data[0] = value
-		logger.debug(
-			`dpt238.js : input value = ${value}   apdu_data = ${apdu_data}`,
-		)
+		logger.debug(`input value = ${value}   apdu_data = ${apdu_data}`)
 		return apdu_data
 	},
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
-			logger.error(
-				'DPT238: Buffer should be 1 byte long, got',
-				buf.length,
-			)
+			logger.error('Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		const ret = buf[0]

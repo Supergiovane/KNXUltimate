@@ -263,7 +263,7 @@ const config: DatapointConfig = {
 	id: 'DPT60001',
 	formatAPDU(value) {
 		if (!value) {
-			logger.error('DPT60001: cannot write null value')
+			logger.error('cannot write null value')
 			return null
 		}
 
@@ -289,7 +289,7 @@ const config: DatapointConfig = {
 		}
 
 		logger.error(
-			'DPT60001: Must supply an value {command:"operation code", data:["localoperation", "long up"], sectors:[159]}',
+			'Must supply an value {command:"operation code", data:["localoperation", "long up"], sectors:[159]}',
 		)
 
 		return null

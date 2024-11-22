@@ -12,21 +12,21 @@ const config: DatapointConfig = {
 	id: 'DPT4',
 	formatAPDU: (value: string) => {
 		if (!value) {
-			logger.warn('DPT4: cannot write null value')
+			logger.warn('cannot write null value')
 		} else {
 			if (typeof value === 'string') {
 				const apdu_data = value.charCodeAt(0)
 				if (apdu_data > 255)
-					logger.warn('DPT4: must supply an ASCII character')
+					logger.warn('must supply an ASCII character')
 				return Buffer.from([apdu_data])
 			}
-			logger.warn('DPT4: Must supply a character or string')
+			logger.warn('Must supply a character or string')
 		}
 		return null
 	},
 	fromBuffer: (buf: Buffer) => {
 		if (buf.length !== 1) {
-			logger.warn('DPT4: Buffer should be 1 byte long, got', buf.length)
+			logger.warn('Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		return String.fromCharCode(buf[0])

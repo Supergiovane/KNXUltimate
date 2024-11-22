@@ -25,7 +25,7 @@ const config: DatapointConfig = {
 	id: 'DPT242',
 	formatAPDU(value) {
 		if (!value) {
-			logger.error('DPT242: cannot write null value')
+			logger.error('cannot write null value')
 		} else {
 			if (
 				typeof value === 'object' &&
@@ -44,7 +44,7 @@ const config: DatapointConfig = {
 				// noop
 			} else {
 				logger.error(
-					'DPT242: Must supply an value {x:0-65535, y:0-65535, brightness:0-100, isColorValid:true/false, isBrightnessValid:true/false}',
+					'Must supply an value {x:0-65535, y:0-65535, brightness:0-100, isColorValid:true/false, isBrightnessValid:true/false}',
 				)
 			}
 
@@ -75,10 +75,7 @@ const config: DatapointConfig = {
 
 	fromBuffer(buf) {
 		if (buf.length !== 6) {
-			logger.error(
-				'DPT242: Buffer should be 6 bytes long, got',
-				buf.length,
-			)
+			logger.error('Buffer should be 6 bytes long, got', buf.length)
 			return null
 		}
 		const bufTotale = buf.toString('hex')

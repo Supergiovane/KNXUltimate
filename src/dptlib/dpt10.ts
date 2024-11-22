@@ -36,7 +36,7 @@ const config: DatapointConfig = {
 						minute = parseInt(match[2])
 						second = parseInt(match[3])
 					} else {
-						logger.warn('DPT10: invalid time format (%s)', value)
+						logger.warn('invalid time format (%s)', value)
 					}
 				}
 				break
@@ -67,10 +67,7 @@ const config: DatapointConfig = {
 	// If day of week is 0, then the KNX device has not sent this optional value (Supergiovane)
 	fromBuffer: (buf) => {
 		if (buf.length !== 3) {
-			logger.error(
-				'DPT10: Buffer should be 3 bytes long, got',
-				buf.length,
-			)
+			logger.error('Buffer should be 3 bytes long, got', buf.length)
 			return null
 		}
 		const d = new Date()
@@ -97,7 +94,7 @@ const config: DatapointConfig = {
 			d.setSeconds(seconds)
 		} else {
 			logger.warn(
-				'DPT10: buffer %j (decoded as %d:%d:%d) is not a valid time',
+				'buffer %j (decoded as %d:%d:%d) is not a valid time',
 				buf,
 				hours,
 				minutes,

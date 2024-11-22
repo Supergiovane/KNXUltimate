@@ -13,7 +13,7 @@ const config: DatapointConfig = {
 	id: 'DPT2',
 	formatAPDU: (value: { priority: boolean; data: boolean }) => {
 		if (!value) {
-			logger.error('DPT2: cannot write null value')
+			logger.error('cannot write null value')
 			return null
 		}
 		let apdu_data
@@ -25,12 +25,12 @@ const config: DatapointConfig = {
 			apdu_data = ((value.priority ? 1 : 0) << 1) | (value.data ? 1 : 0)
 			return Buffer.from([apdu_data])
 		}
-		logger.error('DPT2: Must supply a value {priority:<bool>, data:<bool>}')
+		logger.error('Must supply a value {priority:<bool>, data:<bool>}')
 		return null
 	},
 	fromBuffer: (buf: Buffer) => {
 		if (buf.length !== 1) {
-			logger.error('DPT2: Buffer should be 1 byte long, got', buf.length)
+			logger.error('Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		return {

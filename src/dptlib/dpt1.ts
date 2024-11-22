@@ -22,7 +22,7 @@ const config: DatapointConfig = {
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
 			logger.warn(
-				'DPT1.fromBuffer: buf should be 1 byte (got %d bytes)',
+				'fromBuffer: buf should be 1 byte (got %d bytes)',
 				buf.length,
 			)
 			return null

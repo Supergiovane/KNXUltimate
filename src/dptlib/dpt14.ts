@@ -14,13 +14,13 @@ import { module } from '../KnxLog'
  *  the case for 32-bit floating point is simple...
  */
 
-const logger = module('DPT12')
+const logger = module('DPT14')
 
 const config: DatapointConfig = {
 	id: 'DPT14',
 	formatAPDU: (value) => {
 		if (!value || typeof value !== 'number') {
-			logger.error('DPT14: Must supply a number value. Will emit 0')
+			logger.error('Must supply a number value. Will emit 0')
 			value = 0
 		}
 
@@ -31,7 +31,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 4) {
-			logger.warn('DPT14: Buffer should be 4 bytes long, got', buf.length)
+			logger.warn('Buffer should be 4 bytes long, got', buf.length)
 			return null
 		}
 		return buf.readFloatBE(0)

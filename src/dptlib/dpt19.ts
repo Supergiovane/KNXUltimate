@@ -18,7 +18,7 @@ const config: DatapointConfig = {
 	id: 'DPT19',
 	formatAPDU: (value) => {
 		if (typeof value !== 'object' || value.constructor.name !== 'Date') {
-			logger.error('DPT19: Must supply a Date object')
+			logger.error('Must supply a Date object')
 			return null
 		}
 		// Sunday is 0 in Javascript, but 7 in KNX.
@@ -39,7 +39,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 8) {
-			logger.warn('DPT19: Buffer should be 8 bytes long, got', buf.length)
+			logger.warn('Buffer should be 8 bytes long, got', buf.length)
 			return null
 		}
 		const d = new Date(
