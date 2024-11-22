@@ -1386,8 +1386,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		if (this._options.sniffingMode) {
-			console.log('Sniffing mode is enabled. Dumping sniffing buffers...')
-			console.log(this.sniffingPackets)
+			this.sysLogger.info(
+				'Sniffing mode is enabled. Dumping sniffing buffers...',
+			)
+			this.sysLogger.info(this.sniffingPackets)
 		}
 	}
 
