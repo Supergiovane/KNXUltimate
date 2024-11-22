@@ -19,6 +19,17 @@ export interface KNXLoggerContainer extends winston.Container {
 
 export type LogLevel = 'disable' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
 
+export type KNXLoggerOptions = {
+	loglevel?: LogLevel
+	setPrefix?: string
+}
+
+export function setLogLevel(level: LogLevel) {
+	logContainer.loggers.forEach((logger) => {
+		logger.level = level
+	})
+}
+
 // Custom colors
 addColors({
 	time: 'grey',
