@@ -5,7 +5,8 @@
 
 import { hasProp } from '../utils'
 import type { DatapointConfig } from '.'
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
+import logger from 'node-color-log'
 
 //
 // DPT232: 3-byte RGB color array
@@ -15,7 +16,7 @@ const config: DatapointConfig = {
 	id: 'DPT232',
 	formatAPDU: (value) => {
 		if (!value) {
-			Log.get().error('DPT232: cannot write null value')
+			logger.error('DPT232: cannot write null value')
 			return null
 		}
 		if (
@@ -36,7 +37,7 @@ const config: DatapointConfig = {
 				Math.floor(value.blue),
 			])
 		}
-		Log.get().error(
+		logger.error(
 			'DPT232: Must supply an value {red:0-255, green:0-255, blue:0-255}',
 		)
 		return null
@@ -44,7 +45,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 3) {
-			Log.get().error(
+			logger.error(
 				'DPT232: Buffer should be 3 byte long, got',
 				buf.length,
 			)

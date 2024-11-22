@@ -3,7 +3,7 @@
  * (C) 2020-2022 Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 
 //
@@ -13,6 +13,8 @@ import type { DatapointConfig } from '.'
 const timeRegexp = /(\d{1,2}):(\d{1,2}):(\d{1,2})/
 // DPTFrame to parse a DPT10 frame.
 // Always 8-bit aligned.
+
+const logger = module('DPT10')
 
 const config: DatapointConfig = {
 	id: 'DPT10',
@@ -34,15 +36,13 @@ const config: DatapointConfig = {
 						minute = parseInt(match[2])
 						second = parseInt(match[3])
 					} else {
-						Log.get().warn('DPT10: invalid time format (%s)', value)
+						logger.warn('DPT10: invalid time format (%s)', value)
 					}
 				}
 				break
 			case 'object':
 				if (value.constructor.name !== 'Date') {
-					Log.get().warn(
-						'Must supply a Date or String for DPT10 time',
-					)
+					logger.warn('Must supply a Date or String for DPT10 time')
 					break
 				}
 			// eslint-disable-next-line no-fallthrough
@@ -67,7 +67,7 @@ const config: DatapointConfig = {
 	// If day of week is 0, then the KNX device has not sent this optional value (Supergiovane)
 	fromBuffer: (buf) => {
 		if (buf.length !== 3) {
-			Log.get().error(
+			logger.error(
 				'DPT10: Buffer should be 3 bytes long, got',
 				buf.length,
 			)
@@ -96,7 +96,7 @@ const config: DatapointConfig = {
 			d.setMinutes(minutes)
 			d.setSeconds(seconds)
 		} else {
-			Log.get().warn(
+			logger.warn(
 				'DPT10: buffer %j (decoded as %d:%d:%d) is not a valid time',
 				buf,
 				hours,

@@ -3,15 +3,17 @@
  * (C) 2020-2022 Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import { hasProp } from '../utils'
 import type { DatapointConfig } from '.'
+
+const logger = module('DPT3')
 
 const config: DatapointConfig = {
 	id: 'DPT3',
 	formatAPDU: (value: { decr_incr: number; data: number }) => {
 		if (!value) {
-			Log.get().warn('DPT3: cannot write null value')
+			logger.warn('DPT3: cannot write null value')
 			return null
 		}
 
@@ -24,16 +26,13 @@ const config: DatapointConfig = {
 			apdu_data[0] =
 				((value.decr_incr ? 1 : 0) << 3) | (value.data & 0b00000111)
 		} else {
-			Log.get().error('Must supply a value object of {decr_incr, data}')
+			logger.error('Must supply a value object of {decr_incr, data}')
 		}
 		return apdu_data
 	},
 	fromBuffer: (buf: Buffer) => {
 		if (buf.length !== 1) {
-			Log.get().error(
-				'DPT3: Buffer should be 1 byte long, got',
-				buf.length,
-			)
+			logger.error('DPT3: Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		return {

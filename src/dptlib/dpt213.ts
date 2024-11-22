@@ -3,7 +3,7 @@
  * (C) 2020 Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 import { hasProp, getHex, getFloat } from '../utils'
 
@@ -13,6 +13,9 @@ import { hasProp, getHex, getFloat } from '../utils'
 
 // 07/01/2021 Supergiovane
 // Send to BUS
+
+const logger = module('DPT213')
+
 const config: DatapointConfig = {
 	id: 'DPT213',
 	formatAPDU(value) {
@@ -54,7 +57,7 @@ const config: DatapointConfig = {
 			apdu_data[7] = ArrBuildingProtection[1]
 			return apdu_data
 		}
-		Log.get().error(
+		logger.error(
 			'DPT213: Must supply a payload like, for example: {Comfort:21, Standby:20, Economy:14, BuildingProtection:8}',
 		)
 		return null
@@ -63,7 +66,7 @@ const config: DatapointConfig = {
 	// RX from BUS
 	fromBuffer(buf) {
 		if (buf.length !== 8) {
-			Log.get().warn(
+			logger.warn(
 				'DPT213.fromBuffer: buf should be 4x2 bytes long (got %d bytes)',
 				buf.length,
 			)

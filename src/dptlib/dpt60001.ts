@@ -1,9 +1,11 @@
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
+
+const logger = module('DPT60001')
 
 function toRadix(value: number, radix: number) {
 	if (!Number.isSafeInteger(value)) {
-		Log.get().error('value must be a safe integer')
+		logger.error('value must be a safe integer')
 	}
 
 	const digits = Math.ceil(64 / Math.log2(radix))
@@ -162,7 +164,7 @@ function griesserCommandToCommandCode(command: string) {
 		case 'operation code':
 			return 5
 		default:
-			Log.get().error(`not implemented yet: ${command}`)
+			logger.error(`not implemented yet: ${command}`)
 			return null
 	}
 }
@@ -184,7 +186,7 @@ function griesserCommandToCommandCodeP1(command: string) {
 		case 'long-short down':
 			return 134
 		default:
-			Log.get().error(`unknown command: ${command}`)
+			logger.error(`unknown command: ${command}`)
 			return null
 	}
 }
@@ -261,7 +263,7 @@ const config: DatapointConfig = {
 	id: 'DPT60001',
 	formatAPDU(value) {
 		if (!value) {
-			Log.get().error('DPT60001: cannot write null value')
+			logger.error('DPT60001: cannot write null value')
 			return null
 		}
 
@@ -286,7 +288,7 @@ const config: DatapointConfig = {
 			return bufferTotal
 		}
 
-		Log.get().error(
+		logger.error(
 			'DPT60001: Must supply an value {command:"operation code", data:["localoperation", "long up"], sectors:[159]}',
 		)
 
@@ -296,7 +298,7 @@ const config: DatapointConfig = {
 	// RX from BUS
 	fromBuffer(buf) {
 		if (buf.length !== 6) {
-			Log.get().warn(
+			logger.warn(
 				'DPTGriesser.fromBuffer: buf should be 6 bytes long (got %d bytes)',
 				buf.length,
 			)

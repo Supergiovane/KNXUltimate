@@ -3,31 +3,30 @@
  * (C) 2020-2022 Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
+
+const logger = module('DPT4')
 
 const config: DatapointConfig = {
 	id: 'DPT4',
 	formatAPDU: (value: string) => {
 		if (!value) {
-			Log.get().warn('DPT4: cannot write null value')
+			logger.warn('DPT4: cannot write null value')
 		} else {
 			if (typeof value === 'string') {
 				const apdu_data = value.charCodeAt(0)
 				if (apdu_data > 255)
-					Log.get().warn('DPT4: must supply an ASCII character')
+					logger.warn('DPT4: must supply an ASCII character')
 				return Buffer.from([apdu_data])
 			}
-			Log.get().warn('DPT4: Must supply a character or string')
+			logger.warn('DPT4: Must supply a character or string')
 		}
 		return null
 	},
 	fromBuffer: (buf: Buffer) => {
 		if (buf.length !== 1) {
-			Log.get().warn(
-				'DPT4: Buffer should be 1 byte long, got',
-				buf.length,
-			)
+			logger.warn('DPT4: Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		return String.fromCharCode(buf[0])

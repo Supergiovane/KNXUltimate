@@ -4,18 +4,21 @@
  */
 
 import type { DatapointConfig } from '.'
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 
 //
 // DPT20: 1-byte HVAC
 //
 // FIXME: help needed
+
+const logger = module('DPT20')
+
 const config: DatapointConfig = {
 	id: 'DPT20',
 	formatAPDU: (value) => {
 		const apdu_data = Buffer.alloc(1)
 		apdu_data[0] = value
-		Log.get().debug(
+		logger.debug(
 			`./knx/src/dpt20.js : input value = ${value}   apdu_data = ${apdu_data}`,
 		)
 		return apdu_data
@@ -23,14 +26,10 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
-			Log.get().warn(
-				'DPT20: Buffer should be 1 byte long, got',
-				buf.length,
-			)
+			logger.warn('DPT20: Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		const ret = buf.readUInt8(0)
-		// Log.get().debug('               dpt20.js   fromBuffer : ' + ret);
 		return ret
 	},
 

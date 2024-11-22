@@ -3,7 +3,7 @@
  *  Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 import { hasProp, hex2bin } from '../utils'
 
@@ -13,6 +13,9 @@ import { hasProp, hex2bin } from '../utils'
 
 // 08/09/2020 Supergiovane
 // Send to BUS
+
+const logger = module('DPT235')
+
 const config: DatapointConfig = {
 	id: 'DPT235',
 	formatAPDU(value) {
@@ -48,11 +51,11 @@ const config: DatapointConfig = {
 				apdu_data[5] = validity
 				return apdu_data
 			}
-			Log.get().error(
+			logger.error(
 				'DPT235: Must supply a payload like, for example: {activeElectricalEnergy:1540, tariff:20, validityTariff:true, validityEnergy:true}',
 			)
 		} catch (error) {
-			Log.get().error(`DPT235: exports.formatAPDU error ${error.message}`)
+			logger.error(`DPT235: exports.formatAPDU error ${error.message}`)
 		}
 		return null
 	},
@@ -73,7 +76,7 @@ const config: DatapointConfig = {
 				validityEnergy,
 			}
 		} catch (error) {
-			Log.get().error(`DPT235: exports.fromBuffer error ${error.message}`)
+			logger.error(`DPT235: exports.fromBuffer error ${error.message}`)
 		}
 		return null
 	},

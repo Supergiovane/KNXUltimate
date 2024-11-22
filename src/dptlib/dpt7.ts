@@ -7,18 +7,20 @@
 // DPT7: 16-bit unsigned integer value
 //
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
+
+const logger = module('DPT7')
 
 const config: DatapointConfig = {
 	id: 'DPT7',
 	formatAPDU: (value) => {
 		const apdu_data = Buffer.alloc(2)
 		if (!isFinite(value)) {
-			Log.get().warn('DPT7: cannot write non-numeric or undefined value')
+			logger.warn('DPT7: cannot write non-numeric or undefined value')
 		} else {
 			if (value < 0 || value > 65535) {
-				Log.get().warn(
+				logger.warn(
 					'DPT7: value must be between 0 and 65535. Auto adjousting.',
 				)
 				if (value < 0) value = 0
@@ -32,7 +34,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 2) {
-			Log.get().warn(
+			logger.warn(
 				'DPT7.fromBuffer: buf should be 2 bytes long (got %d bytes)',
 				buf.length,
 			)

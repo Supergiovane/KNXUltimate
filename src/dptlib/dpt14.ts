@@ -4,7 +4,7 @@
  */
 
 import type { DatapointConfig } from '.'
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 
 //
 // DPT14.*: 4-byte floating point value
@@ -13,11 +13,14 @@ import Log from '../KnxLog'
 /* In sharp contrast to DPT9 (16-bit floating point - JS spec does not support),
  *  the case for 32-bit floating point is simple...
  */
+
+const logger = module('DPT12')
+
 const config: DatapointConfig = {
 	id: 'DPT14',
 	formatAPDU: (value) => {
 		if (!value || typeof value !== 'number') {
-			Log.get().error('DPT14: Must supply a number value. Will emit 0')
+			logger.error('DPT14: Must supply a number value. Will emit 0')
 			value = 0
 		}
 
@@ -28,10 +31,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 4) {
-			Log.get().warn(
-				'DPT14: Buffer should be 4 bytes long, got',
-				buf.length,
-			)
+			logger.warn('DPT14: Buffer should be 4 bytes long, got', buf.length)
 			return null
 		}
 		return buf.readFloatBE(0)

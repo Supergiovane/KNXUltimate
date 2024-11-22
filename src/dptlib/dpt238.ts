@@ -3,7 +3,7 @@
  * (C) 2020-2022 Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 
 //
@@ -11,12 +11,14 @@ import type { DatapointConfig } from '.'
 //
 // DPT5 is the only (AFAIK) DPT with scalar datatypes (5.001 and 5.003)
 
+const logger = module('DPT238')
+
 const config: DatapointConfig = {
 	id: 'DPT238',
 	formatAPDU: (value) => {
 		const apdu_data = Buffer.alloc(1)
 		apdu_data[0] = value
-		Log.get().debug(
+		logger.debug(
 			`dpt238.js : input value = ${value}   apdu_data = ${apdu_data}`,
 		)
 		return apdu_data
@@ -24,7 +26,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
-			Log.get().error(
+			logger.error(
 				'DPT238: Buffer should be 1 byte long, got',
 				buf.length,
 			)

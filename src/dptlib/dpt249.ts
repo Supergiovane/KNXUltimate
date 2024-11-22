@@ -3,7 +3,7 @@
  *  Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 import { hasProp, hex2bin } from '../utils'
 
@@ -11,11 +11,14 @@ import { hasProp, hex2bin } from '../utils'
 // DPT249: 3-byte RGB xyY
 // The info about validity of Colour and Brighness are omitted.
 //
+
+const logger = module('DPT249')
+
 const config: DatapointConfig = {
 	id: 'DPT249',
 	formatAPDU(value) {
 		if (!value) {
-			Log.get().error('DPT249: cannot write null value')
+			logger.error('DPT249: cannot write null value')
 			return null
 		}
 		if (
@@ -33,7 +36,7 @@ const config: DatapointConfig = {
 		) {
 			// noop
 		} else {
-			Log.get().error(
+			logger.error(
 				'DPT249: Must supply an value, for example {transitionTime:100, colourTemperature:1000, absoluteBrightness:80, isTimePeriodValid:true, isAbsoluteColourTemperatureValid:true, isAbsoluteBrightnessValid:true}',
 			)
 			return null
@@ -66,7 +69,7 @@ const config: DatapointConfig = {
 	},
 	fromBuffer(buf) {
 		if (buf.length !== 6) {
-			Log.get().error(
+			logger.error(
 				'DPT249: Buffer should be 6 bytes long, got',
 				buf.length,
 			)
