@@ -54,13 +54,14 @@ describe('KNX Logger Functionality Tests', async () => {
 
 		const data = await new Promise<any>((resolve) => {
 			logStream.once('data', resolve)
-			logger.error('Error message', error)
+			const prefixMessage = 'Error message'
+			logger.error(prefixMessage, error)
 		})
 
 		const fullMessage = data[Symbol.for('message')]
 
 		assert.ok(
-			fullMessage.includes('Test error'),
+			fullMessage.includes(error.message),
 			'Should include error message',
 		)
 		assert.ok(
