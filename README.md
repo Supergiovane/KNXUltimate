@@ -99,15 +99,16 @@ List of events raised by KNXultimate, in proper order. For the signatures, pleas
 
 ## LOG STREAM
 
-KNXUltimate provides a PassThrough stream for intercepting log messages. The stream can be imported from the KnxLog module.
+
+KNXUltimate logging is managed by [Winston](https://github.com/winstonjs/winston) logger. In case you want to intercept library logs you can use our `logStram` exported from default entrypoint. Example:
 ```typescript
-import { logStream, module, setLogLevel } from 'knxultimate/KnxLog'
+import { logStream } from 'knxultimate'  
 
-// Create a logger instance with a custom module name
-const logger = module('YOUR-MODULE-NAME')
-
-// Set log level
-setLogLevel('debug')
+logStream.on('data', (log) => {  
+    // handle log  
+    if(log.level === 'ERROR)  
+        console.log(`${log.timestamp} ${log.message}`)  
+}) 
 ```
 
 | Field                          | Description                                                   |
