@@ -1,8 +1,30 @@
-import { KNXClient, KNXClientEvents } from '../src'
+import { KNXClient, KNXClientEvents, logStream } from '../src'
 import { module, setLogLevel } from '../src/KnxLog'
 import { wait } from '../src/utils'
+import { Writable } from 'stream'
+import * as fs from 'fs'
 
 const logger = module('KNX-TEST')
+
+const logFileStream = new Writable({
+    objectMode: true,
+    write(chunk, encoding, callback) {
+        const formattedLog = `${chunk.timestamp} [${chunk.level}] ${chunk.label}: ${chunk.message}\n`
+        fs.appendFile('knx-test.log', formattedLog, (err) => {
+            if (err) {
+                logger.error('Error writing to log file:', err)
+                callback(err)
+                return
+            }
+            callback()
+        })
+    }
+})
+
+logStream.pipe(logFileStream)
+    .on('error', (error) => {
+        logger.error('Stream error:', error)
+    })
 
 async function testKNXClient() {
     setLogLevel('debug')
@@ -18,10 +40,12 @@ async function testKNXClient() {
         ', Total capture time: ' + TOTAL_CAPTURE_TIME/1000 + ' seconds')
     
     logger.info('Discovering KNX interfaces...')
+    
     const discovered = await KNXClient.discover();
 
     if (discovered.length === 0) {
         logger.error('No KNX interfaces found')
+        logFileStream.end()
         return
     }
 
@@ -54,6 +78,7 @@ async function testKNXClient() {
         
         logger.info('Initiating disconnection...')
         await client.Disconnect()
+        logFileStream.end()
     })
 
     client.on(KNXClientEvents.error, (err) => {
@@ -68,6 +93,4 @@ async function testKNXClient() {
     client.Connect()
 }
 
-testKNXClient().catch(error => {
-    logger.error('Unexpected error occurred:', error)
-})
+testKNXClient()
