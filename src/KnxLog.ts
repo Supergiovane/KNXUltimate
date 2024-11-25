@@ -29,7 +29,13 @@ export type KNXLoggerOptions = {
 
 export function setLogLevel(level: LogLevel) {
 	logContainer.loggers.forEach((logger) => {
-		logger.level = level
+		const transportsList = logger.transports
+
+		transportsList.forEach((t) => {
+			t.level = level
+		})
+
+		logger.configure({ level, transports: transportsList })
 	})
 }
 
