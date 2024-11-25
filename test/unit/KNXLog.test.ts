@@ -1,6 +1,10 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
-import { module as createLogger, setLogLevel } from '../../src/KnxLog'
+import {
+	module as createLogger,
+	setLogLevel,
+	logStream,
+} from '../../src/KnxLog'
 import winston from 'winston'
 
 describe('KNX Logger Functionality Tests', async () => {
@@ -44,41 +48,33 @@ describe('KNX Logger Functionality Tests', async () => {
 		)
 	})
 
-	it('should handle error objects and format stack traces correctly', () => {
+	it('should handle error objects and format stack traces correctly', async () => {
 		const logger = createLogger('TestLogger')
 		const error = new Error('Test error')
 
-		let capturedOutput = ''
-		const originalStderrWrite = process.stderr.write
-		process.stderr.write = (str: string) => {
-			capturedOutput = str
-			return true
-		}
+		const data = await new Promise<any>((resolve) => {
+			logStream.once('data', resolve)
+			logger.error('Error message', error)
+		})
 
-		try {
-			assert.doesNotThrow(() => {
-				logger.error('Error message', error)
-			})
+		const fullMessage = data[Symbol.for('message')]
 
-			assert.ok(
-				capturedOutput.includes('Test error'),
-				'Should include error message',
-			)
-			assert.ok(
-				capturedOutput.includes('Error message'),
-				'Should include custom message',
-			)
-			assert.ok(
-				capturedOutput.includes(error.stack!),
-				'Should include full stack trace',
-			)
-			assert.ok(
-				capturedOutput.includes('\n'),
-				'Stack trace should be on new line',
-			)
-		} finally {
-			process.stderr.write = originalStderrWrite
-		}
+		assert.ok(
+			fullMessage.includes('Test error'),
+			'Should include error message',
+		)
+		assert.ok(
+			fullMessage.includes('Error message'),
+			'Should include custom message',
+		)
+		assert.ok(
+			fullMessage.includes(error.stack!),
+			'Should include full stack trace',
+		)
+		assert.ok(
+			fullMessage.includes('\n'),
+			'Stack trace should be on new line',
+		)
 	})
 
 	it('should handle null and undefined values', () => {
