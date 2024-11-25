@@ -97,6 +97,39 @@ List of events raised by KNXultimate, in proper order. For the signatures, pleas
 | error        | KNXUltimate has raised an error. The error description is provided as well.                         |
 | descriptionResponse | Gather the *getGatewayDescription* responses. There is an example in the **examples** folder named **gatewaydescription.ts** . |
 
+## LOG STREAM
+
+KNXUltimate provides a PassThrough stream for intercepting log messages. The stream can be imported from the KnxLog module.
+```typescript
+import { logStream, module, setLogLevel } from 'knxultimate/KnxLog'
+
+// Create a logger instance with a custom module name
+const logger = module('YOUR-MODULE-NAME')
+
+// Set log level
+setLogLevel('debug')
+```
+
+| Field                          | Description                                                   |
+| ------------------------------ | ------------------------------------------------------------- |
+| timestamp                      | ISO formatted date (YYYY-MM-DD HH:mm:ss.SSS)                  |
+| level                          | Log level in uppercase (ERROR, WARN, INFO, DEBUG)             |
+| label                          | Module name in uppercase (specified when creating logger)      |
+| message                        | Log message content                                           |
+| stack                          | Error stack trace (only present for errors)                   |
+
+### Log Levels
+
+| Level                          | Description                                                   |
+| ------------------------------ | ------------------------------------------------------------- |
+| disable                        | No logging                                                    |
+| error                          | Only logs errors                                             |
+| warn                          | Logs errors and warnings                                      |
+| info                          | Logs normal operations                                        |
+| debug                         | Logs detailed information                                     |
+| trace                         | Most verbose logging level                                    |
+
+For a complete example of logging usage, see [logging.ts](./examples/logging.ts) in the examples folder.
 
 ## DECONDING THE TELEGRAMS FROM BUS
 
@@ -119,6 +152,7 @@ You can find all examples in the [examples](./examples/) folder:
 - [simpleSample](./examples/simpleSample.ts) - A simple example that shows how to connect to the KNX bus and send a telegram. **WARNING** this sends data to your KNX BUS!
 - [discovery](./examples/discovery.ts) - A simple example that shows how to discover KNX devices on the network.
 - [test-toggle](./examples/test-toggle.ts) - An interactive example that shows how to toggle a switch on/off. **WARNING** this sends data to your KNX BUS!
+- [logging](./examples/logging.ts) - Shows how to use the logging system and capture log messages.
 - [gatewaydescription](./examples/gatewaydescription.ts) - Discover all gateways on your network and shows the details (name, mac address, etc...).
 
 <br/>
