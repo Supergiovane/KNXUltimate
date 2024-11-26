@@ -3,8 +3,10 @@
  * (C) 2020-2022 Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
+
+const logger = module('DPT1')
 
 const config: DatapointConfig = {
 	id: 'DPT1',
@@ -19,8 +21,8 @@ const config: DatapointConfig = {
 	},
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
-			Log.get().warn(
-				'DPT1.fromBuffer: buf should be 1 byte (got %d bytes)',
+			logger.warn(
+				'fromBuffer: buf should be 1 byte (got %d bytes)',
 				buf.length,
 			)
 			return null

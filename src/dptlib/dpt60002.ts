@@ -1,5 +1,7 @@
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
+
+const logger = module('DPT60002')
 
 interface ShutterValue {
 	mode: string
@@ -14,7 +16,7 @@ function bitsToShutterPosition(bits: number): string {
 		case 0b10:
 			return 'bottom'
 		default:
-			Log.get().error(`unknown position value: ${bits}`)
+			logger.error(`unknown position value: ${bits}`)
 			return null
 	}
 }
@@ -28,7 +30,7 @@ function shutterPositionToBits(position: string): number {
 		case 'bottom':
 			return 0b10
 		default:
-			Log.get().error(`Unknown position: ${position}`)
+			logger.error(`Unknown position: ${position}`)
 			return null
 	}
 }
@@ -46,7 +48,7 @@ function bitsToOperationMode(bits: number): string {
 		case 0b100:
 			return 'disabled'
 		default:
-			Log.get().error(`unknown operation mode value: ${bits}`)
+			logger.error(`unknown operation mode value: ${bits}`)
 			return null
 	}
 }
@@ -64,7 +66,7 @@ function operationModeToBits(mode: string): number {
 		case 'disabled':
 			return 0b100
 		default:
-			Log.get().error(`Unknown operation mode: ${mode}`)
+			logger.error(`Unknown operation mode: ${mode}`)
 			return null
 	}
 }
@@ -72,7 +74,7 @@ const config: DatapointConfig = {
 	id: 'DPT60002',
 	formatAPDU(value: ShutterValue): Buffer {
 		if (!value) {
-			Log.get().error('DPT60002: cannot write null value')
+			logger.error('cannot write null value')
 			return null
 		}
 
@@ -86,8 +88,8 @@ const config: DatapointConfig = {
 			const position = shutterPositionToBits(value.position)
 			apduData = (mode << 2) + position
 		} else {
-			Log.get().error(
-				'DPT60002: Must supply a value {mode: "normal"|"priority"|"wind|alarm"|"rain|alarm"|"disabled", position: "intermediate"|"top"|"bottom"}',
+			logger.error(
+				'Must supply a value {mode: "normal"|"priority"|"wind|alarm"|"rain|alarm"|"disabled", position: "intermediate"|"top"|"bottom"}',
 			)
 		}
 		return Buffer.from([apduData])
@@ -95,9 +97,7 @@ const config: DatapointConfig = {
 
 	fromBuffer(buf: Buffer): ShutterValue {
 		if (buf.length !== 1) {
-			Log.get().error(
-				`DPT60002: Buffer should be 1 byte long, got ${buf.length}`,
-			)
+			logger.error(`Buffer should be 1 byte long, got ${buf.length}`)
 			return null
 		}
 

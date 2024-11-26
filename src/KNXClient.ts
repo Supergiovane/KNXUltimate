@@ -13,7 +13,13 @@ import * as ipAddressHelper from './util/ipAddressHelper'
 import KNXAddress from './protocol/KNXAddress'
 import KNXDataBuffer, { IDataPoint } from './protocol/KNXDataBuffer'
 import * as DPTLib from './dptlib'
-import KnxLog, { KNXLoggerOptions } from './KnxLog'
+import KnxLog, {
+	KNXLogger,
+	LogLevel,
+	module as createLogger,
+	setLogLevel,
+	KNXLoggerOptions,
+} from './KnxLog'
 import { KNXDescriptionResponse, KNXPacket } from './protocol'
 import KNXRoutingIndication from './protocol/KNXRoutingIndication'
 import KNXConnectRequest from './protocol/KNXConnectRequest'
@@ -193,7 +199,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _clientSocket: UDPSocket | TCPSocket
 
-	private sysLogger: any
+	private sysLogger: KNXLogger
 
 	private jKNXSecureKeyring: any
 
@@ -253,9 +259,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		this.sniffingPackets = []
 
-		this.sysLogger = KnxLog.get({
-			loglevel: this._options.loglevel,
-		})
+		this.sysLogger = createLogger(this._options.setPrefix || 'KNXEngine')
+		if (this._options.loglevel) {
+			setLogLevel(this._options.loglevel)
+		}
 
 		this._channelID = null
 		this._connectionState = ConncetionState.DISCONNECTED
@@ -1384,8 +1391,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		if (this._options.sniffingMode) {
-			console.log('Sniffing mode is enabled. Dumping sniffing buffers...')
-			console.log(this.sniffingPackets)
+			this.sysLogger.info(
+				'Sniffing mode is enabled. Dumping sniffing buffers...',
+			)
+			this.sysLogger.info(this.sniffingPackets)
 		}
 	}
 

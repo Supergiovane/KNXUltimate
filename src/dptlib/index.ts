@@ -4,7 +4,7 @@
  */
 
 import * as util from 'util'
-import KnxLog from '../KnxLog'
+import { module } from '../KnxLog'
 import { hasProp } from '../utils'
 
 import DPT1 from './dpt1'
@@ -46,6 +46,8 @@ import DPT60001 from './dpt60001'
 import DPT60002 from './dpt60002'
 
 type Range = [number, number] | [undefined]
+
+const logger = module('DPTLib')
 
 interface DatapointSubtype {
 	scalar_range?: Range
@@ -180,7 +182,7 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
 		if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 'scalar_range')) {
 			const scalar = dpt.subtype.scalar_range
 			if (value < scalar[0] || value > scalar[1]) {
-				KnxLog.get().debug(
+				logger.debug(
 					'Value %j(%s) out of scalar range(%j) for %s',
 					value,
 					typeof value,
@@ -198,7 +200,7 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
 			// just a plain numeric value, only check if within bounds
 			// eslint-disable-next-line no-lonely-if
 			if (value < range[0] || value > range[1]) {
-				KnxLog.get().debug(
+				logger.debug(
 					'Value %j(%s) out of bounds(%j) for %s.%s',
 					value,
 					typeof value,

@@ -1,8 +1,10 @@
 import KNXDataBuffer from '../KNXDataBuffer'
 import CEMIConstants from './CEMIConstants'
-import KnxLog from '../../KnxLog'
+import { module } from '../../KnxLog'
 
 // 08/04/2021 new logger to adhere to the loglevel selected in the config-window
+
+const logger = module('NPDU')
 
 export default class NPDU {
 	private _tpci: number
@@ -141,11 +143,9 @@ export default class NPDU {
 	}
 
 	static createFromBuffer(buffer: Buffer, offset: number = 0): NPDU {
-		const sysLogger = KnxLog.get()
+		const sysLogger = logger
 		if (offset > buffer.length) {
-			sysLogger.error(
-				'NPDU: createFromBuffer: offset out of buffer range ',
-			)
+			sysLogger.error('createFromBuffer: offset out of buffer range ')
 			throw new Error(
 				`offset ${offset}  out of buffer range ${buffer.length}`,
 			)
@@ -159,22 +159,18 @@ export default class NPDU {
 			npduLength = buffer.readUInt8(offset++)
 		} catch (error) {
 			sysLogger.error(
-				`NPDU: createFromBuffer: error npduLength: ${error.message}`,
+				`createFromBuffer: error npduLength: ${error.message}`,
 			)
 		}
 		try {
 			tpci = buffer.readUInt8(offset++)
 		} catch (error) {
-			sysLogger.error(
-				`NPDU: createFromBuffer: error tpci: ${error.message}`,
-			)
+			sysLogger.error(`createFromBuffer: error tpci: ${error.message}`)
 		}
 		try {
 			apci = buffer.readUInt8(offset++)
 		} catch (error) {
-			sysLogger.error(
-				`NPDU: createFromBuffer: error apci: ${error.message}`,
-			)
+			sysLogger.error(`createFromBuffer: error apci: ${error.message}`)
 		}
 		try {
 			data =
@@ -182,9 +178,7 @@ export default class NPDU {
 					? buffer.subarray(offset, offset + npduLength - 1)
 					: null
 		} catch (error) {
-			sysLogger.error(
-				`NPDU: createFromBuffer: error data: ${error.message}`,
-			)
+			sysLogger.error(`createFromBuffer: error data: ${error.message}`)
 		}
 		return new NPDU(
 			tpci,

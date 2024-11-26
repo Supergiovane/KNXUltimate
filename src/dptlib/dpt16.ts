@@ -3,20 +3,21 @@
  * (C) 2020-2022 Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 
 //
 // DPT16: ASCII string (max 14 chars)
 //
+
+const logger = module('DPT16')
+
 const config: DatapointConfig = {
 	id: 'DPT16',
 	// Write to BUS
 	formatAPDU(value) {
 		if (typeof value !== 'string') {
-			Log.get().error(
-				'Must supply a string value. Autoconversion to string',
-			)
+			logger.error('Must supply a string value. Autoconversion to string')
 			try {
 				value = value.toString()
 			} catch (error) {
@@ -33,10 +34,7 @@ const config: DatapointConfig = {
 	// Read from BUS
 	fromBuffer(buf) {
 		if (buf.length !== 14) {
-			Log.get().error(
-				'DPT6: Buffer should be 14 byte long, got',
-				buf.length,
-			)
+			logger.error('Buffer should be 14 byte long, got', buf.length)
 			return null
 		}
 		if (this.subtypeid === '001') return buf.toString('latin1')

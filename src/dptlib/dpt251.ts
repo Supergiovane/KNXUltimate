@@ -8,7 +8,7 @@
  *  Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 import { hasProp } from '../utils'
 
@@ -26,11 +26,13 @@ import { hasProp } from '../utils'
 // Bit 4-7: 0
 // The bitfield which defines whether an value(R, G, B, W) is valid or not should be in the last byte of the array and not at the beginning.This can be verified by trying to send a DPT 251.600 telegram in the BUS monitor of the ETS5 application.
 
+const logger = module('DPT251')
+
 const config: DatapointConfig = {
 	id: 'DPT251',
 	formatAPDU(value) {
 		if (!value) {
-			Log.get().error('DPT251: cannot write null value')
+			logger.error('cannot write null value')
 		} else {
 			if (
 				typeof value === 'object' &&
@@ -53,8 +55,8 @@ const config: DatapointConfig = {
 			) {
 				// noop
 			} else {
-				Log.get().error(
-					'DPT251: Must supply a value payload: {red:0-255, green:0-255, blue:0-255, white:0-255, mR:0-1, mG:0-1, mB:0-1, mW:0-1}',
+				logger.error(
+					'Must supply a value payload: {red:0-255, green:0-255, blue:0-255, white:0-255, mR:0-1, mG:0-1, mB:0-1, mW:0-1}',
 				)
 			}
 			const bitVal = parseInt(
@@ -75,10 +77,7 @@ const config: DatapointConfig = {
 	},
 	fromBuffer(buf) {
 		if (buf.length !== 6) {
-			Log.get().error(
-				'DPT251: Buffer should be 6 bytes long, got',
-				buf.length,
-			)
+			logger.error('Buffer should be 6 bytes long, got', buf.length)
 			return null
 		}
 		const valByte = buf[5].toString(2) // Get validity bits

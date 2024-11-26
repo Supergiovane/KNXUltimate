@@ -5,7 +5,7 @@
 
 import { hasProp } from '../utils'
 import type { DatapointConfig } from '.'
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 
 function hex2bin(hex) {
 	return parseInt(hex, 16).toString(2).padStart(8, '0')
@@ -17,11 +17,14 @@ function dec2bin(dec) {
 //
 // DPT237: DPT_DALI_Control_Gear_Diagnostic
 //
+
+const logger = module('DPT237')
+
 const config: DatapointConfig = {
 	id: 'DPT237',
 	formatAPDU: (value) => {
 		if (!value) {
-			Log.get().error('DPT237: cannot write null value')
+			logger.error('cannot write null value')
 		} else {
 			let apdu_data
 			if (
@@ -36,9 +39,7 @@ const config: DatapointConfig = {
 				value.daliAddress <= 64
 			) {
 			} else {
-				Log.get().error(
-					'DPT237: Must supply an valid payload. See the WIKI.',
-				)
+				logger.error('Must supply an valid payload. See the WIKI.')
 			}
 
 			// LSB
@@ -62,10 +63,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 2) {
-			Log.get().error(
-				'DPT237: Buffer should be 2 byte long, got',
-				buf.length,
-			)
+			logger.error('Buffer should be 2 byte long, got', buf.length)
 			return null
 		}
 
