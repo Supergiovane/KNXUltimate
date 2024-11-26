@@ -6,15 +6,17 @@
 // DPT12.*:  4-byte unsigned value
 //
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 
 import type { DatapointConfig } from '.'
+
+const logger = module('DPT12')
 
 const config: DatapointConfig = {
 	id: 'DPT12',
 	formatAPDU: (value) => {
 		if (!value || typeof value !== 'number') {
-			Log.get().error('DPT12: Must supply a number value')
+			logger.error('Must supply a number value')
 		}
 		const apdu_data = Buffer.alloc(4)
 		apdu_data.writeUIntBE(value, 0, 4)
@@ -23,10 +25,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 4) {
-			Log.get().warn(
-				'DPT12: Buffer should be 4 bytes long, got',
-				buf.length,
-			)
+			logger.warn('Buffer should be 4 bytes long, got', buf.length)
 			return null
 		}
 		return buf.readUIntBE(0, 4)

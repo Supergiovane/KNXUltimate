@@ -5,7 +5,7 @@
 
 import { getFloat, getHex, hasProp } from '../utils'
 import type { DatapointConfig } from '.'
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 
 //
 // DPT222: Data Type 3x 16-Float Value
@@ -13,6 +13,8 @@ import Log from '../KnxLog'
 
 // 08/09/2020 Supergiovane
 // Send to BUS
+
+const logger = module('DPT222')
 
 const config: DatapointConfig = {
 	id: 'DPT222',
@@ -47,8 +49,8 @@ const config: DatapointConfig = {
 			apdu_data[5] = ArrEconomy[1]
 			return apdu_data
 		}
-		Log.get().error(
-			'DPT222: Must supply a payload like, for example: {Comfort:21, Standby:20, Economy:14}',
+		logger.error(
+			'Must supply a payload like, for example: {Comfort:21, Standby:20, Economy:14}',
 		)
 		return null
 	},
@@ -56,8 +58,8 @@ const config: DatapointConfig = {
 	// RX from BUS
 	fromBuffer: (buf) => {
 		if (buf.length !== 6) {
-			Log.get().warn(
-				'DPT222.fromBuffer: buf should be 3x2 bytes long (got %d bytes)',
+			logger.warn(
+				'fromBuffer: buf should be 3x2 bytes long (got %d bytes)',
 				buf.length,
 			)
 			return null

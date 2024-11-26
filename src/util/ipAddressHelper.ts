@@ -1,6 +1,8 @@
 import { hasProp } from '../utils'
-import KnxLog from '../KnxLog'
+import { module } from '../KnxLog'
 import os, { NetworkInterfaceInfo } from 'os'
+
+const logger = module('ipAddressHelper')
 
 export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 	const candidateInterfaces: { [key: string]: NetworkInterfaceInfo } = {}
@@ -26,33 +28,29 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 	for (const iface in interfaces) {
 		for (const intf of interfaces[iface]) {
 			try {
-				KnxLog.get().debug(
-					'ipAddressHelper.js: parsing interface: %s (%j)',
-					iface,
-					intf,
-				)
+				logger.debug('parsing interface: %s (%j)', iface, intf)
 				if (
 					intf.family !== undefined &&
 					(intf.family.toString().includes('4') ||
 						(intf as any).family === 4) &&
 					!intf.internal
 				) {
-					KnxLog.get().debug(
-						'ipAddressHelper.js: Found suitable interface: %s (%j)',
+					logger.debug(
+						'Found suitable interface: %s (%j)',
 						iface,
 						intf,
 					)
 					candidateInterfaces[iface] = intf
 				} else {
-					KnxLog.get().debug(
-						'ipAddressHelper.js: Found NOT suitable interface: %s (%j)',
+					logger.debug(
+						'Found NOT suitable interface: %s (%j)',
 						iface,
 						intf,
 					)
 				}
 			} catch (error) {
-				KnxLog.get().error(
-					'ipAddressHelper.js: getIPv4Interfaces: error parsing the interface %s (%j)',
+				logger.error(
+					'getIPv4Interfaces: error parsing the interface %s (%j)',
 					iface,
 					intf,
 				)
@@ -64,15 +62,13 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 }
 
 export function getLocalAddress(_interface = ''): string {
-	KnxLog.get().debug(
-		'ipAddressHelper.js: getLocalAddress: getting interfaces',
-	)
+	logger.debug('getLocalAddress: getting interfaces')
 
 	const candidateInterfaces = getIPv4Interfaces()
 	if (_interface !== '') {
 		if (!hasProp(candidateInterfaces, _interface)) {
-			KnxLog.get().error(
-				`ipAddressHelper.js: exports.getLocalAddress: Interface ${_interface} not found or has no useful IPv4 address!`,
+			logger.error(
+				`exports.getLocalAddress: Interface ${_interface} not found or has no useful IPv4 address!`,
 			)
 			throw Error(
 				`Interface ${_interface} not found or has no useful IPv4 address!`,

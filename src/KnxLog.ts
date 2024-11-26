@@ -1,62 +1,116 @@
-/**
- * (C) 2021 Supergiovane
- */
+import winston, { Container, Logform, Logger, transport } from 'winston'
+import { PassThrough } from 'stream'
 
-import util from 'util'
-// import factory, { Logger, LogLevel, LogDriverOptions } from 'log-driver'
-// let clog = require('node-color-log')
-import logger from 'node-color-log'
+const { format, transports, addColors } = winston
+const { combine, timestamp, label, printf, colorize, splat } = format
 
-let clog = logger
-const possibleLevels: string[] = ['disable', 'error', 'warn', 'info', 'debug']
+const colorizer = colorize()
+
+const MODULES = process.env.LOG_MODULES
+	? process.env.LOG_MODULES.split(',').map((m) => m.trim().toUpperCase())
+	: null
+
+export const logStream = new PassThrough({ objectMode: true })
+
+export interface KNXLogger extends Logger {
+	module: string
+}
+
+export interface KNXLoggerContainer extends winston.Container {
+	loggers: Map<string, KNXLogger>
+}
+
+export type LogLevel = 'disable' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
 
 export type KNXLoggerOptions = {
-	/** The log level to use */
-	loglevel?: any
-	/** Set it to true to enable max log level */
-	debug?: boolean
+	loglevel?: LogLevel
 	setPrefix?: string
 }
 
-const determineLogLevel = (options: KNXLoggerOptions): string => {
-	let level: string
+export function setLogLevel(level: LogLevel) {
+	logContainer.loggers.forEach((logger) => {
+		const transportsList = logger.transports
 
-	// 24/03/2021 Supergiovane fixed logLevel capitalization to lowercase
-	if (options) {
-		if (options.loglevel) {
-			level = options.loglevel
-		} else if (options.debug) {
-			level = 'debug'
-		} else {
-			level = 'info'
-		}
-	} else {
-		level = 'info'
-	}
-	if (!possibleLevels.includes(level)) level = 'error'
-	return level
+		transportsList.forEach((t) => {
+			t.level = level
+		})
+
+		logger.configure({ level, transports: transportsList })
+	})
 }
 
-export interface KnxLogger {
-	get: (options?: KNXLoggerOptions) => any
-	destroy: () => void
+// Custom colors
+addColors({
+	time: 'grey',
+	module: 'bold',
+})
+
+export function customKNXFormat(moduleName: string): Logform.Format {
+	return combine(
+		splat(),
+		timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
+		format((info: winston.Logform.TransformableInfo) => {
+			info.level = info.level.toUpperCase()
+			return info
+		})(),
+		label({ label: moduleName.toUpperCase() }),
+		colorize({ level: true }),
+		printf((info: winston.Logform.TransformableInfo) => {
+			info.timestamp = colorizer.colorize(
+				'time',
+				info.timestamp as string,
+			)
+			info.label = colorizer.colorize(
+				'module',
+				(info.label || '-') as string,
+			)
+			return `${info.timestamp} ${info.level} ${info.label}: ${info.message}${info.stack ? `\n${info.stack}` : ''}`
+		}),
+	)
 }
 
-const KnxLog: KnxLogger = {
-	get: (options) => {
-		if (!options && clog) return clog
-		clog = clog.createNamedLogger(options.setPrefix || 'KNXEngine')
-		if (options.loglevel === undefined) options.loglevel = 'error'
-		if (options.loglevel === 'silent') options.loglevel = 'disable'
-		if (options.loglevel === 'trace') options.loglevel = 'debug'
-		clog.setLevel(options.loglevel)
-		clog.setDate(() => new Date().toLocaleString())
-		return clog
-	},
-	destroy: () => {
-		// 16/08/2020 Supergiovane Destruction of the logger
-		clog = null
-	},
+const logModules = (moduleName: string): Logform.Format =>
+	format((info) =>
+		!MODULES || MODULES.find((c) => moduleName.toUpperCase().startsWith(c))
+			? info
+			: false,
+	)()
+
+export function customTransports(moduleName: string): transport[] {
+	const formats = MODULES ? [logModules(moduleName)] : []
+	formats.push(customKNXFormat(moduleName))
+
+	const transportsList: transport[] = [
+		new transports.Console({
+			format: combine(...formats),
+			level: process.env.LOG_LEVEL || 'info',
+			stderrLevels: ['error'],
+		}),
+		new winston.transports.Stream({
+			stream: logStream,
+			format: combine(...formats),
+		}),
+	]
+
+	return transportsList
 }
 
-export default KnxLog
+export function setupLogger(
+	container: Container,
+	moduleName: string,
+): KNXLogger {
+	const logger = container.add(moduleName) as KNXLogger
+	logger.configure({
+		transports: customTransports(moduleName),
+	})
+	logger.module = moduleName
+	return logger
+}
+
+const logContainer = new winston.Container() as KNXLoggerContainer
+
+export function module(moduleName: string): KNXLogger {
+	return setupLogger(logContainer, moduleName)
+}
+
+export default logContainer.loggers

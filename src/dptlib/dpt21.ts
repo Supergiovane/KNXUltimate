@@ -3,7 +3,7 @@
 * (C) 2022 Supergiovane
 */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 import { hasProp } from '../utils'
 
@@ -17,11 +17,13 @@ import { hasProp } from '../utils'
 // Bit 6: reserved (0)
 // Bit 7: reserved (0)
 
+const logger = module('DPT21')
+
 const config: DatapointConfig = {
 	id: 'DPT21',
 	formatAPDU: (value) => {
 		if (!value) {
-			Log.get().error('DPT21: cannot write null value')
+			logger.error('cannot write null value')
 			return null
 		}
 		if (
@@ -47,18 +49,15 @@ const config: DatapointConfig = {
 			)
 			return Buffer.from([bitVal])
 		}
-		Log.get().error(
-			'DPT21: Must supply a right payload: {outOfService:true-false, fault:true-false, overridden:true-false, inAlarm:true-false, alarmUnAck:true-false}',
+		logger.error(
+			'Must supply a right payload: {outOfService:true-false, fault:true-false, overridden:true-false, inAlarm:true-false, alarmUnAck:true-false}',
 		)
 		return null
 	},
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
-			Log.get().error(
-				'DPT21: Buffer should be 8 bit long, got',
-				buf.length,
-			)
+			logger.error('Buffer should be 8 bit long, got', buf.length)
 			return null
 		}
 		const sBit = Array.from(

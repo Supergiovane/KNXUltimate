@@ -3,21 +3,21 @@
  *  Supergiovane
  */
 
-import Log from '../KnxLog'
+import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 
 //
 // DPT28: ASCII string (variable length) UTF-8
 //
 
+const logger = module('DPT28')
+
 // Write to BUS
 const config: DatapointConfig = {
 	id: 'DPT28',
 	formatAPDU(value) {
 		if (typeof value !== 'string') {
-			Log.get().error(
-				'Must supply a string value. Autoconversion to string',
-			)
+			logger.error('Must supply a string value. Autoconversion to string')
 			try {
 				value = value.toString()
 			} catch (error) {
