@@ -41,7 +41,7 @@ const config: DatapointConfig = {
 			hasProp(value, 'save_recall') &&
 			hasProp(value, 'scenenumber')
 		) {
-			if (value.scenenumber - 1 > 64 || value.scenenumber - 1 < 1) {
+			if (value.scenenumber > 64 || value.scenenumber < 1) {
 				logger.error('scenenumber must between 1 and 64')
 				return null
 			}
