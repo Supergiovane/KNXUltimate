@@ -1,5 +1,7 @@
 
 
+# [4.1.0-beta.4](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.3...v4.1.0-beta.4) (2024-12-07)
+
 # [4.1.0-beta.3](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.2...v4.1.0-beta.3) (2024-12-07)
 
 # [4.1.0-beta.2](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.1...v4.1.0-beta.2) (2024-12-06)
