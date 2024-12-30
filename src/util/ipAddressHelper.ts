@@ -24,29 +24,34 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 			],
 		}
 	}
-
 	for (const iface in interfaces) {
-		for (const intf of interfaces[iface]) {
+		for (let index = 0; index < interfaces[iface].length; index++) {
+			let intf
 			try {
-				logger.debug('parsing interface: %s (%j)', iface, intf)
-				if (
-					intf.family !== undefined &&
-					(intf.family.toString().includes('4') ||
-						(intf as any).family === 4) &&
-					!intf.internal
-				) {
-					logger.debug(
-						'Found suitable interface: %s (%j)',
-						iface,
-						intf,
-					)
-					candidateInterfaces[iface] = intf
+				intf = interfaces[iface][index]
+				if (intf === undefined) {
+					logger.debug('intf is null: control point 1')
 				} else {
-					logger.debug(
-						'Found NOT suitable interface: %s (%j)',
-						iface,
-						intf,
-					)
+					logger.debug('parsing interface: %s (%j)', iface, intf)
+					if (
+						intf.family !== undefined &&
+						(intf.family.toString().includes('4') ||
+							intf.family === 4) &&
+						!intf.internal
+					) {
+						logger.debug(
+							'Found suitable interface: %s (%j)',
+							iface,
+							intf,
+						)
+						candidateInterfaces[iface] = intf
+					} else {
+						logger.debug(
+							'Found NOT suitable interface: %s (%j)',
+							iface,
+							intf,
+						)
+					}
 				}
 			} catch (error) {
 				logger.error(
@@ -57,7 +62,6 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 			}
 		}
 	}
-
 	return candidateInterfaces
 }
 
