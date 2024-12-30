@@ -1,5 +1,12 @@
 
 
+# [4.1.0-beta.7](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.4...v4.1.0-beta.7) (2024-12-30)
+
+
+### Bug Fixes
+
+* ipAddressHelper uncatched error when running on raspberry pi, having interfaces without any ip. ([#44](https://github.com/Supergiovane/KNXUltimate/issues/44)) ([a9e46ee](https://github.com/Supergiovane/KNXUltimate/commit/a9e46ee53c08f0d355acf454cb3515f523aee37a))
+
 # [4.1.0-beta.4](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.3...v4.1.0-beta.4) (2024-12-07)
 
 # [4.1.0-beta.3](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.2...v4.1.0-beta.3) (2024-12-07)
