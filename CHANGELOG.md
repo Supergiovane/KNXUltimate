@@ -1,5 +1,12 @@
 
 
+# [4.1.0-beta.8](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.7...v4.1.0-beta.8) (2025-01-28)
+
+
+### Features
+
+* added all subtypes to datapoint 20.x ([#45](https://github.com/Supergiovane/KNXUltimate/issues/45)) ([9051dbe](https://github.com/Supergiovane/KNXUltimate/commit/9051dbeadd7bc379dc2487454a2663ec007d91a4))
+
 # [4.1.0-beta.7](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.4...v4.1.0-beta.7) (2024-12-30)
 
 
