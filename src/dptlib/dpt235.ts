@@ -57,7 +57,7 @@ const config: DatapointConfig = {
 		} catch (error) {
 			logger.error(`exports.formatAPDU error ${error.message}`)
 		}
-		return Buffer.alloc(6)
+		return null
 	},
 
 	// RX from BUS
