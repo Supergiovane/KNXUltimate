@@ -1,5 +1,12 @@
 
 
+# [4.1.0-beta.9](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.8...v4.1.0-beta.9) (2025-03-04)
+
+
+### Features
+
+* added src and destination addresses in the LDataInd LOG. ([#46](https://github.com/Supergiovane/KNXUltimate/issues/46)) ([1f5947d](https://github.com/Supergiovane/KNXUltimate/commit/1f5947dcd2ec61337cc6cfdbc10a0e04728d6722))
+
 # [4.1.0-beta.8](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.7...v4.1.0-beta.8) (2025-01-28)
 
 
