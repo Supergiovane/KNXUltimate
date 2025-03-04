@@ -171,6 +171,7 @@ export default class NPDU {
 			apci = buffer.readUInt8(offset++)
 		} catch (error) {
 			sysLogger.error(`createFromBuffer: error apci: ${error.message}`)
+			throw error
 		}
 		try {
 			data =

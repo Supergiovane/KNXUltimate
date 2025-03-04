@@ -5,6 +5,10 @@ import ControlField from './ControlField'
 import NPDU from './NPDU'
 import KNXDataBuffer from '../KNXDataBuffer'
 
+import { module } from '../../KnxLog'
+
+const logger = module('LDataInd')
+
 export default class LDataInd extends CEMIMessage {
 	additionalInfo: KNXDataBuffer | null
 
@@ -46,6 +50,8 @@ export default class LDataInd extends CEMIMessage {
 	}
 
 	static createFromBuffer(buffer: Buffer, offset: number = 0): LDataInd {
+		const sysLogger = logger
+
 		if (offset >= buffer.length) {
 			throw new Error('Buffer too short')
 		}
@@ -67,7 +73,15 @@ export default class LDataInd extends CEMIMessage {
 			controlField.addressType,
 		)
 		offset += dstAddress.length
-		const npdu = NPDU.createFromBuffer(buffer, offset)
+		let npdu
+		try {
+			npdu = NPDU.createFromBuffer(buffer, offset)
+		} catch (error) {
+			sysLogger.error(
+				`createFromBuffer: ${error.message} srcAddress: ${srcAddress}, dstAddress: ${dstAddress}`,
+			)
+		}
+
 		return new LDataInd(
 			additionalInfo,
 			controlField,
