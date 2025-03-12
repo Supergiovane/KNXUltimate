@@ -63,7 +63,7 @@ interface DatapointSubtype {
 export interface DatapointConfig {
 	id: string
 	subtypeid?: string
-	desc?: string
+	// desc?: string
 	basetype: {
 		bitlength: number
 		signedness?: string
