@@ -1,5 +1,12 @@
 
 
+# [4.1.0-beta.10](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.9...v4.1.0-beta.10) (2025-03-12)
+
+
+### Bug Fixes
+
+* index.ts of dtplib was whrowing an unmeaningful error. ([#47](https://github.com/Supergiovane/KNXUltimate/issues/47)) ([168d73a](https://github.com/Supergiovane/KNXUltimate/commit/168d73a106a1194ff707390ffbd17899eeb499fe))
+
 # [4.1.0-beta.9](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.8...v4.1.0-beta.9) (2025-03-04)
 
 
