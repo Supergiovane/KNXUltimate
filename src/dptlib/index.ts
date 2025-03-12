@@ -171,7 +171,7 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
 	} else {
 		if (!isFinite(value)) {
 			throw new Error(
-				util.format('Invalid value, expected a %s', dpt.desc),
+				util.format('Invalid value, expected a %s', dpt.basetype?.desc),
 			)
 		}
 		// check if value is in range, be it explicitly defined or implied from bitlength
