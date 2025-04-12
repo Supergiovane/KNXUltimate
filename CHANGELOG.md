@@ -1,5 +1,12 @@
 
 
+# [4.1.0](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.10...v4.1.0) (2025-04-12)
+
+
+### Bug Fixes
+
+* removed unwanted "desc" prop from DatapointConfig root. ([#48](https://github.com/Supergiovane/KNXUltimate/issues/48)) ([a73166a](https://github.com/Supergiovane/KNXUltimate/commit/a73166abdbe8ff035e1ed55d2ebb8e59c5f04ebe))
+
 # [4.1.0-beta.10](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.9...v4.1.0-beta.10) (2025-03-12)
 
 
