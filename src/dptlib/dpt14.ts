@@ -202,6 +202,11 @@ return msg;`,
 			name: 'Work',
 			unit: 'J',
 		},
+		'1200': {
+			desc: 'DPT_Value_Volume_m3_h',
+			name: 'Flow rate',
+			unit: 'm³/h',
+		},
 	},
 }
 
