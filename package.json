@@ -17,7 +17,7 @@
     "lint-fix": "eslint --fix --ext .ts .",
     "test": "node -r esbuild-register --test test/**/*.test.ts",
     "test:coverage": "nyc npm run test",
-    "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it",
+    "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it patch",
     "newbetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it patch --preRelease=beta",
     "consecutivebetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it --preRelease",
     "clean": "node -e \"const fs = require('fs'); fs.existsSync('build') && fs.rm('build', { recursive: true }, () => process.exit(0))\""
