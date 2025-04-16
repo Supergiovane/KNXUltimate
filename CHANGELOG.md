@@ -1,5 +1,17 @@
 
 
+## [4.1.1](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0...v4.1.1) (2025-04-16)
+
+
+### Bug Fixes
+
+* make release-it adding a patch release instead of main release. ([#51](https://github.com/Supergiovane/KNXUltimate/issues/51)) ([211c0ef](https://github.com/Supergiovane/KNXUltimate/commit/211c0eff1cdcde23fed0a29abb2921b25b97ff7c))
+
+
+### Features
+
+* Ad DPT 14.1200 ([#50](https://github.com/Supergiovane/KNXUltimate/issues/50)) ([76eb6ed](https://github.com/Supergiovane/KNXUltimate/commit/76eb6edce953ca9c9f7b8b29fa227c58d5fa40d9))
+
 # [4.1.0](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0-beta.10...v4.1.0) (2025-04-12)
 
 
