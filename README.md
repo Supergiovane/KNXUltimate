@@ -48,7 +48,7 @@ These are the properties to be passed to the connection as a *JSON object {}* (s
 | localIPAddress (string)          | **Optional**. The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate |
 | interface (string)               | **Optional**. Specifies the local eth interface to be used to connect to the KNX Bus.                |
 | KNXQueueSendIntervalMilliseconds | **Optional**. The KNX standard has a maximum transmit rate to the BUS, of about 1 telegram each 25ms (to stay safe). In case you've a lot of traffic on the BUS, you can increase this value, expressed in milliseconds. Be careful, because if you set it too high, the KNX engine could send a telegram with flag 'repeat', because the ACK from the device is coming too late. |
-
+| theGatewayIsKNXVirtual (bool)               | **Optional**. Tells KNX Ultimate, that the gateway is a KNX Virtual ETS software. When set to *true*, it adds the **localIPAddress** to the tunnel_endpoint, in the datagram's tun section. Default is *false*. CAUTION: if set to *true*, connections to KNX/IP interfaces may not work properly. Use only for connecting to KNX Virtual            |
 ## SUPPORTED DATAPOINTS
 
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
