@@ -116,6 +116,8 @@ export type KNXClientOptions = {
 	KNXQueueSendIntervalMilliseconds?: number
 	/** Enables sniffing mode to monitor KNX */
 	sniffingMode?: boolean
+	/** Sets the tunnel_endpoint with the localIPAddress instead of the standard 0.0.0.0 */
+	theGatewayIsKNXVirtual?: boolean
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
@@ -132,6 +134,7 @@ const optionsDefaults: KNXClientOptions = {
 	interface: '',
 	jKNXSecureKeyring: {},
 	KNXQueueSendIntervalMilliseconds: 25,
+	theGatewayIsKNXVirtual: false,
 }
 
 export function getDecodedKeyring() {
@@ -210,6 +213,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private timers: Map<KNXTimer, NodeJS.Timeout>
 
 	public physAddr: KNXAddress
+
+	public theGatewayIsKNXVirtual: boolean
 
 	private commandQueue: Array<KNXQueueItem> = []
 
@@ -414,31 +419,37 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 			// The multicast traffic is not sent to a specific local IP, so we cannot set the this._options.localIPAddress in the bind
 			// otherwise the socket will never ever receive a packet.
-			this.udpSocket.bind(this._peerPort, '0.0.0.0', () => {
-				try {
-					this.udpSocket.setMulticastTTL(5)
-					this.udpSocket.setMulticastInterface(
-						this._options.localIPAddress,
-					)
-				} catch (error) {
-					this.sysLogger.error(
-						`Multicast: Error setting SetTTL ${error.message}` ||
-							'',
-					)
-				}
-				try {
-					this.udpSocket.addMembership(
-						this._peerHost,
-						this._options.localIPAddress,
-					)
-				} catch (err) {
-					this.sysLogger.error(
-						'Multicast: cannot add membership (%s)',
-						err,
-					)
-					this.emit(KNXClientEvents.error, err)
-				}
-			})
+			this.udpSocket.bind(
+				this._peerPort,
+				this._options.theGatewayIsKNXVirtual
+					? this._options.localIPAddress || '0.0.0.0'
+					: '0.0.0.0',
+				() => {
+					try {
+						this.udpSocket.setMulticastTTL(5)
+						this.udpSocket.setMulticastInterface(
+							this._options.localIPAddress,
+						)
+					} catch (error) {
+						this.sysLogger.error(
+							`Multicast: Error setting SetTTL ${error.message}` ||
+								'',
+						)
+					}
+					try {
+						this.udpSocket.addMembership(
+							this._peerHost,
+							this._options.localIPAddress,
+						)
+					} catch (err) {
+						this.sysLogger.error(
+							'Multicast: cannot add membership (%s)',
+							err,
+						)
+						this.emit(KNXClientEvents.error, err)
+					}
+				},
+			)
 		}
 	}
 
@@ -1786,7 +1797,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					} else {
 						// Inform that i received an ACK with an unexpected sequence number. It should be handled as error, but for now, only log.
 						this.sysLogger.error(
-							`Received KNX packet: TUNNELING: Unexpected Tunnel Ack with seqCounter = ${knxTunnelingAck.seqCounter}, expecting ${this.getSeqNumber()}`,
+							`Received KNX packet: TUNNELING: Unexpected Tunnel Ack with seqCounter = ${knxTunnelingAck.seqCounter}, expecting ${this.getCurrentItemHandledByTheQueue()}. Don't care for now.`,
+						)
+						this.clearTimer(KNXTimer.ACK)
+						this._numFailedTelegramACK = 0 // 25/12/2021 clear the current ACK failed telegram number
+						this.clearToSend = true // I'm ready to send a new datagram now
+						// 08/04/2022 Emits the event informing that the last ACK has been acknowledge.
+						this.emit(
+							KNXClientEvents.ackReceived,
+							knxTunnelingAck,
+							true,
 						)
 						// this.emit(KNXClientEvents.error, `Unexpected Tunnel Ack ${knxTunnelingAck.seqCounter}`);
 					}
@@ -1927,7 +1947,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private sendSecureSessionRequestMessage(cri: TunnelCRI) {
 		const oHPAI = new HPAI(
-			'0.0.0.0',
+			this._options.theGatewayIsKNXVirtual
+				? this._options.localIPAddress || '0.0.0.0'
+				: '0.0.0.0',
 			0,
 			this._options.hostProtocol === 'TunnelTCP'
 				? KNX_CONSTANTS.IPV4_TCP
