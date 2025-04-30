@@ -1799,6 +1799,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this.sysLogger.error(
 							`Received KNX packet: TUNNELING: Unexpected Tunnel Ack with seqCounter = ${knxTunnelingAck.seqCounter}, expecting ${this.getCurrentItemHandledByTheQueue()}. Don't care for now.`,
 						)
+						this.clearTimer(KNXTimer.ACK)
+						this._numFailedTelegramACK = 0 // 25/12/2021 clear the current ACK failed telegram number
+						this.clearToSend = true // I'm ready to send a new datagram now
+						// 08/04/2022 Emits the event informing that the last ACK has been acknowledge.
+						this.emit(
+							KNXClientEvents.ackReceived,
+							knxTunnelingAck,
+							true,
+						)
 						// this.emit(KNXClientEvents.error, `Unexpected Tunnel Ack ${knxTunnelingAck.seqCounter}`);
 					}
 				} else {
