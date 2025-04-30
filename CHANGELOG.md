@@ -1,5 +1,12 @@
 
 
+## [4.1.2](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.1...v4.1.2) (2025-04-30)
+
+
+### Features
+
+* Preliminary support for knx virtual & ACK fix ([#53](https://github.com/Supergiovane/KNXUltimate/issues/53)) ([d2a340a](https://github.com/Supergiovane/KNXUltimate/commit/d2a340a91e7bd1524923421f67a7a69ea8dff025))
+
 ## [4.1.1](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.0...v4.1.1) (2025-04-16)
 
 
