@@ -1363,7 +1363,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Sends a DISCONNECT_REQUEST telegram to the BUS and closes the socket
 	 */
 	async Disconnect() {
-		this.exitProcessingKNXQueueLoop = true // Exits KNX processing queue loop
 		if (this._clientSocket === null) {
 			throw new Error('No client socket defined')
 		}
@@ -1393,6 +1392,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		// wait for disconnect event or at most 2 seconds
 		await this.waitForEvent(KNXClientEvents.disconnected, 2000)
+
+		// fix #54 : disconnect request is not sent properly
+		this.exitProcessingKNXQueueLoop = true // Exits KNX processing queue loop
 
 		// 12/03/2021 Set disconnected if not already set by DISCONNECT_RESPONSE sent from the IP Interface
 		if (this._connectionState !== ConncetionState.DISCONNECTED) {
