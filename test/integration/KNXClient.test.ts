@@ -176,6 +176,27 @@ const getMockPacketsForDisconnectTest: SnifferPacket[] = [
 	},
 ]
 
+const getMockPacketsForDisconnectRequestTest: SnifferPacket[] = [
+	// Initial connection
+	{
+		reqType: 'KNXConnectRequest',
+		request: '06100205001a0801000000000000080100000000000004040200',
+		response: '06100206001424000801c0a801740e570404affc',
+		deltaReq: 0,
+		deltaRes: 8,
+		resType: 'KNXConnectResponse',
+	},
+	// Disconnect
+	{
+		reqType: 'KNXDisconnectRequest',
+		request: '06100209001024000801000000000000',
+		deltaReq: 500,
+		response: '0610020a00085100',
+		resType: 'KNXDisconnectResponse',
+		deltaRes: 4,
+	},
+]
+
 describe('KNXClient Tests', () => {
 	test('should discover KNX interfaces', async () => {
 		const clock = sinon.useFakeTimers({ shouldAdvanceTime: true })
@@ -469,5 +490,85 @@ describe('KNXClient Tests', () => {
 		} finally {
 			clock.restore()
 		}
+	})
+
+	test('should send a disconnect request', async () => {
+		const events: string[] = []
+		let server: MockKNXServer
+		let disconnectReason = ''
+
+		const client = new KNXClient(
+			{
+				loglevel: 'trace',
+				hostProtocol: 'TunnelUDP',
+				ipAddr: MockKNXServer.host,
+				ipPort: MockKNXServer.port,
+				localIPAddress: getDefaultIpLocal(),
+			},
+			(c: KNXClient) => {
+				server = new MockKNXServer(
+					getMockPacketsForDisconnectRequestTest,
+					c,
+				)
+				server.on('error', (error) => {
+					if (error.message.includes('No matching response found')) {
+						throw new Error(`MockKNXServer error: ${error.message}`)
+					}
+				})
+
+				server.createFakeSocket()
+			},
+		)
+
+		// Track connection
+		const connectionPromise = new Promise<void>((resolve) => {
+			client.once(KNXClientEvents.connected, () => {
+				events.push('connected')
+				resolve()
+			})
+		})
+
+		// Track disconnection
+		const disconnectionPromise = new Promise<void>((resolve) => {
+			client.on(KNXClientEvents.error, (error) => {
+				events.push('error')
+			})
+
+			client.once(KNXClientEvents.disconnected, (reason) => {
+				disconnectReason = reason
+				events.push('disconnected')
+				resolve()
+			})
+		})
+
+		// Connect and wait for connection
+		client.Connect()
+		await connectionPromise
+
+		// Connected state verification
+		assert.strictEqual(client.isConnected(), true, 'Should be connected')
+		assert.deepStrictEqual(
+			events,
+			['connected'],
+			'Should have connected event',
+		)
+
+		// Disconnect and wait for disconnection
+		client.Disconnect()
+
+		await disconnectionPromise
+
+		assert.strictEqual(
+			client.isConnected(),
+			false,
+			'Should be disconnected',
+		)
+
+		assert.ok(
+			disconnectReason.includes(
+				'Received DISCONNECT_RESPONSE from the KNX interface',
+			),
+			`Should receive disconnect response: ${disconnectReason}`,
+		)
 	})
 })
