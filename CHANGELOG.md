@@ -1,5 +1,12 @@
 
 
+## [4.1.3](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.2...v4.1.3) (2025-05-16)
+
+
+### Bug Fixes
+
+* disconnect request not sent properly in KNXClient.ts ([#55](https://github.com/Supergiovane/KNXUltimate/issues/55)) ([4253064](https://github.com/Supergiovane/KNXUltimate/commit/4253064ad4d96cb5898ec8dd16ac40b0ed94041a))
+
 ## [4.1.2](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.1...v4.1.2) (2025-04-30)
 
 
