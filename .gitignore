@@ -120,6 +120,9 @@ _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
 
+.Codex
+.claude
+
 # JustCode is a .NET coding add-in
 .JustCode
 
