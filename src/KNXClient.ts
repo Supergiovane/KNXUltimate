@@ -30,6 +30,7 @@ import KNXTunnelingAck from './protocol/KNXTunnelingAck'
 import KNXSearchResponse from './protocol/KNXSearchResponse'
 import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
 import { wait, getTimestamp } from './utils'
+import { SecureConfig } from './secure/SecureTunnelTCP'
 
 export enum ConncetionState {
 	STARTED = 'STARTED',
@@ -85,8 +86,6 @@ export interface KNXClientEventCallbacks {
 	descriptionResponse: (packet: KNXDescriptionResponse) => void
 }
 
-const jKNXSecureKeyring: string = ''
-
 export type KNXClientOptions = {
 	/** The physical address to be identified in the KNX bus */
 	physAddr?: string
@@ -108,8 +107,6 @@ export type KNXClientOptions = {
 	localIPAddress?: string
 	/** Specifies the local eth interface to be used to connect to the KNX Bus. */
 	interface?: string
-	/** ETS Keyring JSON file content (leave blank until KNX-Secure has been released) */
-	jKNXSecureKeyring?: any
 	/** Local socket address. Automatically filled by KNXClient */
 	localSocketAddress?: string
 	// ** Local queue interval between each KNX telegram. Default is 1 telegram each 25ms
@@ -118,6 +115,11 @@ export type KNXClientOptions = {
 	sniffingMode?: boolean
 	/** Sets the tunnel_endpoint with the localIPAddress instead of the standard 0.0.0.0 */
 	theGatewayIsKNXVirtual?: boolean
+    /**
+     * Optional configuration for Secure Tunnel TCP (see SecureConfig).
+     * Use `gatewayIp` and `gatewayPort` for the endpoint, aligned with SecureConfig.
+     */
+    secureTunnelConfig?: SecureConfig
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
@@ -132,14 +134,10 @@ const optionsDefaults: KNXClientOptions = {
 	localEchoInTunneling: true,
 	localIPAddress: '',
 	interface: '',
-	jKNXSecureKeyring: {},
-	KNXQueueSendIntervalMilliseconds: 25,
-	theGatewayIsKNXVirtual: false,
+    KNXQueueSendIntervalMilliseconds: 25,
+    theGatewayIsKNXVirtual: false,
 }
 
-export function getDecodedKeyring() {
-	return jKNXSecureKeyring
-}
 
 export enum KNXTimer {
 	/** Triggers when an ACK is not received in time */
@@ -204,9 +202,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private sysLogger: KNXLogger
 
-	private jKNXSecureKeyring: any
-
-	private _clearToSend = false
+    private _clearToSend = false
 
 	private socketReady = false
 
@@ -281,8 +277,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._heartbeatFailures = 0
 		this.max_HeartbeatFailures = 3
 		this._awaitingResponseType = null
-		this._clientSocket = null
-		this.jKNXSecureKeyring = this._options.jKNXSecureKeyring
+        this._clientSocket = null
 		// Configure the limiter
 		try {
 			if (Number(this._options.KNXQueueSendIntervalMilliseconds) < 20) {
@@ -506,18 +501,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/** Waits till providden event occurs for at most the providden timeout */
-	private async waitForEvent(event: KNXClientEvents, timeout: number) {
-		let resolveRef: () => void
-		return Promise.race<void>([
-			new Promise((resolve) => {
-				resolveRef = resolve
-				this.once(event, resolve)
-			}),
-			wait(timeout),
-		]).then(() => {
-			this.off(event, resolveRef)
-		})
-	}
+    private async waitForEvent(event: KNXClientEvents, timeout: number) {
+        let resolveRef: () => void
+        return Promise.race<void>([
+            new Promise<void>((resolve) => {
+                resolveRef = resolve
+                this.once(event, resolve)
+            }),
+            wait(timeout),
+        ]).then(() => {
+            this.off(event, resolveRef)
+        })
+    }
 
 	private setTimer(type: KNXTimer, cb: () => void, delay: number) {
 		if (this.timers.has(type)) {
@@ -1301,16 +1296,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 				2000,
 			)
-		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			this.tcpSocket.connect(this._peerPort, this._peerHost, () => {
-				this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
-				this._clientTunnelSeqNumber = 0
-				if (this._options.isSecureKNXEnabled)
-					this.sendSecureSessionRequestMessage(
-						new TunnelCRI(knxLayer),
-					)
-			})
-		} else {
+        } else if (this._options.hostProtocol === 'TunnelTCP') {
+            this.tcpSocket.connect(this._peerPort, this._peerHost, () => {
+                this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
+                this._clientTunnelSeqNumber = 0
+            })
+        } else {
 			// Multicast
 			this._connectionState = ConncetionState.CONNECTED
 
@@ -1947,21 +1938,5 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 	}
 
-	private sendSecureSessionRequestMessage(cri: TunnelCRI) {
-		const oHPAI = new HPAI(
-			this._options.theGatewayIsKNXVirtual
-				? this._options.localIPAddress || '0.0.0.0'
-				: '0.0.0.0',
-			0,
-			this._options.hostProtocol === 'TunnelTCP'
-				? KNX_CONSTANTS.IPV4_TCP
-				: KNX_CONSTANTS.IPV4_UDP,
-		)
-		this.send(
-			KNXProtocol.newKNXSecureSessionRequest(cri, oHPAI),
-			undefined,
-			true,
-			this.getSeqNumber(),
-		)
-	}
+    // Legacy KNX Secure Session request removed (use SecureTunnelTCP instead)
 }
