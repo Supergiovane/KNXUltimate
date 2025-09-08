@@ -122,6 +122,8 @@ _ReSharper*/
 
 .Codex
 .claude
+# Local AI tooling + credentials (do not commit)
+Codex/
 
 # JustCode is a .NET coding add-in
 .JustCode
@@ -343,5 +345,4 @@ build
 /coverage/
 
 /.nyc_output/
-
 
