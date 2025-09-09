@@ -46,6 +46,7 @@ export enum SocketEvents {
 	listening = 'listening',
 	data = 'data',
 	close = 'close',
+	connect = 'connect',
 }
 
 export type KNXClientProtocol = 'TunnelUDP' | 'Multicast' | 'TunnelTCP'
@@ -365,26 +366,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._options.secureTunnelConfig,
 			)
 			// this._clientSocket.removeAllListeners()
-			this.tcpSocketSecure.on(SocketEvents.data, (data) => {
-				this.sysLogger.debug(
-					`[${getTimestamp()}] Received message`,
-					data,
-				)
-			})
+			this.tcpSocketSecure.on(
+				SocketEvents.message,
+				this.processInboundMessage.bind(this),
+			)
 			this.tcpSocketSecure.on(SocketEvents.error, (error) => {
 				this.socketReady = false
 				this.emit(KNXClientEvents.error, error)
 			})
-			this.tcpSocketSecure.on(SocketEvents.close, (hadError) => {
+
+			this.tcpSocketSecure.on(SocketEvents.close, () => {
 				this.socketReady = false
 				this.exitProcessingKNXQueueLoop = true
 				this.emit(KNXClientEvents.close)
-			})
-
-			this.tcpSocketSecure.on('connect', () => {
-				this.socketReady = true
-				this.handleKNXQueue()
-				this.emit(KNXClientEvents.connected, this._options)
 			})
 		} else if (this._options.hostProtocol === 'Multicast') {
 			this._clientSocket = dgram.createSocket({
@@ -1298,10 +1292,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				2000,
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			this.tcpSocketSecure.connect(this._peerPort, this._peerHost, () => {
-				this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
-				this._clientTunnelSeqNumber = 0
-			})
+			this.tcpSocketSecure.connect()
 		} else {
 			// Multicast
 			this._connectionState = ConncetionState.CONNECTED

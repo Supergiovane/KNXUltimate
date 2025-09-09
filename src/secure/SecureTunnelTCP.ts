@@ -4,7 +4,7 @@
  * - Loads credentials and GA keys from ETS keyring
  * - Establishes Secure Session (tunneling)
  */
-
+import { SocketEvents } from 'src/KNXClient'
 import * as net from 'net'
 import * as crypto from 'crypto'
 import { Keyring } from './keyring'
@@ -53,6 +53,7 @@ import {
 	DEFAULT_KNXKEYS_PATH,
 	DEFAULT_KNXKEYS_PASSWORD,
 } from './secure_knx_constants'
+import { EventEmitter } from 'stream'
 
 // Defaults for library consumers
 const DEFAULT_GATEWAY_IP = '192.168.1.4'
@@ -85,7 +86,7 @@ export interface SecureConfig {
 	debug?: boolean
 }
 
-export class SecureTunnelTCP {
+export class SecureTunnelTCP extends EventEmitter {
 	// Config
 	private gatewayIp: string
 
@@ -133,6 +134,7 @@ export class SecureTunnelTCP {
 	}
 
 	constructor(cfg: SecureConfig) {
+		super()
 		this.gatewayIp = cfg.gatewayIp ?? DEFAULT_GATEWAY_IP
 		this.gatewayPort = cfg.gatewayPort ?? DEFAULT_GATEWAY_PORT
 		this.interfaceIa = cfg.tunnelInterfaceIndividualAddress ?? '1.1.255'
@@ -416,14 +418,17 @@ export class SecureTunnelTCP {
 					}
 				}
 			})
-
 			this.socket.on('error', (err) => {
 				if (!resolved) bail(`Socket error: ${err.message}`)
+				this.emit(SocketEvents.error, err)
 			})
 			this.socket.on('close', () => {
-				if (!resolved)
-					return bail('Socket closed before session established')
+				if (!resolved) {
+					bail('Socket closed before session established')
+					return
+				}
 				console.log('Socket closed')
+				this.emit(SocketEvents.close)
 			})
 			this.socket.connect(this.gatewayPort, this.gatewayIp)
 		})
