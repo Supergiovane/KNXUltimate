@@ -7,8 +7,6 @@
 
 import * as net from 'net'
 import * as crypto from 'crypto'
-import * as fs from 'fs'
-import * as path from 'path'
 import { Keyring } from './keyring'
 import {
 	calculateMessageAuthenticationCodeCBC,
@@ -59,39 +57,17 @@ import {
 // Defaults for library consumers
 const DEFAULT_GATEWAY_IP = '192.168.1.4'
 const DEFAULT_GATEWAY_PORT = 3671
-const DEFAULT_XKNX_SERIAL = Buffer.from('000000000000', 'hex')
-
-// constants moved to ./secure/secure_knx_constants
+const DEFAULT_SERIAL = Buffer.from('000000000000', 'hex')
+// DER SPKI prefix for X25519 (OID 1.3.101.110)
+const X25519_SPKI_PREFIX_DER = Buffer.from('302a300506032b656e032100', 'hex')
 
 type SecureHandshakeState = 'connecting' | 'session' | 'auth' | 'connect'
-
-// Sequence number persistence file
-const SEQ_STORE = path.join(__dirname, '../../documents/seq_store.json')
 
 function nowBasedInitialSeq(): bigint {
 	// Align with xknx: ms since 2018-01-05T00:00:00Z
 	const base = Date.parse('2018-01-05T00:00:00Z')
 	const diffMs = BigInt(Date.now() - base)
 	return diffMs // already in ms, fits 48-bit for many years
-}
-
-function readPersistedSeq(): bigint {
-	try {
-		const data = JSON.parse(fs.readFileSync(SEQ_STORE, 'utf-8'))
-		if (data && typeof data.last_send_seq === 'string') {
-			return BigInt(data.last_send_seq)
-		}
-	} catch {}
-	return nowBasedInitialSeq()
-}
-
-function writePersistedSeq(seq: bigint) {
-	try {
-		fs.writeFileSync(
-			SEQ_STORE,
-			JSON.stringify({ last_send_seq: seq.toString() }, null, 2),
-		)
-	} catch {}
 }
 
 export interface SecureConfig {
@@ -147,7 +123,7 @@ export class SecureTunnelTCP {
 
 	private sendSeq48: bigint = 0n // Data Secure sender 6-byte sequence
 
-	private serial: Buffer = Buffer.from(DEFAULT_XKNX_SERIAL) // 6-byte serial for SecureWrapper
+	private serial: Buffer = DEFAULT_SERIAL // 6-byte serial for SecureWrapper
 
 	private assignedIa: number = 0 // KNX IA assigned by gateway for this tunnel
 
@@ -206,7 +182,7 @@ export class SecureTunnelTCP {
 		}
 
 		// Init sender sequence from persisted store
-		this.sendSeq48 = readPersistedSeq()
+		this.sendSeq48 = nowBasedInitialSeq()
 		// Choose gateway device by host IA if present, otherwise the interface IA
 		const gatewayIaStr =
 			iface?.host?.toString() || iface?.individualAddress?.toString()
@@ -281,7 +257,7 @@ export class SecureTunnelTCP {
 			this.socket.on('connect', () => {
 				console.log('  ✓ TCP connected')
 				state = 'session'
-				// Send SESSION_REQUEST immediately (working version)
+				// Send SESSION_REQUEST immediately
 				this.socket!.write(this.buildSessionRequest())
 				// Optional simple timeout -> reconnect
 				handshakeTimer = setTimeout(
@@ -308,7 +284,7 @@ export class SecureTunnelTCP {
 					// Calculate session key
 					const serverKey = crypto.createPublicKey({
 						key: Buffer.concat([
-							Buffer.from('302a300506032b656e032100', 'hex'),
+							X25519_SPKI_PREFIX_DER,
 							serverPublicKey,
 						]),
 						format: 'der',
@@ -640,7 +616,6 @@ export class SecureTunnelTCP {
 		const current = this.sendSeq48 & 0xffffffffffffn
 		seq.writeUIntBE(Number(current), 0, 6)
 		this.sendSeq48 = (this.sendSeq48 + 1n) & 0xffffffffffffn
-		writePersistedSeq(this.sendSeq48)
 
 		const addrFields = Buffer.from([
 			(srcIa >> 8) & 0xff,
@@ -698,7 +673,7 @@ export class SecureTunnelTCP {
 		rawCemi: Buffer,
 	): { ga: number; srcIa: number; value?: number } | null {
 		if (rawCemi.length < 10) return null
-		// Parse CEMI header (code + additional info)
+		// Parse CEMI header (code + additional info) di sta minchia
 		const infoLen = rawCemi[1]
 		const start = 2 + infoLen
 		if (rawCemi.length < start + 8) return null

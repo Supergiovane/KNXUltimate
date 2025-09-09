@@ -30,7 +30,7 @@ import KNXTunnelingAck from './protocol/KNXTunnelingAck'
 import KNXSearchResponse from './protocol/KNXSearchResponse'
 import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
 import { wait, getTimestamp } from './utils'
-import { SecureConfig } from './secure/SecureTunnelTCP'
+import { SecureConfig, SecureTunnelTCP } from './secure/SecureTunnelTCP'
 
 export enum ConncetionState {
 	STARTED = 'STARTED',
@@ -115,11 +115,8 @@ export type KNXClientOptions = {
 	sniffingMode?: boolean
 	/** Sets the tunnel_endpoint with the localIPAddress instead of the standard 0.0.0.0 */
 	theGatewayIsKNXVirtual?: boolean
-    /**
-     * Optional configuration for Secure Tunnel TCP (see SecureConfig).
-     * Use `gatewayIp` and `gatewayPort` for the endpoint, aligned with SecureConfig.
-     */
-    secureTunnelConfig?: SecureConfig
+	/** Optional configuration for Secure Tunnel TCP (see SecureConfig). */
+	secureTunnelConfig?: SecureConfig
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
@@ -134,10 +131,9 @@ const optionsDefaults: KNXClientOptions = {
 	localEchoInTunneling: true,
 	localIPAddress: '',
 	interface: '',
-    KNXQueueSendIntervalMilliseconds: 25,
-    theGatewayIsKNXVirtual: false,
+	KNXQueueSendIntervalMilliseconds: 25,
+	theGatewayIsKNXVirtual: false,
 }
-
 
 export enum KNXTimer {
 	/** Triggers when an ACK is not received in time */
@@ -198,11 +194,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _awaitingResponseType: number
 
-	private _clientSocket: UDPSocket | TCPSocket
+	private _clientSocket: UDPSocket | TCPSocket | SecureTunnelTCP
 
 	private sysLogger: KNXLogger
 
-    private _clearToSend = false
+	private _clearToSend = false
 
 	private socketReady = false
 
@@ -231,8 +227,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return null
 	}
 
-	get tcpSocket() {
-		if (this._clientSocket instanceof TCPSocket) {
+	get tcpSocketSecure() {
+		if (this._clientSocket instanceof SecureTunnelTCP) {
 			return this._clientSocket
 		}
 		return null
@@ -277,7 +273,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._heartbeatFailures = 0
 		this.max_HeartbeatFailures = 3
 		this._awaitingResponseType = null
-        this._clientSocket = null
+		this._clientSocket = null
 		// Configure the limiter
 		try {
 			if (Number(this._options.KNXQueueSendIntervalMilliseconds) < 20) {
@@ -365,25 +361,27 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
 			// November 2024 - DIRTY function, to be checked
-			this._clientSocket = new net.Socket()
+			this._clientSocket = new SecureTunnelTCP(
+				this._options.secureTunnelConfig,
+			)
 			// this._clientSocket.removeAllListeners()
-			this.tcpSocket.on(SocketEvents.data, (data) => {
+			this.tcpSocketSecure.on(SocketEvents.data, (data) => {
 				this.sysLogger.debug(
 					`[${getTimestamp()}] Received message`,
 					data,
 				)
 			})
-			this.tcpSocket.on(SocketEvents.error, (error) => {
+			this.tcpSocketSecure.on(SocketEvents.error, (error) => {
 				this.socketReady = false
 				this.emit(KNXClientEvents.error, error)
 			})
-			this.tcpSocket.on(SocketEvents.close, (hadError) => {
+			this.tcpSocketSecure.on(SocketEvents.close, (hadError) => {
 				this.socketReady = false
 				this.exitProcessingKNXQueueLoop = true
 				this.emit(KNXClientEvents.close)
 			})
 
-			this.tcpSocket.on('connect', () => {
+			this.tcpSocketSecure.on('connect', () => {
 				this.socketReady = true
 				this.handleKNXQueue()
 				this.emit(KNXClientEvents.connected, this._options)
@@ -501,18 +499,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/** Waits till providden event occurs for at most the providden timeout */
-    private async waitForEvent(event: KNXClientEvents, timeout: number) {
-        let resolveRef: () => void
-        return Promise.race<void>([
-            new Promise<void>((resolve) => {
-                resolveRef = resolve
-                this.once(event, resolve)
-            }),
-            wait(timeout),
-        ]).then(() => {
-            this.off(event, resolveRef)
-        })
-    }
+	private async waitForEvent(event: KNXClientEvents, timeout: number) {
+		let resolveRef: () => void
+		return Promise.race<void>([
+			new Promise<void>((resolve) => {
+				resolveRef = resolve
+				this.once(event, resolve)
+			}),
+			wait(timeout),
+		]).then(() => {
+			this.off(event, resolveRef)
+		})
+	}
 
 	private setTimer(type: KNXTimer, cb: () => void, delay: number) {
 		if (this.timers.has(type)) {
@@ -621,17 +619,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 			} else {
 				try {
-					this.tcpSocket.write(_knxPacket.toBuffer(), (error) => {
-						if (error) {
-							this.sysLogger.error(
-								`Sending KNX packet: Send TCP sending error: ${error.message}` ||
-									'Undef error',
-							)
-							this.emit(KNXClientEvents.error, error)
-						}
+					this.tcpSocketSecure.write(
+						_knxPacket.toBuffer(),
+						(error) => {
+							if (error) {
+								this.sysLogger.error(
+									`Sending KNX packet: Send TCP sending error: ${error.message}` ||
+										'Undef error',
+								)
+								this.emit(KNXClientEvents.error, error)
+							}
 
-						resolve(!error)
-					})
+							resolve(!error)
+						},
+					)
 				} catch (error) {
 					this.sysLogger.error(
 						`Sending KNX packet: Send TCP Catch error: ${error.message}` ||
@@ -1296,12 +1297,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 				2000,
 			)
-        } else if (this._options.hostProtocol === 'TunnelTCP') {
-            this.tcpSocket.connect(this._peerPort, this._peerHost, () => {
-                this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
-                this._clientTunnelSeqNumber = 0
-            })
-        } else {
+		} else if (this._options.hostProtocol === 'TunnelTCP') {
+			this.tcpSocketSecure.connect(this._peerPort, this._peerHost, () => {
+				this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
+				this._clientTunnelSeqNumber = 0
+			})
+		} else {
 			// Multicast
 			this._connectionState = ConncetionState.CONNECTED
 
@@ -1938,5 +1939,5 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 	}
 
-    // Legacy KNX Secure Session request removed (use SecureTunnelTCP instead)
+	// Legacy KNX Secure Session request removed (use SecureTunnelTCP instead)
 }

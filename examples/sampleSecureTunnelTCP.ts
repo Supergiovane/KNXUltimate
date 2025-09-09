@@ -5,7 +5,7 @@ async function main() {
   const cfg: SecureConfig = {
     gatewayIp: '192.168.1.4', // KNX/IP gateway IP (router or interface)
     gatewayPort: 3671,        // KNX/IP gateway port (default 3671)
-    tunnelInterfaceIndividualAddress: '1.1.254', // Tunnel Interface IA from ETS keyring
+    tunnelInterfaceIndividualAddress: '1.1.254', // Optional tunnel Interface IA from ETS keyring
     // knxkeys_file_path: '/path/to/file.knxkeys', // (optional) path to .knxkeys file
     // knxkeys_password: 'projectpassword',        // (optional) ETS keyring password
     debug: true,               // Enable secure session debug logging
