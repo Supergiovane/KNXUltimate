@@ -797,18 +797,17 @@ export class SecureTunnelTCP extends EventEmitter {
 		})
 	}
 
-	async sendCommand(
-		gaStr: string,
-		data: KNXDataBuffer,
-		dpt: string,
-	): Promise<void> {
-		const ga = this.parseGroupAddress(gaStr)
-		const srcIa =
-			this.assignedIa ||
-			this.parseIndividualAddress(DEFAULT_SRC_IA_FALLBACK)
+    async sendCommand(gaStr: string, on: boolean): Promise<void> {
+        const ga = this.parseGroupAddress(gaStr)
+        const srcIa =
+            this.assignedIa ||
+            this.parseIndividualAddress(DEFAULT_SRC_IA_FALLBACK)
 
-		// Plain APDU for GroupValueWrite
-		const apdu = Buffer.from([0x00, APCI.GROUP_VALUE_WRITE | data.value])
+        // Plain APDU for GroupValueWrite (1-bit)
+        const apdu = Buffer.from([
+            0x00,
+            APCI.GROUP_VALUE_WRITE | (on ? 0x01 : 0x00),
+        ])
 
 		// Build cEMI flags (use standard group frame values 0xBCE0)
 		const flags = CEMI.DEFAULT_GROUP_FLAGS // group addr, std frame, no ack, low prio
@@ -818,7 +817,7 @@ export class SecureTunnelTCP extends EventEmitter {
 		)
 	}
 
-	async readStatus(gaStr: string): Promise<number> {
+    async readStatus(gaStr: string): Promise<number> {
 		const ga = this.parseGroupAddress(gaStr)
 		const srcIa =
 			this.assignedIa ||
@@ -850,7 +849,7 @@ export class SecureTunnelTCP extends EventEmitter {
 		])
 	}
 
-	private async sendTunneling(cemi: Buffer): Promise<void> {
+    private async sendTunneling(cemi: Buffer): Promise<void> {
 		const seq = this.tunnelSeq++ & 0xff
 		const connHeader = Buffer.from([
 			TUNNEL_CONN_HEADER_LEN,
@@ -867,8 +866,39 @@ export class SecureTunnelTCP extends EventEmitter {
 			cemi,
 		])
 		const wrapped = this.wrap(frame)
-		this.socket!.write(wrapped)
-	}
+        this.socket!.write(wrapped)
+    }
+
+    // Public write compatible with net.Socket.write; wraps KNX/IP frame into Secure Wrapper
+    write(buffer: string | Uint8Array, cb?: (err?: Error) => void): boolean
+    write(
+        str: string | Uint8Array,
+        encoding?: BufferEncoding,
+        cb?: (err?: Error) => void,
+    ): boolean
+    write(
+        data: string | Uint8Array,
+        encodingOrCb?: BufferEncoding | ((err?: Error) => void),
+        cb?: (err?: Error) => void,
+    ): boolean {
+        if (!this.socket) {
+            const err = new Error('Socket not initialized')
+            if (typeof encodingOrCb === 'function') encodingOrCb(err)
+            else if (cb) cb(err)
+            return false
+        }
+        if (typeof data === 'string') {
+            return this.socket.write(data, encodingOrCb as any, cb as any)
+        }
+        try {
+            const wrapped = this.wrap(Buffer.from(data))
+            return this.socket.write(wrapped, cb as any)
+        } catch (e: any) {
+            if (typeof encodingOrCb === 'function') encodingOrCb(e)
+            else if (cb) cb(e)
+            return false
+        }
+    }
 
 	private parseGroupAddress(ga: string): number {
 		const [m, mi, s] = ga.split('/').map(Number)

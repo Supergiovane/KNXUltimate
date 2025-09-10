@@ -361,24 +361,31 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			// November 2024 - DIRTY function, to be checked
+			// Secure TCP tunnel (Data Secure handled in SecureTunnelTCP)
 			this._clientSocket = new SecureTunnelTCP(
 				this._options.secureTunnelConfig,
 			)
-			// this._clientSocket.removeAllListeners()
-			this.tcpSocketSecure.on(
-				SocketEvents.message,
-				this.processInboundMessage.bind(this),
-			)
-			this.tcpSocketSecure.on(SocketEvents.error, (error) => {
+			// Wire basic socket-like events for KNXClient lifecycle
+			this.tcpSocketSecure.on(SocketEvents.data, (data: Buffer) => {
+				this.sysLogger.debug(
+					`[${getTimestamp()}] Received message`,
+					data,
+				)
+				// Optionally, you can parse incoming here if needed in the future
+			})
+			this.tcpSocketSecure.on(SocketEvents.error, (error: Error) => {
 				this.socketReady = false
 				this.emit(KNXClientEvents.error, error)
 			})
-
 			this.tcpSocketSecure.on(SocketEvents.close, () => {
 				this.socketReady = false
 				this.exitProcessingKNXQueueLoop = true
 				this.emit(KNXClientEvents.close)
+			})
+			this.tcpSocketSecure.on(SocketEvents.connect, () => {
+				this.socketReady = true
+				this.handleKNXQueue()
+				this.emit(KNXClientEvents.connected, this._options)
 			})
 		} else if (this._options.hostProtocol === 'Multicast') {
 			this._clientSocket = dgram.createSocket({
@@ -1296,11 +1303,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				2000,
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
+			// Trigger secure connect; final connected event is emitted on 'connect'
 			this.tcpSocketSecure.connect().catch((err) => {
 				this.emit(KNXClientEvents.error, err)
 			})
-			this._connectionState = ConncetionState.CONNECTED
-			this.emit(KNXClientEvents.connected, this._options)
 		} else {
 			// Multicast
 			this._connectionState = ConncetionState.CONNECTED
@@ -1338,8 +1344,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					// use destroy instead of end here to ensure socket is closed
 					// we could try to see if `end()` works well too
 					client.destroy()
+				} else if (client instanceof SecureTunnelTCP) {
+					client.disconnect()
+					cb()
 				} else {
-					client.close(cb)
+					(client as UDPSocket).close(cb)
 				}
 			} catch (error) {
 				this.sysLogger.error(
@@ -1937,6 +1946,4 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.getSeqNumber(),
 		)
 	}
-
-	// Legacy KNX Secure Session request removed (use SecureTunnelTCP instead)
 }
