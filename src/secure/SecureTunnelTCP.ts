@@ -669,6 +669,11 @@ export class SecureTunnelTCP extends EventEmitter {
 			plainApdu,
 		)
 
+		// Deep debug compare payload building with KNXClient version
+		this.dbg(
+			`DS build: dst=${this.formatGa(groupAddr)} src=${((srcIa >> 12) & 0x0f)}.${((srcIa >> 8) & 0x0f)}.${(srcIa & 0xff)} flags=0x${(cemiFlags & 0xffff).toString(16)} plain=${plainApdu.toString('hex')} seq48=${seq.toString('hex')} block0=${block0.toString('hex')} ctr0=${counter0.toString('hex')}`,
+		)
+
 		// Build SecureAPDU: APCI_SEC header, then SCF + [seq6][encPayload][encMac4]
 		const apciSecHeader = APCI_SEC.HEADER
 		const scf = Buffer.from([SCF_ENCRYPTION_S_A_DATA])
@@ -849,7 +854,7 @@ export class SecureTunnelTCP extends EventEmitter {
 		])
 	}
 
-    private async sendTunneling(cemi: Buffer): Promise<void> {
+	private async sendTunneling(cemi: Buffer): Promise<void> {
 		const seq = this.tunnelSeq++ & 0xff
 		const connHeader = Buffer.from([
 			TUNNEL_CONN_HEADER_LEN,
@@ -865,6 +870,7 @@ export class SecureTunnelTCP extends EventEmitter {
 			connHeader,
 			cemi,
 		])
+		this.dbg(`TX inner (KNX/IP TunnelReq): ${frame.toString('hex')}`)
 		const wrapped = this.wrap(frame)
         this.socket!.write(wrapped)
     }

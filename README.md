@@ -28,7 +28,7 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 | --------------------- | -------------------------------------------------------------------- |
 | KNX Tunnelling        | ![](https://placehold.co/200x20/green/white?text=YES)                |
 | KNX Routing           | ![](https://placehold.co/200x20/green/white?text=YES)                |
-| KNX Secure Tunnelling | ![](https://placehold.co/200x20/orange/white?text=PREVIEW) |
+| KNX Secure Tunnelling | ![](https://placehold.co/200x20/green/white?text=YES) |
 | KNX Secure Routing    | ![](https://placehold.co/200x20/red/white?text=NO)                   |
 
 ## CONNECTION SETUP
@@ -38,18 +38,19 @@ These are the properties to be passed to the connection as a *JSON object {}* (s
 | Property                         | Description                                                                                          |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | ipAddr (string)                  | The IP of your KNX router/interface (for Routers, use "224.0.23.12")                                 |
-| hostProtocol (string)            | "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces. "TunnelTCP" is reserved; for KNX/IP Secure use the separate `SecureTunnelTCP` class (see Secure section below). |
+| hostProtocol (string)            | "Multicast" se ti connetti a un Router KNX. "TunnelUDP" per interfacce KNX. "TunnelTCP" per KNX/IP Secure (tunnel TCP con Secure Wrapper). |
 | ipPort (string)                  | The port, default is "3671"                                                                          |
 | physAddr (string)                | The physical address to be identified in the KNX bus                                                 |
 | suppress_ack_ldatareq (bool)     | Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true |
 | loglevel (string)                | The log level 'disable', 'error', 'warn', 'info', 'debug'                                            |
-| isSecureKNXEnabled (bool)        | Reserved for future use in `KNXClient`. For KNX/IP Secure, use `SecureTunnelTCP`. |
+| isSecureKNXEnabled (bool)        | Abilita KNX Secure. Valido solo con `hostProtocol: 'TunnelTCP'` (handshake di sessione + Secure Wrapper e Data Secure per GA presenti nel keyring). |
+| secureTunnelConfig (object)      | Configurazione KNX Secure: `{ gatewayIp, gatewayPort, tunnelInterfaceIndividualAddress, knxkeys_file_path, knxkeys_password, debug }`. Usata per handshake e Data Secure. |
 | localIPAddress (string)          | **Optional**. The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate |
 | interface (string)               | **Optional**. Specifies the local eth interface to be used to connect to the KNX Bus.                |
 | KNXQueueSendIntervalMilliseconds | **Optional**. The KNX standard has a maximum transmit rate to the BUS, of about 1 telegram each 25ms (to stay safe). In case you've a lot of traffic on the BUS, you can increase this value, expressed in milliseconds. Be careful, because if you set it too high, the KNX engine could send a telegram with flag 'repeat', because the ACK from the device is coming too late. |
 | theGatewayIsKNXVirtual (bool)               | **Optional**. Tells KNX Ultimate, that the gateway is a KNX Virtual ETS software. When set to *true*, it adds the **localIPAddress** to the tunnel_endpoint, in the datagram's tun section. Default is *false*. CAUTION: if set to *true*, connections to KNX/IP interfaces may not work properly. Use only for connecting to KNX Virtual            |
 
-> Note on KNX Secure: `KNXClient` does not embed KNX/IP Secure yet. Use the `SecureTunnelTCP` class for secure tunnelling and Data Secure operations. See the Secure section below.
+> Nota su KNX Secure: `KNXClient` integra ora KNX/IP Secure. Con `hostProtocol: 'TunnelTCP'` e `isSecureKNXEnabled: true` viene stabilita la sessione sicura (Secure Wrapper) e i GA inclusi nel keyring ETS vengono cifrati con Data Secure. I GA non presenti nel keyring restano plain.
 ## SUPPORTED DATAPOINTS
 
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
@@ -157,37 +158,42 @@ You can find all examples in the [examples](./examples/) folder:
 - [logging](./examples/logging.ts) - Shows how to use the logging system and capture log messages.
 - [gatewaydescription](./examples/gatewaydescription.ts) - Discover all gateways on your network and shows the details (name, mac address, etc...).
 
-### KNX IP Secure (Data Secure) — Preview
+### KNX IP Secure (Data Secure)
 
-An experimental Secure Tunneling + Data Secure implementation is available via `SecureTunnelTCP`.
+`KNXClient` supporta KNX/IP Secure e Data Secure.
 
-- Requirements: a KNX Secure gateway, ETS keyring (`.knxkeys`) and the interface IA.
-- Supported: boolean GroupValueWrite/Read (DPT 1.xxx) with Data Secure.
-- Not integrated into `KNXClient` yet; use the separate class.
+- Requisiti: gateway KNX Secure, keyring ETS (`.knxkeys`) e IA dell’interfaccia (come configurata in ETS).
+- Data Secure: tutti i GA presenti nel keyring vengono cifrati end‑to‑end; i GA non presenti restano non cifrati.
+– Modalità supportata: `TunnelTCP` + `isSecureKNXEnabled: true` → sessione sicura (Secure Wrapper) + Data Secure per GA del keyring.
 
-Quick start:
+Esempio veloce:
 
 ```ts
-import { SecureTunnelTCP, SecureConfig } from './src/secure/SecureTunnelTCP'
+import KNXClient, { SecureConfig } from './src/KNXClient'
 
-const cfg: SecureConfig = {
+const secureCfg: SecureConfig = {
   gatewayIp: '192.168.1.4',
   gatewayPort: 3671,
   tunnelInterfaceIndividualAddress: '1.1.254',
-  // knxkeys_file_path: '/absolute/or/relative/path/to/file.knxkeys',
-  // knxkeys_password: 'yourKeyringPassword',
+  // knxkeys_file_path: '/path/to/project.knxkeys',
+  // knxkeys_password: 'projectPassword',
   debug: true,
 }
 
-const knx = new SecureTunnelTCP(cfg)
-await knx.connect()
+const client = new KNXClient({
+  hostProtocol: 'TunnelTCP',
+  isSecureKNXEnabled: true,
+  secureTunnelConfig: secureCfg,
+  physAddr: '1.1.200',
+})
 
-// Write ON to 1/1/1 and read 1/1/2
-await knx.sendCommand('1/1/1', true)
-const status = await knx.readStatus('1/1/2')
-console.log('Status:', status ? 'ON' : 'OFF')
+client.on('connected', () => console.log('Connected (secure)'))
+client.on('error', (e) => console.error('Error:', e))
 
-knx.disconnect()
+client.Connect()
+
+// Scrive ON su 1/1/1; se 1/1/1 è nel keyring → Data Secure
+client.write('1/1/1', true, '1.001')
 ```
 
 <br/>
