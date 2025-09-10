@@ -797,13 +797,12 @@ export class SecureTunnelTCP extends EventEmitter {
 		})
 	}
 
-	async sendCommand(gaStr: string, on: boolean): Promise<void> {
-		console.log(`\n💡 Sending ${on ? 'ON' : 'OFF'} → ${gaStr}`)
-
+	async sendCommand(gaStr: string, data: any, dpt: string): Promise<void> {
 		const ga = this.parseGroupAddress(gaStr)
 		const srcIa =
 			this.assignedIa ||
 			this.parseIndividualAddress(DEFAULT_SRC_IA_FALLBACK)
+
 		// Plain APDU for GroupValueWrite (1-bit)
 		const apdu = Buffer.from([
 			0x00,
