@@ -54,7 +54,7 @@ import {
 	DEFAULT_KNXKEYS_PASSWORD,
 } from './secure_knx_constants'
 import { EventEmitter, on } from 'stream'
-import { KNXPacket } from 'src/protocol'
+import { KNXDataBuffer, KNXPacket } from 'src/protocol'
 
 // Defaults for library consumers
 const DEFAULT_GATEWAY_IP = '192.168.1.4'
@@ -797,17 +797,18 @@ export class SecureTunnelTCP extends EventEmitter {
 		})
 	}
 
-	async sendCommand(gaStr: string, data: any, dpt: string): Promise<void> {
+	async sendCommand(
+		gaStr: string,
+		data: KNXDataBuffer,
+		dpt: string,
+	): Promise<void> {
 		const ga = this.parseGroupAddress(gaStr)
 		const srcIa =
 			this.assignedIa ||
 			this.parseIndividualAddress(DEFAULT_SRC_IA_FALLBACK)
 
-		// Plain APDU for GroupValueWrite (1-bit)
-		const apdu = Buffer.from([
-			0x00,
-			APCI.GROUP_VALUE_WRITE | (on ? 0x01 : 0x00),
-		])
+		// Plain APDU for GroupValueWrite
+		const apdu = Buffer.from([0x00, APCI.GROUP_VALUE_WRITE | data.value])
 
 		// Build cEMI flags (use standard group frame values 0xBCE0)
 		const flags = CEMI.DEFAULT_GROUP_FLAGS // group addr, std frame, no ack, low prio
