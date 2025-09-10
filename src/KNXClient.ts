@@ -611,7 +611,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.emit(KNXClientEvents.error, error)
 					resolve(false)
 				}
-			} else {
+			} else if (
+				this._options.hostProtocol === 'TunnelTCP' &&
+				this._options.isSecureKNXEnabled
+			) {
+				// KNX Secure over TCP
 				try {
 					this.tcpSocketSecure.write(
 						_knxPacket.toBuffer(),
@@ -1292,7 +1296,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				2000,
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			this.tcpSocketSecure.connect()
+			this.tcpSocketSecure.connect().catch((err) => {
+				this.emit(KNXClientEvents.error, err)
+			})
+			this._connectionState = ConncetionState.CONNECTED
+			this.emit(KNXClientEvents.connected, this._options)
 		} else {
 			// Multicast
 			this._connectionState = ConncetionState.CONNECTED

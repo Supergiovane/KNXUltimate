@@ -53,7 +53,8 @@ import {
 	DEFAULT_KNXKEYS_PATH,
 	DEFAULT_KNXKEYS_PASSWORD,
 } from './secure_knx_constants'
-import { EventEmitter } from 'stream'
+import { EventEmitter, on } from 'stream'
+import { KNXPacket } from 'src/protocol'
 
 // Defaults for library consumers
 const DEFAULT_GATEWAY_IP = '192.168.1.4'
