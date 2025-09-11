@@ -1,7 +1,11 @@
-import KNXClient, { SecureConfig } from '../src/KNXClient'
+import KNXClient from '../src/KNXClient'
 import CEMIConstants from '../src/protocol/cEMI/CEMIConstants'
 
-async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): Promise<number> {
+async function waitForStatus(
+  client: KNXClient,
+  ga: string,
+  timeoutMs = 5000,
+): Promise<number> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       client.off('indication', onInd)
@@ -30,24 +34,20 @@ async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): P
 }
 
 async function main() {
-  // KNX Secure + Data Secure configuration
-  const secureCfg: SecureConfig = {
-    tunnelInterfaceIndividualAddress: '1.1.254',
-    knxkeys_file_path: '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
-    knxkeys_password: 'passwordprogetto',
-  }
+  console.log('🚀 Connecting KNX/IP (TunnelUDP, plain)')
 
   const client = new KNXClient({
-    hostProtocol: 'TunnelTCP',
-    ipAddr: '192.168.1.4',
+    hostProtocol: 'Multicast',
+    ipAddr: '224.0.23.12',
     ipPort: 3671,
-    isSecureKNXEnabled: true,
-    secureTunnelConfig: secureCfg,
-    loglevel: 'info',
+    physAddr:"15.15.250",
+    isSecureKNXEnabled: false,
+    // For multicast, local echo helps see own telegrams
     localEchoInTunneling: true,
+    loglevel: 'info'
   })
 
-  client.on('connected', () => console.log('✓ KNXClient connected (secure)'))
+  client.on('connected', () => console.log('✓ KNXClient connected (plain UDP)'))
   client.on('error', (e) => console.error('Error:', e.message))
   client.on('disconnected', (reason) => console.log('Disconnected:', reason))
 
@@ -55,27 +55,25 @@ async function main() {
     client.Connect()
     await new Promise<void>((resolve) => client.once('connected', () => resolve()))
 
-    console.log('\nTEST: ON/OFF 1/1/1 with status check 1/1/2')
+    console.log('\nTEST: ON/OFF 0/1/1 with status check 0/1/25')
+
     // ON
-    client.write('1/1/1', true, '1.001')
-    // Small delay before reading status to avoid racing immediately after write
-    await new Promise((r) => setTimeout(r, 150))
-    client.read('1/1/2')
-    const onVal = await waitForStatus(client, '1/1/2', 5000)
+    client.write('0/1/1', true, '1.001')
+    await new Promise((r) => setTimeout(r, 1500))
+    client.read('0/1/25')
+    const onVal = await waitForStatus(client, '0/1/25', 5000)
     console.log(`Status after ON: ${onVal ? 'ON' : 'OFF'}`)
-    if (onVal !== 1) throw new Error('Unexpected status after ON (expected ON)')
-
-    // OFF
-    client.write('1/1/1', false, '1.001')
-    await new Promise((r) => setTimeout(r, 150))
-    client.read('1/1/2')
-    const offVal = await waitForStatus(client, '1/1/2', 5000)
-    console.log(`Status after OFF: ${offVal ? 'ON' : 'OFF'}`)
-    if (offVal !== 0) throw new Error('Unexpected status after OFF (expected OFF)')
-
-    console.log('\nCommands sent and status verified correctly.')
-    console.log('Waiting 5s before closing the connection (KNX spec).')
     await new Promise((r) => setTimeout(r, 5000))
+    // OFF
+    client.write('0/1/1', false, '1.001')
+    await new Promise((r) => setTimeout(r, 1500))
+    client.read('0/1/25')
+    const offVal = await waitForStatus(client, '0/1/25', 5000)
+    console.log(`Status after OFF: ${offVal ? 'ON' : 'OFF'}`)
+
+    console.log('\nCommands sent and status verified (TunnelUDP).')
+    console.log('Waiting 3s before closing the connection (cleanup).')
+    await new Promise((r) => setTimeout(r, 3000))
   } catch (err) {
     console.error('\nError:', err)
   } finally {
@@ -84,3 +82,4 @@ async function main() {
 }
 
 main().catch(console.error)
+

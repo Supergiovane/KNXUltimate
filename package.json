@@ -13,6 +13,8 @@
   },
   "scripts": {
     "build": "npm run clean && tsc -p tsconfig.build.json",
+    "example:secure:multicast": "node -r esbuild-register -e \"require('./examples/sampleSecureMulticast.ts')\"",
+    "example:secure:tunnel": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCP.ts')\"",
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",
     "test": "node -r esbuild-register --test test/**/*.test.ts",

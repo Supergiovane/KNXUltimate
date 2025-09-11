@@ -32,6 +32,7 @@ import KNXTunnelingAck from './protocol/KNXTunnelingAck'
 import KNXSearchResponse from './protocol/KNXSearchResponse'
 import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
 import { wait, getTimestamp } from './utils'
+import { performance } from 'perf_hooks'
 // KNX Secure helpers (moved inlined usage from SecureTunnelTCP)
 import { Keyring } from './secure/keyring'
 import {
@@ -179,6 +180,8 @@ export type KNXClientOptions = {
 	theGatewayIsKNXVirtual?: boolean
 	/** Optional configuration for KNX/IP Secure over TCP (handshake + Data Secure helpers). */
 	secureTunnelConfig?: SecureConfig
+	/** Secure multicast: wait to send until timer is authenticated (default: true) */
+	secureRoutingWaitForTimer?: boolean
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
@@ -195,6 +198,7 @@ const optionsDefaults: KNXClientOptions = {
 	interface: '',
 	KNXQueueSendIntervalMilliseconds: 25,
 	theGatewayIsKNXVirtual: false,
+	secureRoutingWaitForTimer: true,
 }
 
 export enum KNXTimer {
@@ -309,6 +313,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _secureAssignedIa: number = 0
 
+	// ==== KNX/IP Secure Group (routing over multicast) ====
+	private _secureBackboneKey?: Buffer
+	private _secureRoutingTimerOffsetMs: number = 0
+	private _secureRoutingTimerAuthenticated: boolean = false
+	private _secureRoutingLatencyMs: number = 1000
+
 	// Logging helpers use KNXClient loglevel; no separate boolean
 	private _secureHandshakeSessionTimer?: NodeJS.Timeout
 
@@ -422,10 +432,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				type: 'udp4',
 				reuseAddr: true,
 			}) as UDPSocket
-			this.udpSocket.on(
-				SocketEvents.message,
-				this.processInboundMessage.bind(this),
-			)
+			this.udpSocket.on(SocketEvents.message, (msg: Buffer, rinfo: RemoteInfo) => {
+				try {
+					// TunnelUDP never uses IP Secure wrapper; pass through
+					this.processInboundMessage(msg, rinfo)
+				} catch (e) {
+					this.emit(
+						KNXClientEvents.error,
+						e instanceof Error ? e : new Error('UDP data error'),
+					)
+				}
+			})
 			this.udpSocket.on(SocketEvents.error, (error) => {
 				this.socketReady = false
 				this.emit(KNXClientEvents.error, error)
@@ -509,11 +526,32 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.udpSocket.on(SocketEvents.listening, () => {
 				this.socketReady = true
 				this.handleKNXQueue()
+				// For plain multicast, emit connected at listening; for secure multicast wait for timer auth (0955/0950)
+				if (
+					this._connectionState === ConncetionState.CONNECTING &&
+					!this._options.isSecureKNXEnabled
+				) {
+					this._connectionState = ConncetionState.CONNECTED
+					this._numFailedTelegramACK = 0
+					this.clearToSend = true
+					this._clientTunnelSeqNumber = -1
+					this.emit(KNXClientEvents.connected, this._options)
+				}
 			})
-			this.udpSocket.on(
-				SocketEvents.message,
-				this.processInboundMessage.bind(this),
-			)
+			this.udpSocket.on(SocketEvents.message, (msg: Buffer, rinfo: RemoteInfo) => {
+				try {
+					if (this._options.isSecureKNXEnabled) {
+						this.secureOnUdpData(msg, rinfo)
+						return
+					}
+					this.processInboundMessage(msg, rinfo)
+				} catch (e) {
+					this.emit(
+						KNXClientEvents.error,
+						e instanceof Error ? e : new Error('UDP data error'),
+					)
+				}
+			})
 			this.udpSocket.on(SocketEvents.error, (error) => {
 				this.socketReady = false
 				this.emit(KNXClientEvents.error, error)
@@ -537,6 +575,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this.udpSocket.setMulticastInterface(
 							this._options.localIPAddress,
 						)
+						// Ensure we receive our own multicast (useful for local echo/diagnostics)
+						try {
+							this.udpSocket.setMulticastLoopback(true)
+						} catch {}
+						this.sysLogger.debug(
+							`[${getTimestamp()}] Multicast socket bound on ${this._options.localIPAddress || '0.0.0.0'}:${this._peerPort}`,
+						)
 					} catch (error) {
 						this.sysLogger.error(
 							`Multicast: Error setting SetTTL ${error.message}` ||
@@ -547,6 +592,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this.udpSocket.addMembership(
 							this._peerHost,
 							this._options.localIPAddress,
+						)
+						this.sysLogger.debug(
+							`[${getTimestamp()}] Joined multicast group ${this._peerHost} on ${this._options.localIPAddress}`,
 						)
 					} catch (err) {
 						this.sysLogger.error(
@@ -705,8 +753,47 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._options.hostProtocol === 'TunnelUDP'
 			) {
 				try {
+					// If Multicast+Secure, apply Data Secure (if GA has key) before wrapping
+					try {
+						if (
+							this._options.hostProtocol === 'Multicast' &&
+							this._options.isSecureKNXEnabled &&
+							_knxPacket instanceof KNXRoutingIndication
+						) {
+							const kri = _knxPacket as KNXRoutingIndication & { header: any; length: number }
+							this.maybeApplyDataSecure(kri.cEMIMessage as any)
+							// Update KNX/IP header length to include updated cEMI length
+							try {
+								kri.length = kri.cEMIMessage?.length ?? kri.length
+								kri.header.length = KNX_CONSTANTS.HEADER_SIZE_10 + kri.length
+							} catch {}
+						}
+					} catch {}
+
+					let outBuf = _knxPacket.toBuffer()
+					if (
+						this._options.hostProtocol === 'Multicast' &&
+						this._options.isSecureKNXEnabled &&
+						(_knxPacket instanceof KNXRoutingIndication ||
+							(_knxPacket as any)?.header?.service_type ===
+								KNX_CONSTANTS.ROUTING_INDICATION)
+					) {
+						try {
+							outBuf = this.secureWrapRouting(outBuf)
+							if (this.isLevelEnabled('debug')) {
+								this.sysLogger.debug(
+									`[${getTimestamp()}] TX 0950 SecureWrapper (routing) len=${outBuf.length}`,
+								)
+							}
+						} catch (e) {
+							this.sysLogger.error(
+								`Secure multicast wrap error: ${(e as Error).message}`,
+							)
+						}
+					}
+
 					this.udpSocket.send(
-						_knxPacket.toBuffer(),
+						outBuf,
 						this._peerPort,
 						this._peerHost,
 						(error) => {
@@ -723,12 +810,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				} catch (error) {
 					this.sysLogger.error(
 						`Sending KNX packet: Send UDP Catch error: ${
-							error.message
+							(error as Error).message
 						} ${typeof _knxPacket} seqCounter:${
 							(_knxPacket as any)?.seqCounter
 						}`,
 					)
-					this.emit(KNXClientEvents.error, error)
+					this.emit(KNXClientEvents.error, error as Error)
 					resolve(false)
 				}
 			} else if (this._options.hostProtocol === 'TunnelTCP') {
@@ -880,6 +967,25 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			}
 
 			const item = this.commandQueue.pop()
+
+			// Secure multicast gating: wait for timer authentication before sending RoutingIndication
+			if (
+				this._options.hostProtocol === 'Multicast' &&
+				this._options.isSecureKNXEnabled &&
+				(this._options.secureRoutingWaitForTimer ?? true) &&
+				!this._secureRoutingTimerAuthenticated &&
+				(item.knxPacket instanceof KNXRoutingIndication)
+			) {
+				try {
+					this.sysLogger.debug(
+						`[${getTimestamp()}] Secure multicast: waiting timer auth, deferring 0950 send`,
+					)
+				} catch {}
+				// push back item and wait briefly
+				this.commandQueue.push(item)
+				await wait(200)
+				continue
+			}
 			this.currentItemHandledByTheQueue = item
 			// Associa il sequence number di tunneling al momento dell'invio
 			try {
@@ -997,8 +1103,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const srcAddress = this.physAddr
 
 		if (this._options.hostProtocol === 'Multicast') {
-			// Multicast.
-			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
+			// Multicast: use L_DATA_REQ for outgoing injection onto the bus
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
 				'write',
 				srcAddress,
 				dstAddress,
@@ -1009,7 +1115,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.priority = 3
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
-			// Data Secure si applica solo in TunnelTCP
+			// Data Secure si applica solo se GA è sicura (TunnelTCP o, opzionalmente, anche qui se chiavi presenti)
 			const knxPacketRequest =
 				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
@@ -1077,8 +1183,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const srcAddress = this.physAddr
 
 		if (this._options.hostProtocol === 'Multicast') {
-			// Multicast
-			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
+			// Multicast: use L_DATA_REQ for outgoing injection
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
 				'response',
 				srcAddress,
 				dstAddress,
@@ -1089,7 +1195,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.priority = 3
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
-			// Data Secure si applica solo in TunnelTCP
+			// Data Secure opzionale se GA è sicura
 			const knxPacketRequest =
 				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
@@ -1146,8 +1252,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const srcAddress = this.physAddr
 
 		if (this._options.hostProtocol === 'Multicast') {
-			// Multicast
-			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
+			// Multicast: use L_DATA_REQ for outgoing read request
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
 				'read',
 				srcAddress,
 				dstAddress,
@@ -1514,15 +1620,29 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				.catch((err) => this.emit(KNXClientEvents.error, err))
 		} else {
 			// Multicast
-			// Multicast
-			this._connectionState = ConncetionState.CONNECTED
-
-			// 16/03/2022 These two are referring to tunneling connection, but i set it here as well. Non si sa mai.
-			this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
-			this.clearToSend = true // 26/12/2021 allow to send
-
-			this._clientTunnelSeqNumber = -1
-			this.emit(KNXClientEvents.connected, this._options)
+			// If secure routing requested, ensure keyring/backbone key is loaded (async, no need to await)
+			if (this._options.isSecureKNXEnabled) {
+				this.secureEnsureKeyring()
+					.then(() => {
+						if (!this._secureBackboneKey) {
+							this.emit(
+								KNXClientEvents.error,
+								new Error('No Backbone key found in keyring for secure multicast'),
+							)
+						}
+					})
+					.catch((err) => this.emit(KNXClientEvents.error, err))
+			}
+			// For multicast there is no handshake; emit connected at 'listening' only in plain mode
+			// If socket is already listening and we're in plain mode, emit now
+			if (this.socketReady && !this._options.isSecureKNXEnabled) {
+				this._connectionState = ConncetionState.CONNECTED
+				this._numFailedTelegramACK = 0
+				this.clearToSend = true
+				this._clientTunnelSeqNumber = -1
+				this.emit(KNXClientEvents.connected, this._options)
+			}
+			// If secure mode, keep CONNECTING; will emit after first timer sync (0955/0950)
 		}
 	}
 
@@ -2128,15 +2248,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				'sha256',
 			)
 
-			// Load group keys
+
+			// Load group keys (optional for Data Secure). Secure routing does not require them
 			this._secureGroupKeys = new Map()
 			for (const [gaStr, g] of kr.getGroupAddresses()) {
 				if (!g.decryptedKey) continue
 				const ga = this.secureParseGroupAddress(gaStr)
 				this._secureGroupKeys.set(ga, g.decryptedKey.slice(0, 16))
-			}
-			if (!this._secureGroupKeys.size) {
-				throw new Error('No Data Secure group keys found in keyring.')
 			}
 
 			// Initialize Data Secure sender sequence (48-bit)
@@ -2152,6 +2270,24 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					const ser = Buffer.from(dev.serialNumber, 'hex')
 					if (ser.length === 6) this._secureSerial = ser
 				} catch {}
+			}
+
+			// Load Backbone key for secure multicast routing (if present)
+			try {
+				const backbones = kr.getBackbones()
+				if (backbones && backbones.length > 0) {
+					const bb = backbones[0]
+					if (bb?.decryptedKey && bb.decryptedKey.length >= 16) {
+						this._secureBackboneKey = bb.decryptedKey.subarray(0, 16)
+					}
+					if (typeof bb?.latency === 'number') {
+						this._secureRoutingLatencyMs = Math.max(100, bb.latency)
+					}
+				}
+			} catch (e) {
+				this.sysLogger.warn(
+					`Secure multicast: cannot read backbone key/latency: ${(e as Error).message}`,
+				)
 			}
 		}
 	}
@@ -2461,6 +2597,244 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		])
 	}
 
+	// ===== KNX/IP Secure Multicast (routing) helpers =====
+	private secureRoutingTimerValue(): number {
+		// Monotonic-ish timer in ms; adjust by offset if synchronized
+		const now = performance.now()
+		const v = Math.floor(now + this._secureRoutingTimerOffsetMs)
+		// Constrain to 48-bit range
+		return Math.max(0, Math.min(v, 0xffffffffffff))
+	}
+
+	private secureRoutingEmitConnectedIfPending() {
+		try {
+			if (
+				this._options.hostProtocol === 'Multicast' &&
+				this._options.isSecureKNXEnabled &&
+				this._connectionState === ConncetionState.CONNECTING
+			) {
+				this._connectionState = ConncetionState.CONNECTED
+				this._numFailedTelegramACK = 0
+				this.clearToSend = true
+				this._clientTunnelSeqNumber = -1
+				this.emit(KNXClientEvents.connected, this._options)
+			}
+		} catch {}
+	}
+
+	private secureWrapRouting(inner: Buffer): Buffer {
+		if (!this._secureBackboneKey) throw new Error('Backbone key not set')
+		const seqNum = this.secureRoutingTimerValue()
+		const seq = Buffer.alloc(SECURE_SEQ_LEN)
+		seq.writeUIntBE(seqNum, 0, SECURE_SEQ_LEN)
+		const tag = crypto.randomBytes(2)
+		const sid = 0 // routing uses session id 0
+		const totalLen = SECURE_WRAPPER_OVERHEAD + inner.length
+		const hdr = Buffer.concat([
+			KNXIP_HDR_SECURE_WRAPPER,
+			Buffer.from([(totalLen >> 8) & 0xff, totalLen & 0xff]),
+		])
+		const sidBytes = Buffer.from([0x00, 0x00])
+		const additionalData = Buffer.concat([hdr, sidBytes])
+		const block0 = Buffer.concat([
+			seq,
+			this._secureSerial,
+			tag,
+			Buffer.from([(inner.length >> 8) & 0xff, inner.length & 0xff]),
+		])
+		const blocks = Buffer.concat([
+			block0,
+			Buffer.from([0x00, additionalData.length]),
+			additionalData,
+			inner,
+		])
+		const padded = Buffer.concat([
+			blocks,
+			Buffer.alloc((16 - (blocks.length % 16)) % 16, 0),
+		])
+		const cipher = crypto.createCipheriv(
+			'aes-128-cbc',
+			this._secureBackboneKey,
+			Buffer.alloc(AES_BLOCK_LEN, 0),
+		)
+		cipher.setAutoPadding(false)
+		const encrypted = Buffer.concat([cipher.update(padded), cipher.final()])
+		const macCbc = encrypted.subarray(encrypted.length - MAC_LEN_FULL)
+
+		const ctr0 = Buffer.concat([
+			seq,
+			this._secureSerial,
+			tag,
+			Buffer.from([0xff, 0x00]),
+		])
+		const ctr = crypto.createCipheriv(
+			'aes-128-ctr',
+			this._secureBackboneKey,
+			ctr0,
+		)
+		const encMac = ctr.update(macCbc)
+		const encData = ctr.update(inner)
+
+		return Buffer.concat([
+			hdr,
+			Buffer.from([sid >> 8, sid & 0xff]),
+			seq,
+			this._secureSerial,
+			tag,
+			encData,
+			encMac,
+		])
+	}
+
+	private secureDecryptRouting(wrapper: Buffer): Buffer {
+		if (!this._secureBackboneKey)
+			throw new Error('Backbone key not set for secure routing')
+		// Validate header
+		if (wrapper.length < 6 + 2 + 6 + 6 + 2 + 16)
+			throw new Error('Invalid SecureWrapper length')
+		const service = wrapper.readUInt16BE(2)
+		if (service !== KNX_CONSTANTS.SECURE_WRAPPER)
+			throw new Error('Not a SecureWrapper')
+		const sid = wrapper.readUInt16BE(6)
+		if (sid !== 0) throw new Error('Unexpected session id for routing')
+		const seq = wrapper.subarray(8, 14)
+		const serial = wrapper.subarray(14, 20)
+		const tag = wrapper.subarray(20, 22)
+		const encData = wrapper.subarray(22, wrapper.length - MAC_LEN_FULL)
+		const mac = wrapper.subarray(wrapper.length - MAC_LEN_FULL)
+
+		// CTR decrypt
+		const ctr0 = Buffer.concat([
+			seq,
+			serial,
+			tag,
+			SECURE_WRAPPER_MAC_SUFFIX,
+		])
+		const [plain, macTr] = decryptCtr(
+			this._secureBackboneKey,
+			ctr0,
+			mac,
+			encData,
+		)
+		// Verify MAC (CBC over additional data + payload)
+		const hdr = wrapper.subarray(0, 6)
+		const additional = Buffer.concat([hdr, Buffer.from([0x00, 0x00])])
+		const b0 = Buffer.concat([
+			seq,
+			serial,
+			tag,
+			Buffer.from([(plain.length >> 8) & 0xff, plain.length & 0xff]),
+		])
+		const macCbc = calculateMessageAuthenticationCodeCBC(
+			this._secureBackboneKey,
+			additional,
+			plain,
+			b0,
+		)
+		if (!macCbc.equals(macTr)) {
+			throw new Error('SecureWrapper MAC verification failed')
+		}
+		return plain
+	}
+
+	private secureOnUdpData(msg: Buffer, rinfo: RemoteInfo) {
+		try {
+			if (!msg || msg.length < 6) return
+			const service = msg.readUInt16BE(2)
+			if (service === KNX_CONSTANTS.SECURE_WRAPPER) {
+				if (!this._options.isSecureKNXEnabled) return
+				// Decrypt and forward inner KNX/IP frame
+				const inner = this.secureDecryptRouting(msg)
+				// Optional: basic timer handling (update max received timer)
+				try {
+					// Extract sequence information to update timer offset
+					const seq = msg.subarray(8, 14)
+					const timerValue = seq.readUIntBE(0, 6)
+					const localNow = Math.floor(performance.now())
+					const delta = timerValue - localNow
+					if (!this._secureRoutingTimerAuthenticated) {
+						this._secureRoutingTimerOffsetMs = delta
+						this._secureRoutingTimerAuthenticated = true
+						try {
+							this.sysLogger.debug(
+								`[${getTimestamp()}] Secure routing timer authenticated. remote=${timerValue} local=${localNow} offset=${delta}ms`,
+							)
+						} catch {}
+						// If we were connecting in secure multicast, now we can emit connected
+						this.secureRoutingEmitConnectedIfPending()
+					}
+				} catch {}
+				const rin: RemoteInfo = {
+					address: rinfo.address,
+					port: rinfo.port,
+					family: rinfo.family,
+					size: inner.length,
+				} as any
+				this.processInboundMessage(inner, rin)
+				return
+			}
+			if (service === KNX_CONSTANTS.SECURE_GROUP_SYNC) {
+				// TimerNotify: verify MAC and adjust timer
+				try {
+					if (!this._secureBackboneKey) return
+					if (msg.length < 0x24) return
+					const seq = msg.subarray(6, 12)
+					const serial = msg.subarray(12, 18)
+					const tag = msg.subarray(18, 20)
+					const mac = msg.subarray(20, 36)
+					const ctr0 = Buffer.concat([
+						seq,
+						serial,
+						tag,
+						Buffer.from([0xff, 0x00]),
+					])
+					const [, macTr] = decryptCtr(
+						this._secureBackboneKey,
+						ctr0,
+						mac,
+					)
+					// additional data is fixed header 06 10 09 55 00 24
+					const additional = Buffer.from('061009550024', 'hex')
+					const b0 = Buffer.concat([
+						seq,
+						serial,
+						tag,
+						Buffer.from([0x00, 0x00]),
+					])
+					const macCbc = calculateMessageAuthenticationCodeCBC(
+						this._secureBackboneKey,
+						additional,
+						Buffer.alloc(0),
+						b0,
+					)
+					if (macCbc.equals(macTr)) {
+						const t = seq.readUIntBE(0, 6)
+						const localNow = Math.floor(performance.now())
+						this._secureRoutingTimerOffsetMs = t - localNow
+						this._secureRoutingTimerAuthenticated = true
+						try {
+							this.sysLogger.debug(
+								`[${getTimestamp()}] TimerNotify authenticated. remote=${t} local=${localNow} offset=${this._secureRoutingTimerOffsetMs}ms`,
+							)
+						} catch {}
+						this.secureRoutingEmitConnectedIfPending()
+					}
+				} catch (e) {
+					// ignore timer errors
+				}
+				return
+			}
+
+			// Fallback: forward as plain
+			this.processInboundMessage(msg, rinfo)
+		} catch (e) {
+			this.emit(
+				KNXClientEvents.error,
+				e instanceof Error ? e : new Error('UDP secure routing error'),
+			)
+		}
+	}
+
 	// ===== Logging level helpers =====
 	private getLoggerLevel(): LogLevel {
 		try {
@@ -2691,7 +3065,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	// Apply Data Secure to an outgoing cEMI if GA has a key in keyring
 	private maybeApplyDataSecure(cemi: any) {
 		try {
-			if (this._options.hostProtocol !== 'TunnelTCP') return
 			if (!this._options.isSecureKNXEnabled) return
 			if (this._options.secureTunnelConfig?.disableDataSecure) return
 			if (!this._secureGroupKeys || this._secureGroupKeys.size === 0)
@@ -2731,7 +3104,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			npdu.tpci = APCI_SEC.HIGH
 			npdu.apci = APCI_SEC.LOW
 			npdu.data = new KNXDataBuffer(secureApduFull.subarray(2))
-			// Ensure srcAddress reflects the assigned IA used on the bus
+			// Ensure srcAddress reflects the assigned IA used on the bus (TunnelTCP) or current physAddr (Multicast)
 			try {
 				if (this._secureAssignedIa) {
 					cemi.srcAddress = new KNXAddress(
@@ -2760,7 +3133,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	// Decrypt incoming Data Secure NPDU in-place if applicable
 	private maybeDecryptDataSecure(cemi: any) {
 		try {
-			if (this._options.hostProtocol !== 'TunnelTCP') return
 			if (!this._options.isSecureKNXEnabled) return
 			if (!this._secureGroupKeys || this._secureGroupKeys.size === 0)
 				return
