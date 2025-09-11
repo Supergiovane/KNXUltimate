@@ -35,62 +35,62 @@ import { wait, getTimestamp } from './utils'
 // KNX Secure helpers (moved inlined usage from SecureTunnelTCP)
 import { Keyring } from './secure/keyring'
 import {
-    calculateMessageAuthenticationCodeCBC,
-    encryptDataCtr,
-    decryptCtr,
+	calculateMessageAuthenticationCodeCBC,
+	encryptDataCtr,
+	decryptCtr,
 } from './secure/security_primitives'
 import {
-    SCF_ENCRYPTION_S_A_DATA,
-    KNXIP,
-    CEMI as SEC_CEMI,
-    APCI,
-    APCI_SEC,
-    TPCI_DATA,
-    SECURE_WRAPPER_TAG,
-    SECURE_WRAPPER_CTR_SUFFIX,
-    SECURE_WRAPPER_MAC_SUFFIX,
-    SECURE_WRAPPER_OVERHEAD,
-    KNXIP_HDR_SECURE_WRAPPER,
-    KNXIP_HDR_TUNNELING_REQUEST,
-    KNXIP_HDR_TUNNELING_ACK,
-    KNXIP_HDR_TUNNELING_CONNECT_REQUEST,
-    KNXIP_HDR_SECURE_SESSION_REQUEST,
-    KNXIP_HDR_SECURE_SESSION_AUTHENTICATE,
-    DATA_SECURE_CTR_SUFFIX,
-    AUTH_CTR_IV,
-    CONNECT_SEND_DELAY_MS,
-    DEFAULT_STATUS_TIMEOUT_MS,
-    SECURE_SESSION_TIMEOUT_MS,
-    SECURE_AUTH_TIMEOUT_MS,
-    SECURE_CONNECT_TIMEOUT_MS,
-    HPAI_CONTROL_ENDPOINT_EMPTY,
-    HPAI_DATA_ENDPOINT_EMPTY,
-    CRD_TUNNEL_LINKLAYER,
-    TUNNEL_CONN_HEADER_LEN,
-    TUNNELING_ACK_TOTAL_LEN,
-    WAIT_FOR_STATUS_DEFAULT_MS,
-    KNXIP_HEADER_LEN,
-    DEFAULT_SRC_IA_FALLBACK,
-    PUBLIC_KEY_LEN,
-    SECURE_SEQ_LEN,
-    AES_BLOCK_LEN,
-    MAC_LEN_FULL,
-    MAC_LEN_SHORT,
-    DEFAULT_KNXKEYS_PATH,
-    DEFAULT_KNXKEYS_PASSWORD,
+	SCF_ENCRYPTION_S_A_DATA,
+	KNXIP,
+	CEMI as SEC_CEMI,
+	APCI,
+	APCI_SEC,
+	TPCI_DATA,
+	SECURE_WRAPPER_TAG,
+	SECURE_WRAPPER_CTR_SUFFIX,
+	SECURE_WRAPPER_MAC_SUFFIX,
+	SECURE_WRAPPER_OVERHEAD,
+	KNXIP_HDR_SECURE_WRAPPER,
+	KNXIP_HDR_TUNNELING_REQUEST,
+	KNXIP_HDR_TUNNELING_ACK,
+	KNXIP_HDR_TUNNELING_CONNECT_REQUEST,
+	KNXIP_HDR_SECURE_SESSION_REQUEST,
+	KNXIP_HDR_SECURE_SESSION_AUTHENTICATE,
+	DATA_SECURE_CTR_SUFFIX,
+	AUTH_CTR_IV,
+	CONNECT_SEND_DELAY_MS,
+	DEFAULT_STATUS_TIMEOUT_MS,
+	SECURE_SESSION_TIMEOUT_MS,
+	SECURE_AUTH_TIMEOUT_MS,
+	SECURE_CONNECT_TIMEOUT_MS,
+	HPAI_CONTROL_ENDPOINT_EMPTY,
+	HPAI_DATA_ENDPOINT_EMPTY,
+	CRD_TUNNEL_LINKLAYER,
+	TUNNEL_CONN_HEADER_LEN,
+	TUNNELING_ACK_TOTAL_LEN,
+	WAIT_FOR_STATUS_DEFAULT_MS,
+	KNXIP_HEADER_LEN,
+	DEFAULT_SRC_IA_FALLBACK,
+	PUBLIC_KEY_LEN,
+	SECURE_SEQ_LEN,
+	AES_BLOCK_LEN,
+	MAC_LEN_FULL,
+	MAC_LEN_SHORT,
+	DEFAULT_KNXKEYS_PATH,
+	DEFAULT_KNXKEYS_PASSWORD,
 } from './secure/secure_knx_constants'
 
 // Secure config moved here to avoid dependency on separate class file
 export interface SecureConfig {
-    /** Deprecated: use KNXClientOptions.ipAddr */
-    gatewayIp?: string
-    /** Deprecated: use KNXClientOptions.ipPort */
-    gatewayPort?: number
-    tunnelInterfaceIndividualAddress: string
-    knxkeys_file_path?: string
-    knxkeys_password?: string
-    // Temporary/testing: disable Data Secure wrapping of GA even if present in keyring
-    disableDataSecure?: boolean
+	/** Deprecated: use KNXClientOptions.ipAddr */
+	gatewayIp?: string
+	/** Deprecated: use KNXClientOptions.ipPort */
+	gatewayPort?: number
+	tunnelInterfaceIndividualAddress: string
+	knxkeys_file_path?: string
+	knxkeys_password?: string
+	// Temporary/testing: disable Data Secure wrapping of GA even if present in keyring
+	disableDataSecure?: boolean
 }
 
 export enum ConncetionState {
@@ -177,8 +177,8 @@ export type KNXClientOptions = {
 	sniffingMode?: boolean
 	/** Sets the tunnel_endpoint with the localIPAddress instead of the standard 0.0.0.0 */
 	theGatewayIsKNXVirtual?: boolean
-    /** Optional configuration for KNX/IP Secure over TCP (handshake + Data Secure helpers). */
-    secureTunnelConfig?: SecureConfig
+	/** Optional configuration for KNX/IP Secure over TCP (handshake + Data Secure helpers). */
+	secureTunnelConfig?: SecureConfig
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
@@ -256,9 +256,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _awaitingResponseType: number
 
-    private _clientSocket: UDPSocket | TCPSocket
+	private _clientSocket: UDPSocket | TCPSocket
 
-    private sysLogger: KNXLogger
+	private sysLogger: KNXLogger
 
 	private _clearToSend = false
 
@@ -278,29 +278,49 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private queueLock = false
 
-    private sniffingPackets: SnifferPacket[]
+	private sniffingPackets: SnifferPacket[]
 
-    private lastSnifferRequest: number
+	private lastSnifferRequest: number
 
-    // ==== KNX/IP Secure (migrated from SecureTunnelTCP) ====
-    private _tcpRxBuffer: Buffer
-    private _secureSessionKey?: Buffer
-    private _secureSessionId: number = 0
-    private _secureWrapperSeq: number = 0 // 6-byte counter (we store as number increment)
-    private _secureTunnelSeq: number = 0 // 1-byte seq in tunneling connection header
-    private _securePrivateKey?: crypto.KeyObject
-    private _securePublicKey?: Buffer // 32 bytes raw X25519 public key
-    private _secureUserId: number = 2
-    private _secureUserPasswordKey?: Buffer
-    private _secureGroupKeys: Map<number, Buffer> = new Map()
-    private _secureSendSeq48: bigint = 0n
-    private _secureSerial: Buffer = Buffer.from('000000000000', 'hex')
-    private _secureAssignedIa: number = 0
-    // Logging helpers use KNXClient loglevel; no separate boolean
-    private _secureHandshakeSessionTimer?: NodeJS.Timeout
-    private _secureHandshakeAuthTimer?: NodeJS.Timeout
-    private _secureHandshakeConnectTimer?: NodeJS.Timeout
-    private _secureHandshakeState?: 'connecting' | 'session' | 'auth' | 'connect'
+	// ==== KNX/IP Secure (migrated from SecureTunnelTCP) ====
+	private _tcpRxBuffer: Buffer
+
+	private _secureSessionKey?: Buffer
+
+	private _secureSessionId: number = 0
+
+	private _secureWrapperSeq: number = 0 // 6-byte counter (we store as number increment)
+
+	private _secureTunnelSeq: number = 0 // 1-byte seq in tunneling connection header
+
+	private _securePrivateKey?: crypto.KeyObject
+
+	private _securePublicKey?: Buffer // 32 bytes raw X25519 public key
+
+	private _secureUserId: number = 2
+
+	private _secureUserPasswordKey?: Buffer
+
+	private _secureGroupKeys: Map<number, Buffer> = new Map()
+
+	private _secureSendSeq48: bigint = 0n
+
+	private _secureSerial: Buffer = Buffer.from('000000000000', 'hex')
+
+	private _secureAssignedIa: number = 0
+
+	// Logging helpers use KNXClient loglevel; no separate boolean
+	private _secureHandshakeSessionTimer?: NodeJS.Timeout
+
+	private _secureHandshakeAuthTimer?: NodeJS.Timeout
+
+	private _secureHandshakeConnectTimer?: NodeJS.Timeout
+
+	private _secureHandshakeState?:
+		| 'connecting'
+		| 'session'
+		| 'auth'
+		| 'connect'
 
 	get udpSocket() {
 		if (this._clientSocket instanceof UDPSocket) {
@@ -309,12 +329,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return null
 	}
 
-    get tcpSocket() {
-        if (this._clientSocket instanceof TCPSocket) {
-            return this._clientSocket
-        }
-        return null
-    }
+	get tcpSocket() {
+		if (this._clientSocket instanceof TCPSocket) {
+			return this._clientSocket
+		}
+		return null
+	}
 
 	constructor(
 		options: KNXClientOptions,
@@ -389,12 +409,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			throw error
 		}
 
-        if (createSocket) {
-            createSocket(this)
-        } else {
-            this.createSocket()
-        }
-    }
+		if (createSocket) {
+			createSocket(this)
+		} else {
+			this.createSocket()
+		}
+	}
 
 	private createSocket() {
 		if (this._options.hostProtocol === 'TunnelUDP') {
@@ -441,46 +461,46 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					}
 				},
 			)
-        } else if (this._options.hostProtocol === 'TunnelTCP') {
-            // KNX/IP Secure over TCP handled inline
-            this._clientSocket = new net.Socket()
-            // Buffer incoming TCP to complete frames
-            this._tcpRxBuffer = Buffer.alloc(0)
+		} else if (this._options.hostProtocol === 'TunnelTCP') {
+			// KNX/IP Secure over TCP handled inline
+			this._clientSocket = new net.Socket()
+			// Buffer incoming TCP to complete frames
+			this._tcpRxBuffer = Buffer.alloc(0)
 
-            this.tcpSocket.on('connect', () => {
-                // TCP connected, start secure session handshake
-                this.socketReady = true
-                // Reset queue exit flag on fresh TCP connect
-                this.exitProcessingKNXQueueLoop = false
-                this.secureStartSession().catch((err) => {
-                    this.emit(KNXClientEvents.error, err)
-                })
-            })
-            this.tcpSocket.on('data', (data: Buffer) => {
-                try {
-                    this.secureOnTcpData(data)
-                } catch (e) {
-                    this.emit(
-                        KNXClientEvents.error,
-                        e instanceof Error ? e : new Error('TCP data error'),
-                    )
-                }
-            })
-            this.tcpSocket.on('error', (error) => {
-                this.socketReady = false
-                this.emit(KNXClientEvents.error, error)
-            })
-            this.tcpSocket.on('close', () => {
-                this.socketReady = false
-                this.exitProcessingKNXQueueLoop = true
-                try {
-                    this.sysLogger.debug(
-                        `[${getTimestamp()}] TCP close: set exitProcessingKNXQueueLoop=true`,
-                    )
-                } catch {}
-                this.emit(KNXClientEvents.close)
-            })
-        } else if (this._options.hostProtocol === 'Multicast') {
+			this.tcpSocket.on('connect', () => {
+				// TCP connected, start secure session handshake
+				this.socketReady = true
+				// Reset queue exit flag on fresh TCP connect
+				this.exitProcessingKNXQueueLoop = false
+				this.secureStartSession().catch((err) => {
+					this.emit(KNXClientEvents.error, err)
+				})
+			})
+			this.tcpSocket.on('data', (data: Buffer) => {
+				try {
+					this.secureOnTcpData(data)
+				} catch (e) {
+					this.emit(
+						KNXClientEvents.error,
+						e instanceof Error ? e : new Error('TCP data error'),
+					)
+				}
+			})
+			this.tcpSocket.on('error', (error) => {
+				this.socketReady = false
+				this.emit(KNXClientEvents.error, error)
+			})
+			this.tcpSocket.on('close', () => {
+				this.socketReady = false
+				this.exitProcessingKNXQueueLoop = true
+				try {
+					this.sysLogger.debug(
+						`[${getTimestamp()}] TCP close: set exitProcessingKNXQueueLoop=true`,
+					)
+				} catch {}
+				this.emit(KNXClientEvents.close)
+			})
+		} else if (this._options.hostProtocol === 'Multicast') {
 			this._clientSocket = dgram.createSocket({
 				type: 'udp4',
 				reuseAddr: true,
@@ -711,95 +731,110 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.emit(KNXClientEvents.error, error)
 					resolve(false)
 				}
-            } else if (this._options.hostProtocol === 'TunnelTCP') {
-                // KNX Secure over TCP: wrap KNX/IP frame in SecureWrapper and send via TCP
-                try {
-                    // Ensure Data Secure is applied at send time (after leaving the queue)
-                    if (
-                        this._options.isSecureKNXEnabled &&
-                        _knxPacket instanceof KNXTunnelingRequest &&
-                        (_knxPacket as any).cEMIMessage?.msgCode === CEMIConstants.L_DATA_REQ
-                    ) {
-                        // Apply Data Secure right before sending
-                        this.maybeApplyDataSecure((_knxPacket as any).cEMIMessage)
-                        // IMPORTANT: update KNX/IP header length to include new cEMI length
-                        try {
-                            const ktr = _knxPacket as KNXTunnelingRequest
-                            const cemiLen = ktr.cEMIMessage?.length ?? 0
-                            // Header.length includes header size (10) + body length
-                            ktr.header.length = KNX_CONSTANTS.HEADER_SIZE_10 + (4 + cemiLen)
-                        } catch {}
-                    }
+			} else if (this._options.hostProtocol === 'TunnelTCP') {
+				// KNX Secure over TCP: wrap KNX/IP frame in SecureWrapper and send via TCP
+				try {
+					// Ensure Data Secure is applied at send time (after leaving the queue)
+					if (
+						this._options.isSecureKNXEnabled &&
+						_knxPacket instanceof KNXTunnelingRequest &&
+						(_knxPacket as any).cEMIMessage?.msgCode ===
+							CEMIConstants.L_DATA_REQ
+					) {
+						// Apply Data Secure right before sending
+						this.maybeApplyDataSecure(
+							(_knxPacket as any).cEMIMessage,
+						)
+						// IMPORTANT: update KNX/IP header length to include new cEMI length
+						try {
+							const ktr = _knxPacket as KNXTunnelingRequest
+							const cemiLen = ktr.cEMIMessage?.length ?? 0
+							// Header.length includes header size (10) + body length
+							ktr.header.length =
+								KNX_CONSTANTS.HEADER_SIZE_10 + (4 + cemiLen)
+						} catch {}
+					}
 
-                    // Debug before wrapping: show if APDU is secure/plain, GA, src, flags and seq48
-                    try {
-                        if (_knxPacket instanceof KNXTunnelingRequest) {
-                            const ktr: any = _knxPacket
-                            const cemi: any = ktr?.cEMIMessage
-                            const dstStr = cemi?.dstAddress?.toString?.()
-                            const srcStr = cemi?.srcAddress?.toString?.()
-                            const ctrlBuf: Buffer = cemi?.control?.toBuffer?.()
-                            const flags16 = Buffer.isBuffer(ctrlBuf)
-                                ? (ctrlBuf[0] << 8) | ctrlBuf[1]
-                                : undefined
-                            const isSecApdu =
-                                !!(cemi?.npdu &&
-                                (cemi.npdu.tpci & 0xff) === APCI_SEC.HIGH &&
-                                (cemi.npdu.apci & 0xff) === APCI_SEC.LOW)
-                            let scf: number | undefined
-                            let seq48Hex: string | undefined
-                            if (isSecApdu) {
-                                const dbuf: Buffer = cemi.npdu.dataBuffer?.value
-                                if (Buffer.isBuffer(dbuf) && dbuf.length >= 1 + SECURE_SEQ_LEN) {
-                                    scf = dbuf[0]
-                                    const seq = dbuf.subarray(1, 1 + SECURE_SEQ_LEN)
-                                    seq48Hex = seq.toString('hex')
-                                }
-                            }
-                            this.sysLogger.debug(
-                                `[${getTimestamp()}] ` +
-                                    `TX TunnelTCP: dst=${dstStr} src=${srcStr} flags=0x${(
-                                        flags16 ?? 0
-                                    ).toString(16)} dataSecure=${isSecApdu} scf=${
-                                        typeof scf === 'number' ? scf : 'n/a'
-                                    } seq48=${seq48Hex ?? 'n/a'} dsDisabled=${this._options.secureTunnelConfig?.disableDataSecure ? 'true' : 'false'}`,
-                            )
-                            try {
-                                if (this.isLevelEnabled('debug')) {
-                                    const innerHex = ktr.toBuffer().toString('hex')
-                                    this.sysLogger.debug(
-                                        `[${getTimestamp()}] TX inner (KNX/IP TunnelReq): ${innerHex}`,
-                                    )
-                                }
-                            } catch {}
-                        }
-                    } catch {}
+					// Debug before wrapping: show if APDU is secure/plain, GA, src, flags and seq48
+					try {
+						if (_knxPacket instanceof KNXTunnelingRequest) {
+							const ktr: any = _knxPacket
+							const cemi: any = ktr?.cEMIMessage
+							const dstStr = cemi?.dstAddress?.toString?.()
+							const srcStr = cemi?.srcAddress?.toString?.()
+							const ctrlBuf: Buffer = cemi?.control?.toBuffer?.()
+							const flags16 = Buffer.isBuffer(ctrlBuf)
+								? (ctrlBuf[0] << 8) | ctrlBuf[1]
+								: undefined
+							const isSecApdu = !!(
+								cemi?.npdu &&
+								(cemi.npdu.tpci & 0xff) === APCI_SEC.HIGH &&
+								(cemi.npdu.apci & 0xff) === APCI_SEC.LOW
+							)
+							let scf: number | undefined
+							let seq48Hex: string | undefined
+							if (isSecApdu) {
+								const dbuf: Buffer = cemi.npdu.dataBuffer?.value
+								if (
+									Buffer.isBuffer(dbuf) &&
+									dbuf.length >= 1 + SECURE_SEQ_LEN
+								) {
+									scf = dbuf[0]
+									const seq = dbuf.subarray(
+										1,
+										1 + SECURE_SEQ_LEN,
+									)
+									seq48Hex = seq.toString('hex')
+								}
+							}
+							this.sysLogger.debug(
+								`[${getTimestamp()}] ` +
+									`TX TunnelTCP: dst=${dstStr} src=${srcStr} flags=0x${(
+										flags16 ?? 0
+									).toString(
+										16,
+									)} dataSecure=${isSecApdu} scf=${
+										typeof scf === 'number' ? scf : 'n/a'
+									} seq48=${seq48Hex ?? 'n/a'} dsDisabled=${this._options.secureTunnelConfig?.disableDataSecure ? 'true' : 'false'}`,
+							)
+							try {
+								if (this.isLevelEnabled('debug')) {
+									const innerHex = ktr
+										.toBuffer()
+										.toString('hex')
+									this.sysLogger.debug(
+										`[${getTimestamp()}] TX inner (KNX/IP TunnelReq): ${innerHex}`,
+									)
+								}
+							} catch {}
+						}
+					} catch {}
 
-                    const inner = _knxPacket.toBuffer()
-                    const payload = this._options.isSecureKNXEnabled
-                        ? this.secureWrap(inner)
-                        : inner
-                    this.tcpSocket.write(payload, (error) => {
-                        if (error) {
-                            this.sysLogger.error(
-                                `Sending KNX packet: Send TCP sending error: ${error.message}` ||
-                                    'Undef error',
-                            )
-                            this.emit(KNXClientEvents.error, error)
-                        }
-                        resolve(!error)
-                    })
-                } catch (error) {
-                    this.sysLogger.error(
-                        `Sending KNX packet: Send TCP Catch error: ${(error as Error).message}` ||
-                            'Undef error',
-                    )
-                    this.emit(KNXClientEvents.error, error as Error)
-                    resolve(false)
-                }
-            }
-        })
-    }
+					const inner = _knxPacket.toBuffer()
+					const payload = this._options.isSecureKNXEnabled
+						? this.secureWrap(inner)
+						: inner
+					this.tcpSocket.write(payload, (error) => {
+						if (error) {
+							this.sysLogger.error(
+								`Sending KNX packet: Send TCP sending error: ${error.message}` ||
+									'Undef error',
+							)
+							this.emit(KNXClientEvents.error, error)
+						}
+						resolve(!error)
+					})
+				} catch (error) {
+					this.sysLogger.error(
+						`Sending KNX packet: Send TCP Catch error: ${(error as Error).message}` ||
+							'Undef error',
+					)
+					this.emit(KNXClientEvents.error, error as Error)
+					resolve(false)
+				}
+			}
+		})
+	}
 
 	private async handleKNXQueue() {
 		if (this.queueLock) {
@@ -846,29 +881,32 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 			const item = this.commandQueue.pop()
 			this.currentItemHandledByTheQueue = item
-            // Associa il sequence number di tunneling al momento dell'invio
-            try {
-                if (this._options.hostProtocol === 'TunnelTCP') {
-                    // Solo per KNXTunnelingRequest: il seq dell'ACK deve eguagliare quello ricevuto, non va incrementato
-                    if (item.knxPacket instanceof KNXTunnelingRequest) {
-                        const ktr = item.knxPacket as any
-                        const seq = this.secureIncTunnelSeq()
-                        ktr.seqCounter = seq
-                        if (item.ACK) {
-                            item.expectedSeqNumberForACK = seq
-                        }
-                        try {
-                            this.sysLogger.debug(
-                                `[${getTimestamp()}] Assign tunnel seq=${seq} ch=${ktr?.channelID} dst=${ktr?.cEMIMessage?.dstAddress?.toString?.()}`,
-                            )
-                        } catch {}
-                    }
-                }
-            } catch {}
+			// Associa il sequence number di tunneling al momento dell'invio
+			try {
+				if (this._options.hostProtocol === 'TunnelTCP') {
+					// Solo per KNXTunnelingRequest: il seq dell'ACK deve eguagliare quello ricevuto, non va incrementato
+					if (item.knxPacket instanceof KNXTunnelingRequest) {
+						const ktr = item.knxPacket as any
+						const seq = this.secureIncTunnelSeq()
+						ktr.seqCounter = seq
+						if (item.ACK) {
+							item.expectedSeqNumberForACK = seq
+						}
+						try {
+							this.sysLogger.debug(
+								`[${getTimestamp()}] Assign tunnel seq=${seq} ch=${ktr?.channelID} dst=${ktr?.cEMIMessage?.dstAddress?.toString?.()}`,
+							)
+						} catch {}
+					}
+				}
+			} catch {}
 
-            if (item.ACK !== undefined && this._options.hostProtocol !== 'TunnelTCP') {
-                this.setTimerWaitingForACK(item.ACK)
-            }
+			if (
+				item.ACK !== undefined &&
+				this._options.hostProtocol !== 'TunnelTCP'
+			) {
+				this.setTimerWaitingForACK(item.ACK)
+			}
 
 			if (!(await this.processKnxPacketQueueItem(item.knxPacket))) {
 				this.sysLogger.error(
@@ -958,7 +996,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		const srcAddress = this.physAddr
 
-        if (this._options.hostProtocol === 'Multicast') {
+		if (this._options.hostProtocol === 'Multicast') {
 			// Multicast.
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'write',
@@ -977,13 +1015,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
 			// 06/12/2021 Multivast automaticalli echoes telegrams
 		} else {
-            // Tunneling
-            const cEMIMessage = CEMIFactory.newLDataRequestMessage(
-                'write',
-                srcAddress,
-                dstAddress,
-                knxBuffer,
-            )
+			// Tunneling
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'write',
+				srcAddress,
+				dstAddress,
+				knxBuffer,
+			)
 			// cEMIMessage.control.ack = this._options.suppress_ack_ldatareq ? 0 : 1; // No ack like telegram sent from ETS (0 means don't care)
 			cEMIMessage.control.ack = 0 // No ack like telegram sent from ETS (0 means don't care)
 			cEMIMessage.control.broadcast = 1
@@ -991,21 +1029,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
 			// Data Secure si applica solo in TunnelTCP
-            // Nota: per TunnelTCP, il seq di tunneling viene assegnato al momento dell'invio in handleKNXQueue
-            const seqNum: number =
-                this._options.hostProtocol === 'TunnelTCP'
-                    ? 0
-                    : this.incSeqNumber()
-            const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
-                this._channelID,
-                seqNum,
-                cEMIMessage,
-            )
-            if (!this._options.suppress_ack_ldatareq) {
-                this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
-            } else {
-                this.send(knxPacketRequest, undefined, false, seqNum)
-            }
+			// Nota: per TunnelTCP, il seq di tunneling viene assegnato al momento dell'invio in handleKNXQueue
+			const seqNum: number =
+				this._options.hostProtocol === 'TunnelTCP'
+					? 0
+					: this.incSeqNumber()
+			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+				this._channelID,
+				seqNum,
+				cEMIMessage,
+			)
+			if (!this._options.suppress_ack_ldatareq) {
+				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
+			} else {
+				this.send(knxPacketRequest, undefined, false, seqNum)
+			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
 			if (this._options.localEchoInTunneling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
@@ -1057,13 +1095,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
 			// 06/12/2021 Multivast automatically echoes telegrams
 		} else {
-            // Tunneling
-            const cEMIMessage = CEMIFactory.newLDataRequestMessage(
-                'response',
-                srcAddress,
-                dstAddress,
-                knxBuffer,
-            )
+			// Tunneling
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'response',
+				srcAddress,
+				dstAddress,
+				knxBuffer,
+			)
 			// cEMIMessage.control.ack = this._options.suppress_ack_ldatareq ? 0 : 1;
 			cEMIMessage.control.ack = 0 // No ack like telegram sent from ETS (0 means don't care)
 			cEMIMessage.control.broadcast = 1
@@ -1071,20 +1109,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
 			// Data Secure si applica solo in TunnelTCP
-            const seqNum: number =
-                this._options.hostProtocol === 'TunnelTCP'
-                    ? 0
-                    : this.incSeqNumber()
-            const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
-                this._channelID,
-                seqNum,
-                cEMIMessage,
-            )
-            if (!this._options.suppress_ack_ldatareq) {
-                this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
-            } else {
-                this.send(knxPacketRequest, undefined, false, seqNum)
-            }
+			const seqNum: number =
+				this._options.hostProtocol === 'TunnelTCP'
+					? 0
+					: this.incSeqNumber()
+			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+				this._channelID,
+				seqNum,
+				cEMIMessage,
+			)
+			if (!this._options.suppress_ack_ldatareq) {
+				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
+			} else {
+				this.send(knxPacketRequest, undefined, false, seqNum)
+			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
 			if (this._options.localEchoInTunneling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
@@ -1120,39 +1158,39 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.priority = 3
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
-            const knxPacketRequest =
-                KNXProtocol.newKNXRoutingIndication(cEMIMessage)
-            this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
+			const knxPacketRequest =
+				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
+			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
 			// 06/12/2021 Multivast automaticalli echoes telegrams
 		} else {
-            // Tunneling
-            const cEMIMessage = CEMIFactory.newLDataRequestMessage(
-                'read',
-                srcAddress,
-                dstAddress,
-                null,
-            )
-            // Align with SecureTunnelTCP defaults for group traffic over secure tunnel
-            // Use no-ack to match ETS behavior and what MAC calculation expects
-            cEMIMessage.control.ack = 0
-            cEMIMessage.control.broadcast = 1
-            cEMIMessage.control.priority = 3
-            cEMIMessage.control.addressType = 1
-            cEMIMessage.control.hopCount = 6
-            const seqNum: number =
-                this._options.hostProtocol === 'TunnelTCP'
-                    ? 0
-                    : this.incSeqNumber()
-            const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
-                this._channelID,
-                seqNum,
-                cEMIMessage,
-            )
-            if (!this._options.suppress_ack_ldatareq) {
-                this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
-            } else {
-                this.send(knxPacketRequest, undefined, false, seqNum)
-            }
+			// Tunneling
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'read',
+				srcAddress,
+				dstAddress,
+				null,
+			)
+			// Align with SecureTunnelTCP defaults for group traffic over secure tunnel
+			// Use no-ack to match ETS behavior and what MAC calculation expects
+			cEMIMessage.control.ack = 0
+			cEMIMessage.control.broadcast = 1
+			cEMIMessage.control.priority = 3
+			cEMIMessage.control.addressType = 1
+			cEMIMessage.control.hopCount = 6
+			const seqNum: number =
+				this._options.hostProtocol === 'TunnelTCP'
+					? 0
+					: this.incSeqNumber()
+			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+				this._channelID,
+				seqNum,
+				cEMIMessage,
+			)
+			if (!this._options.suppress_ack_ldatareq) {
+				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
+			} else {
+				this.send(knxPacketRequest, undefined, false, seqNum)
+			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
 			if (this._options.localEchoInTunneling) {
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
@@ -1229,38 +1267,40 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// 06/12/2021 Multivast automaticalli echoes telegrams
 		} else {
 			// Tunneling
-            const cEMIMessage = CEMIFactory.newLDataRequestMessage(
-                'write',
-                srcAddress,
-                dstAddress,
-                data,
-            )
-            // ACK handling:
-            // - TunnelTCP (secure): do not request bus ACK (align ETS/sample)
-            // - TunnelUDP (plain): keep legacy behavior controlled by suppress_ack_ldatareq
-            if (this._options.hostProtocol === 'TunnelTCP') {
-                cEMIMessage.control.ack = 0
-            } else {
-                cEMIMessage.control.ack = this._options.suppress_ack_ldatareq ? 0 : 1
-            }
-            cEMIMessage.control.broadcast = 1
-            cEMIMessage.control.priority = 3
-            cEMIMessage.control.addressType = 1
-            cEMIMessage.control.hopCount = 6
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'write',
+				srcAddress,
+				dstAddress,
+				data,
+			)
+			// ACK handling:
+			// - TunnelTCP (secure): do not request bus ACK (align ETS/sample)
+			// - TunnelUDP (plain): keep legacy behavior controlled by suppress_ack_ldatareq
+			if (this._options.hostProtocol === 'TunnelTCP') {
+				cEMIMessage.control.ack = 0
+			} else {
+				cEMIMessage.control.ack = this._options.suppress_ack_ldatareq
+					? 0
+					: 1
+			}
+			cEMIMessage.control.broadcast = 1
+			cEMIMessage.control.priority = 3
+			cEMIMessage.control.addressType = 1
+			cEMIMessage.control.hopCount = 6
 			const seqNum: number =
 				this._options.hostProtocol === 'TunnelTCP'
 					? this.secureIncTunnelSeq()
 					: this.incSeqNumber()
-            const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
-                this._channelID,
-                seqNum,
-                cEMIMessage,
-            )
-            if (!this._options.suppress_ack_ldatareq) {
-                this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
-            } else {
-                this.send(knxPacketRequest, undefined, false, seqNum)
-            }
+			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+				this._channelID,
+				seqNum,
+				cEMIMessage,
+			)
+			if (!this._options.suppress_ack_ldatareq) {
+				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
+			} else {
+				this.send(knxPacketRequest, undefined, false, seqNum)
+			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
 			if (this._options.localEchoInTunneling)
 				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
@@ -1410,7 +1450,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	/**
 	 * Connect to the KNX bus
 	 */
-    Connect(knxLayer = TunnelTypes.TUNNEL_LINKLAYER) {
+	Connect(knxLayer = TunnelTypes.TUNNEL_LINKLAYER) {
 		if (this._clientSocket === null) {
 			throw new Error('No client socket defined')
 		}
@@ -1434,11 +1474,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.clearTimer(KNXTimer.CONNECTION)
 		// Emit connecting
 		this.emit(KNXClientEvents.connecting, this._options)
-        if (this._options.hostProtocol === 'TunnelUDP') {
-            // Unicast, need to explicitly create the connection
-            const timeoutError = new Error(
-                `Connection timeout to ${this._peerHost}:${this._peerPort}`,
-            )
+		if (this._options.hostProtocol === 'TunnelUDP') {
+			// Unicast, need to explicitly create the connection
+			const timeoutError = new Error(
+				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
+			)
 			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
 			this._clientTunnelSeqNumber = -1
 			this.setTimer(
@@ -1456,24 +1496,26 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 				2000,
 			)
-        } else if (this._options.hostProtocol === 'TunnelTCP') {
-            // KNX/IP Secure over TCP: initialize keyring and connect socket
-            this.secureEnsureKeyring()
-                .then(() => {
-                    try {
-                        this.tcpSocket.connect(this._peerPort, this._peerHost)
-                    } catch (err) {
-                        this.emit(
-                            KNXClientEvents.error,
-                            err instanceof Error ? err : new Error('TCP connect error'),
-                        )
-                    }
-                })
-                .catch((err) => this.emit(KNXClientEvents.error, err))
-        } else {
-            // Multicast
-            // Multicast
-            this._connectionState = ConncetionState.CONNECTED
+		} else if (this._options.hostProtocol === 'TunnelTCP') {
+			// KNX/IP Secure over TCP: initialize keyring and connect socket
+			this.secureEnsureKeyring()
+				.then(() => {
+					try {
+						this.tcpSocket.connect(this._peerPort, this._peerHost)
+					} catch (err) {
+						this.emit(
+							KNXClientEvents.error,
+							err instanceof Error
+								? err
+								: new Error('TCP connect error'),
+						)
+					}
+				})
+				.catch((err) => this.emit(KNXClientEvents.error, err))
+		} else {
+			// Multicast
+			// Multicast
+			this._connectionState = ConncetionState.CONNECTED
 
 			// 16/03/2022 These two are referring to tunneling connection, but i set it here as well. Non si sa mai.
 			this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
@@ -1503,14 +1545,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				resolve()
 			}
 
-            try {
-                if (client instanceof TCPSocket) {
-                    // use destroy instead of end here to ensure socket is closed
-                    client.destroy()
-                } else {
-                    (client as UDPSocket).close(cb)
-                }
-            } catch (error) {
+			try {
+				if (client instanceof TCPSocket) {
+					// use destroy instead of end here to ensure socket is closed
+					client.destroy()
+				} else {
+					;(client as UDPSocket).close(cb)
+				}
+			} catch (error) {
 				this.sysLogger.error(
 					`KNXClient: into async closeSocket(): ${error.stack}`,
 				)
@@ -1582,10 +1624,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Close the socket connection without sending a disconnect request
 	 */
 	private async setDisconnected(_sReason = '') {
-        this.sysLogger.debug(
-            `[${getTimestamp()}] ` +
-                `KNXClient: called _setDisconnected ${this._peerHost}:${this._peerPort} ${_sReason}`,
-        )
+		this.sysLogger.debug(
+			`[${getTimestamp()}] ` +
+				`KNXClient: called _setDisconnected ${this._peerHost}:${this._peerPort} ${_sReason}`,
+		)
 		this._connectionState = ConncetionState.DISCONNECTED
 
 		// clear active timers
@@ -1596,10 +1638,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		await this.closeSocket()
 
-        this.emit(
-            KNXClientEvents.disconnected,
-            `${this._peerHost}:${this._peerPort} ${_sReason}`,
-        )
+		this.emit(
+			KNXClientEvents.disconnected,
+			`${this._peerHost}:${this._peerPort} ${_sReason}`,
+		)
 		this.clearToSend = true // 26/12/2021 allow to send
 	}
 
@@ -1615,9 +1657,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			throw new Error('No client socket defined')
 		}
 
-        const deadError = new Error(
-            `Connection dead with ${this._peerHost}:${this._peerPort}`,
-        )
+		const deadError = new Error(
+			`Connection dead with ${this._peerHost}:${this._peerPort}`,
+		)
 
 		// timeout triggered if no connection state response received
 		this.setTimer(
@@ -1650,27 +1692,27 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 	}
 
-    /**
-     * Get actual tunneling sequence number
-     */
-    private getSeqNumber() {
-        return this._clientTunnelSeqNumber
-    }
+	/**
+	 * Get actual tunneling sequence number
+	 */
+	private getSeqNumber() {
+		return this._clientTunnelSeqNumber
+	}
 
-    private getCurrentItemHandledByTheQueue() {
-        return this.currentItemHandledByTheQueue.expectedSeqNumberForACK
-    }
+	private getCurrentItemHandledByTheQueue() {
+		return this.currentItemHandledByTheQueue.expectedSeqNumberForACK
+	}
 
-    // Secure Tunneling (TCP) sequence helpers
-    private secureGetTunnelSeq() {
-        return this._secureTunnelSeq & 0xff
-    }
+	// Secure Tunneling (TCP) sequence helpers
+	private secureGetTunnelSeq() {
+		return this._secureTunnelSeq & 0xff
+	}
 
-    private secureIncTunnelSeq() {
-        const v = this._secureTunnelSeq & 0xff
-        this._secureTunnelSeq = (this._secureTunnelSeq + 1) & 0xff
-        return v
-    }
+	private secureIncTunnelSeq() {
+		const v = this._secureTunnelSeq & 0xff
+		this._secureTunnelSeq = (this._secureTunnelSeq + 1) & 0xff
+		return v
+	}
 
 	/**
 	 * Increment the tunneling sequence number
@@ -1688,16 +1730,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private setTimerWaitingForACK(knxTunnelingRequest: KNXTunnelingRequest) {
 		this.clearToSend = false // 26/12/2021 stop sending until ACK received
-        const timeoutErr = new errors.RequestTimeoutError(
-            `seqCounter:${knxTunnelingRequest.seqCounter}, DestAddr:${
-                knxTunnelingRequest.cEMIMessage.dstAddress.toString() ||
-                'Non definito'
-            },  AckRequested:${
-                knxTunnelingRequest.cEMIMessage.control.ack
-            }, timed out waiting telegram acknowledge by ${
-                this._peerHost || 'No Peer host detected'
-            }`,
-        )
+		const timeoutErr = new errors.RequestTimeoutError(
+			`seqCounter:${knxTunnelingRequest.seqCounter}, DestAddr:${
+				knxTunnelingRequest.cEMIMessage.dstAddress.toString() ||
+				'Non definito'
+			},  AckRequested:${
+				knxTunnelingRequest.cEMIMessage.control.ack
+			}, timed out waiting telegram acknowledge by ${
+				this._peerHost || 'No Peer host detected'
+			}`,
+		)
 		this.setTimer(
 			KNXTimer.ACK,
 			() => {
@@ -1753,7 +1795,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	/**
 	 * Process a raw message coming from the socket
 	 */
-    private processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
+	private processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
 		let sProcessInboundLog = ''
 		try {
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(msg)
@@ -1889,9 +1931,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.setTimer(
 					KNXTimer.DISCONNECT,
 					() => {
-                        this.setDisconnected(
-                            `Received KNX packet: DISCONNECT_REQUEST, ChannelID:${this._channelID} Host:${this._peerHost}:${this._peerPort}`,
-                        )
+						this.setDisconnected(
+							`Received KNX packet: DISCONNECT_REQUEST, ChannelID:${this._channelID} Host:${this._peerHost}:${this._peerPort}`,
+						)
 					},
 					1000,
 				)
@@ -2059,683 +2101,751 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 	}
 
-    // ===== KNX/IP Secure Support (migrated from SecureTunnelTCP) =====
-    private async secureEnsureKeyring(): Promise<void> {
-        if (!this._options?.secureTunnelConfig) return
-        const cfg = this._options.secureTunnelConfig
-        // Peer host/port now come from KNXClientOptions.ipAddr/ipPort (not from secure config)
-        // Drive secure logs from KNXClientOptions.loglevel; no separate boolean
+	// ===== KNX/IP Secure Support (migrated from SecureTunnelTCP) =====
+	private async secureEnsureKeyring(): Promise<void> {
+		if (!this._options?.secureTunnelConfig) return
+		const cfg = this._options.secureTunnelConfig
+		// Peer host/port now come from KNXClientOptions.ipAddr/ipPort (not from secure config)
+		// Drive secure logs from KNXClientOptions.loglevel; no separate boolean
 
-        // Load ETS keyring and extract credentials only once
-        if (!this._secureUserPasswordKey || this._secureGroupKeys.size === 0) {
-            const kr = new Keyring()
-            const path = cfg.knxkeys_file_path || DEFAULT_KNXKEYS_PATH
-            const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
-            await kr.load(path, pwd)
+		// Load ETS keyring and extract credentials only once
+		if (!this._secureUserPasswordKey || this._secureGroupKeys.size === 0) {
+			const kr = new Keyring()
+			const path = cfg.knxkeys_file_path || DEFAULT_KNXKEYS_PATH
+			const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
+			await kr.load(path, pwd)
 
-            const iface = kr.getInterface(cfg.tunnelInterfaceIndividualAddress)
-            if (iface?.userId) this._secureUserId = iface.userId
-            const password = iface?.decryptedPassword || 'passwordtunnel1'
+			const iface = kr.getInterface(cfg.tunnelInterfaceIndividualAddress)
+			if (iface?.userId) this._secureUserId = iface.userId
+			const password = iface?.decryptedPassword || 'passwordtunnel1'
 
-            // Derive user password key
-            this._secureUserPasswordKey = crypto.pbkdf2Sync(
-                Buffer.from(password, 'latin1'),
-                Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
-                65536,
-                16,
-                'sha256',
-            )
+			// Derive user password key
+			this._secureUserPasswordKey = crypto.pbkdf2Sync(
+				Buffer.from(password, 'latin1'),
+				Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
+				65536,
+				16,
+				'sha256',
+			)
 
-            // Load group keys
-            this._secureGroupKeys = new Map()
-            for (const [gaStr, g] of kr.getGroupAddresses()) {
-                if (!g.decryptedKey) continue
-                const ga = this.secureParseGroupAddress(gaStr)
-                this._secureGroupKeys.set(ga, g.decryptedKey.slice(0, 16))
-            }
-            if (!this._secureGroupKeys.size) {
-                throw new Error('No Data Secure group keys found in keyring.')
-            }
+			// Load group keys
+			this._secureGroupKeys = new Map()
+			for (const [gaStr, g] of kr.getGroupAddresses()) {
+				if (!g.decryptedKey) continue
+				const ga = this.secureParseGroupAddress(gaStr)
+				this._secureGroupKeys.set(ga, g.decryptedKey.slice(0, 16))
+			}
+			if (!this._secureGroupKeys.size) {
+				throw new Error('No Data Secure group keys found in keyring.')
+			}
 
-            // Initialize Data Secure sender sequence (48-bit)
-            const base = Date.parse('2018-01-05T00:00:00Z')
-            this._secureSendSeq48 = BigInt(Date.now() - base)
+			// Initialize Data Secure sender sequence (48-bit)
+			const base = Date.parse('2018-01-05T00:00:00Z')
+			this._secureSendSeq48 = BigInt(Date.now() - base)
 
-            // Pick KNX Serial from gateway device if available
-            const gatewayIaStr =
-                iface?.host?.toString() || iface?.individualAddress?.toString()
-            const dev = gatewayIaStr ? kr.getDevice(gatewayIaStr) : undefined
-            if (dev?.serialNumber) {
-                try {
-                    const ser = Buffer.from(dev.serialNumber, 'hex')
-                    if (ser.length === 6) this._secureSerial = ser
-                } catch {}
-            }
-        }
-    }
+			// Pick KNX Serial from gateway device if available
+			const gatewayIaStr =
+				iface?.host?.toString() || iface?.individualAddress?.toString()
+			const dev = gatewayIaStr ? kr.getDevice(gatewayIaStr) : undefined
+			if (dev?.serialNumber) {
+				try {
+					const ser = Buffer.from(dev.serialNumber, 'hex')
+					if (ser.length === 6) this._secureSerial = ser
+				} catch {}
+			}
+		}
+	}
 
-    private async secureStartSession(): Promise<void> {
-        // Prepare keyring if needed
-        await this.secureEnsureKeyring()
+	private async secureStartSession(): Promise<void> {
+		// Prepare keyring if needed
+		await this.secureEnsureKeyring()
 
-        // Generate ephemeral X25519 key pair
-        const keyPair = crypto.generateKeyPairSync('x25519')
-        this._securePrivateKey = keyPair.privateKey
-        const exported = keyPair.publicKey.export({
-            type: 'spki',
-            format: 'der',
-        }) as Buffer
-        // Last 32 bytes contain raw public key
-        this._securePublicKey = exported.subarray(exported.length - 32)
+		// Generate ephemeral X25519 key pair
+		const keyPair = crypto.generateKeyPairSync('x25519')
+		this._securePrivateKey = keyPair.privateKey
+		const exported = keyPair.publicKey.export({
+			type: 'spki',
+			format: 'der',
+		}) as Buffer
+		// Last 32 bytes contain raw public key
+		this._securePublicKey = exported.subarray(exported.length - 32)
 
-        this._secureHandshakeState = 'session'
-            // Send SESSION_REQUEST immediately
-            try {
-                this.sysLogger.debug(
-                    `[${getTimestamp()}] TX 0951 SECURE_SESSION_REQUEST to ${this._peerHost}:${this._peerPort}`,
-                )
-            } catch {}
-            this.tcpSocket.write(this.secureBuildSessionRequest())
-        // Session timeout
-        this._secureHandshakeSessionTimer = setTimeout(() => {
-            this.emit(
-                KNXClientEvents.error,
-                new Error('Timeout waiting for SESSION_RESPONSE'),
-            )
-        }, SECURE_SESSION_TIMEOUT_MS)
-    }
+		this._secureHandshakeState = 'session'
+		// Send SESSION_REQUEST immediately
+		try {
+			this.sysLogger.debug(
+				`[${getTimestamp()}] TX 0951 SECURE_SESSION_REQUEST to ${this._peerHost}:${this._peerPort}`,
+			)
+		} catch {}
+		this.tcpSocket.write(this.secureBuildSessionRequest())
+		// Session timeout
+		this._secureHandshakeSessionTimer = setTimeout(() => {
+			this.emit(
+				KNXClientEvents.error,
+				new Error('Timeout waiting for SESSION_RESPONSE'),
+			)
+		}, SECURE_SESSION_TIMEOUT_MS)
+	}
 
-    private secureOnTcpData(data: Buffer) {
-        // Accumulate and parse complete KNX/IP frames (length from header bytes 4..5)
-        this._tcpRxBuffer = Buffer.concat([this._tcpRxBuffer, data])
-        while (this._tcpRxBuffer.length >= 6) {
-            const totalLen = this._tcpRxBuffer.readUInt16BE(4)
-            if (this._tcpRxBuffer.length < totalLen) break
-            const frame = this._tcpRxBuffer.subarray(0, totalLen)
-            this._tcpRxBuffer = this._tcpRxBuffer.subarray(totalLen)
+	private secureOnTcpData(data: Buffer) {
+		// Accumulate and parse complete KNX/IP frames (length from header bytes 4..5)
+		this._tcpRxBuffer = Buffer.concat([this._tcpRxBuffer, data])
+		while (this._tcpRxBuffer.length >= 6) {
+			const totalLen = this._tcpRxBuffer.readUInt16BE(4)
+			if (this._tcpRxBuffer.length < totalLen) break
+			const frame = this._tcpRxBuffer.subarray(0, totalLen)
+			this._tcpRxBuffer = this._tcpRxBuffer.subarray(totalLen)
 
-            const type = frame.readUInt16BE(2)
-            if (
-                type === KNXIP.SECURE_SESSION_RESPONSE &&
-                this._secureHandshakeState === 'session'
-            ) {
-                if (this._secureHandshakeSessionTimer) {
-                    clearTimeout(this._secureHandshakeSessionTimer)
-                    this._secureHandshakeSessionTimer = undefined
-                }
-                // SESSION_RESPONSE
-                try {
-                    this.sysLogger.debug(
-                        `[${getTimestamp()}] RX 0952 SECURE_SESSION_RESPONSE sid=${frame.readUInt16BE(6)}`,
-                    )
-                } catch {}
-                this._secureSessionId = frame.readUInt16BE(6)
-                const serverPublicKey = frame.subarray(8, 40)
+			const type = frame.readUInt16BE(2)
+			if (
+				type === KNXIP.SECURE_SESSION_RESPONSE &&
+				this._secureHandshakeState === 'session'
+			) {
+				if (this._secureHandshakeSessionTimer) {
+					clearTimeout(this._secureHandshakeSessionTimer)
+					this._secureHandshakeSessionTimer = undefined
+				}
+				// SESSION_RESPONSE
+				try {
+					this.sysLogger.debug(
+						`[${getTimestamp()}] RX 0952 SECURE_SESSION_RESPONSE sid=${frame.readUInt16BE(6)}`,
+					)
+				} catch {}
+				this._secureSessionId = frame.readUInt16BE(6)
+				const serverPublicKey = frame.subarray(8, 40)
 
-                // Compute session key
-                const X25519_SPKI_PREFIX_DER = Buffer.from(
-                    '302a300506032b656e032100',
-                    'hex',
-                )
-                const serverKey = crypto.createPublicKey({
-                    key: Buffer.concat([
-                        X25519_SPKI_PREFIX_DER,
-                        serverPublicKey,
-                    ]),
-                    format: 'der',
-                    type: 'spki',
-                })
-                const secret = crypto.diffieHellman({
-                    privateKey: this._securePrivateKey!,
-                    publicKey: serverKey,
-                })
-                const sessHash = crypto
-                    .createHash('sha256')
-                    .update(secret)
-                    .digest()
-                this._secureSessionKey = sessHash.subarray(0, 16)
+				// Compute session key
+				const X25519_SPKI_PREFIX_DER = Buffer.from(
+					'302a300506032b656e032100',
+					'hex',
+				)
+				const serverKey = crypto.createPublicKey({
+					key: Buffer.concat([
+						X25519_SPKI_PREFIX_DER,
+						serverPublicKey,
+					]),
+					format: 'der',
+					type: 'spki',
+				})
+				const secret = crypto.diffieHellman({
+					privateKey: this._securePrivateKey!,
+					publicKey: serverKey,
+				})
+				const sessHash = crypto
+					.createHash('sha256')
+					.update(secret)
+					.digest()
+				this._secureSessionKey = sessHash.subarray(0, 16)
 
-                // Send SESSION_AUTHENTICATE (wrapped)
-                const authFrame = this.secureBuildSessionAuthenticate(
-                    serverPublicKey,
-                )
-                try {
-                    this.sysLogger.debug(
-                        `[${getTimestamp()}] TX 0953 SECURE_SESSION_AUTHENTICATE (wrapped) sid=${this._secureSessionId}`,
-                    )
-                } catch {}
-                this.tcpSocket.write(this.secureWrap(authFrame))
-                this._secureHandshakeState = 'auth'
-                this._secureHandshakeAuthTimer = setTimeout(() => {
-                    this.emit(
-                        KNXClientEvents.error,
-                        new Error('Timeout waiting for SESSION_STATUS'),
-                    )
-                }, SECURE_AUTH_TIMEOUT_MS)
-            } else if (type === KNXIP.SECURE_WRAPPER) {
-                const inner = this.secureDecrypt(frame)
-                const innerType = inner.readUInt16BE(2)
-                if (
-                    innerType === KNXIP.SECURE_SESSION_STATUS &&
-                    this._secureHandshakeState === 'auth'
-                ) {
-                    try {
-                        this.sysLogger.debug(
-                            `[${getTimestamp()}] RX 0954 SECURE_SESSION_STATUS status=${inner[6]}`,
-                        )
-                    } catch {}
-                    if (this._secureHandshakeAuthTimer) {
-                        clearTimeout(this._secureHandshakeAuthTimer)
-                        this._secureHandshakeAuthTimer = undefined
-                    }
-                    // On success (status 0), send CONNECT_REQUEST (slight delay improves reliability)
-                    if (inner[6] === 0) {
-                        const conn = this.secureBuildConnectRequest()
-                        setTimeout(() => {
-                            try {
-                                this.sysLogger.debug(
-                                    `[${getTimestamp()}] TX 0205 TUNNELING_CONNECT_REQUEST (wrapped)`,
-                                )
-                            } catch {}
-                            this.tcpSocket.write(this.secureWrap(conn))
-                            this._secureHandshakeState = 'connect'
-                            this._secureHandshakeConnectTimer = setTimeout(
-                                () =>
-                                    this.emit(
-                                        KNXClientEvents.error,
-                                        new Error(
-                                            'Timeout waiting for CONNECT_RESPONSE',
-                                        ),
-                                    ),
-                                SECURE_CONNECT_TIMEOUT_MS,
-                            )
-                        }, CONNECT_SEND_DELAY_MS)
-                    }
-                } else if (
-                    innerType === KNXIP.TUNNELING_CONNECT_RESPONSE &&
-                    this._secureHandshakeState === 'connect'
-                ) {
-                    // CONNECT_RESPONSE
-                    if (this._secureHandshakeConnectTimer) {
-                        clearTimeout(this._secureHandshakeConnectTimer)
-                        this._secureHandshakeConnectTimer = undefined
-                    }
-                    const ch = inner[6]
-                    const status = inner[7]
-                    // Parse assigned IA from CRD after HPAI
-                    const hpaiLen = inner[8]
-                    const crdPos = 8 + hpaiLen
-                    if (inner.length >= crdPos + 4) {
-                        this._secureAssignedIa =
-                            (inner[crdPos + 2] << 8) | inner[crdPos + 3]
-                        try {
-                            const iaStr = `${(this._secureAssignedIa >> 12) & 0x0f}.${(this._secureAssignedIa >> 8) & 0x0f}.${this._secureAssignedIa & 0xff}`
-                            this.sysLogger.debug(
-                                `[${getTimestamp()}] RX 0206 TUNNELING_CONNECT_RESPONSE ch=${ch} status=${status} assignedIA=${iaStr}`,
-                            )
-                        } catch {}
-                    }
-                    if (status === 0) {
-                        // Promote to KNXClient connected state
-                        this._channelID = ch
-                        // Ensure queue processing is enabled after tunnel established
-                        this.exitProcessingKNXQueueLoop = false
-                        // Update source IA to the tunnel-assigned IA for Data Secure correctness on bus
-                        try {
-                            if (this._secureAssignedIa) {
-                                this.physAddr = new KNXAddress(
-                                    this._secureAssignedIa,
-                                    KNXAddress.TYPE_INDIVIDUAL,
-                                )
-                            }
-                        } catch {}
-                        this._connectionState = ConncetionState.CONNECTED
-                        this._numFailedTelegramACK = 0
-                        this.clearToSend = true
-                        this.emit(KNXClientEvents.connected, this._options)
-                        // For TunnelTCP, delay first heartbeat to avoid premature CONNSTATE right after connect
-                        try {
-                            const delayMs = 1000 * (this._options.connectionKeepAliveTimeout || KNX_CONSTANTS.CONNECTION_ALIVE_TIME)
-                            this.setTimer(KNXTimer.HEARTBEAT, () => this.startHeartBeat(), delayMs)
-                        } catch {}
-                        this.handleKNXQueue()
-                    }
-                } else {
-                    // Feed decrypted inner KNX/IP frames into the regular pipeline
-                    const rinfo: RemoteInfo = {
-                        address: this._peerHost,
-                        port: this._peerPort,
-                        family: 'IPv4',
-                        size: inner.length,
-                    } as any
-                    this.processInboundMessage(inner, rinfo)
-                }
-            } else if (
-                type === KNXIP.TUNNELING_CONNECT_RESPONSE &&
-                this._secureHandshakeState === 'connect'
-            ) {
-                // Plain fallback CONNECT_RESPONSE (rare)
-                if (this._secureHandshakeConnectTimer) {
-                    clearTimeout(this._secureHandshakeConnectTimer)
-                    this._secureHandshakeConnectTimer = undefined
-                }
-                const ch = frame[6]
-                const status = frame[7]
-                if (status === 0) {
-                    this._channelID = ch
-                    this._connectionState = ConncetionState.CONNECTED
-                    this._numFailedTelegramACK = 0
-                    this.clearToSend = true
-                    this.emit(KNXClientEvents.connected, this._options)
-                    this.startHeartBeat()
-                    this.handleKNXQueue()
-                }
-            } else {
-                // Other plaintext frames: route to parser if relevant
-                const rinfo: RemoteInfo = {
-                    address: this._peerHost,
-                    port: this._peerPort,
-                    family: 'IPv4',
-                    size: frame.length,
-                } as any
-                this.processInboundMessage(frame, rinfo)
-            }
-        }
-    }
+				// Send SESSION_AUTHENTICATE (wrapped)
+				const authFrame =
+					this.secureBuildSessionAuthenticate(serverPublicKey)
+				try {
+					this.sysLogger.debug(
+						`[${getTimestamp()}] TX 0953 SECURE_SESSION_AUTHENTICATE (wrapped) sid=${this._secureSessionId}`,
+					)
+				} catch {}
+				this.tcpSocket.write(this.secureWrap(authFrame))
+				this._secureHandshakeState = 'auth'
+				this._secureHandshakeAuthTimer = setTimeout(() => {
+					this.emit(
+						KNXClientEvents.error,
+						new Error('Timeout waiting for SESSION_STATUS'),
+					)
+				}, SECURE_AUTH_TIMEOUT_MS)
+			} else if (type === KNXIP.SECURE_WRAPPER) {
+				const inner = this.secureDecrypt(frame)
+				const innerType = inner.readUInt16BE(2)
+				if (
+					innerType === KNXIP.SECURE_SESSION_STATUS &&
+					this._secureHandshakeState === 'auth'
+				) {
+					try {
+						this.sysLogger.debug(
+							`[${getTimestamp()}] RX 0954 SECURE_SESSION_STATUS status=${inner[6]}`,
+						)
+					} catch {}
+					if (this._secureHandshakeAuthTimer) {
+						clearTimeout(this._secureHandshakeAuthTimer)
+						this._secureHandshakeAuthTimer = undefined
+					}
+					// On success (status 0), send CONNECT_REQUEST (slight delay improves reliability)
+					if (inner[6] === 0) {
+						const conn = this.secureBuildConnectRequest()
+						setTimeout(() => {
+							try {
+								this.sysLogger.debug(
+									`[${getTimestamp()}] TX 0205 TUNNELING_CONNECT_REQUEST (wrapped)`,
+								)
+							} catch {}
+							this.tcpSocket.write(this.secureWrap(conn))
+							this._secureHandshakeState = 'connect'
+							this._secureHandshakeConnectTimer = setTimeout(
+								() =>
+									this.emit(
+										KNXClientEvents.error,
+										new Error(
+											'Timeout waiting for CONNECT_RESPONSE',
+										),
+									),
+								SECURE_CONNECT_TIMEOUT_MS,
+							)
+						}, CONNECT_SEND_DELAY_MS)
+					}
+				} else if (
+					innerType === KNXIP.TUNNELING_CONNECT_RESPONSE &&
+					this._secureHandshakeState === 'connect'
+				) {
+					// CONNECT_RESPONSE
+					if (this._secureHandshakeConnectTimer) {
+						clearTimeout(this._secureHandshakeConnectTimer)
+						this._secureHandshakeConnectTimer = undefined
+					}
+					const ch = inner[6]
+					const status = inner[7]
+					// Parse assigned IA from CRD after HPAI
+					const hpaiLen = inner[8]
+					const crdPos = 8 + hpaiLen
+					if (inner.length >= crdPos + 4) {
+						this._secureAssignedIa =
+							(inner[crdPos + 2] << 8) | inner[crdPos + 3]
+						try {
+							const iaStr = `${(this._secureAssignedIa >> 12) & 0x0f}.${(this._secureAssignedIa >> 8) & 0x0f}.${this._secureAssignedIa & 0xff}`
+							this.sysLogger.debug(
+								`[${getTimestamp()}] RX 0206 TUNNELING_CONNECT_RESPONSE ch=${ch} status=${status} assignedIA=${iaStr}`,
+							)
+						} catch {}
+					}
+					if (status === 0) {
+						// Promote to KNXClient connected state
+						this._channelID = ch
+						// Ensure queue processing is enabled after tunnel established
+						this.exitProcessingKNXQueueLoop = false
+						// Update source IA to the tunnel-assigned IA for Data Secure correctness on bus
+						try {
+							if (this._secureAssignedIa) {
+								this.physAddr = new KNXAddress(
+									this._secureAssignedIa,
+									KNXAddress.TYPE_INDIVIDUAL,
+								)
+							}
+						} catch {}
+						this._connectionState = ConncetionState.CONNECTED
+						this._numFailedTelegramACK = 0
+						this.clearToSend = true
+						this.emit(KNXClientEvents.connected, this._options)
+						// For TunnelTCP, delay first heartbeat to avoid premature CONNSTATE right after connect
+						try {
+							const delayMs =
+								1000 *
+								(this._options.connectionKeepAliveTimeout ||
+									KNX_CONSTANTS.CONNECTION_ALIVE_TIME)
+							this.setTimer(
+								KNXTimer.HEARTBEAT,
+								() => this.startHeartBeat(),
+								delayMs,
+							)
+						} catch {}
+						this.handleKNXQueue()
+					}
+				} else {
+					// Feed decrypted inner KNX/IP frames into the regular pipeline
+					const rinfo: RemoteInfo = {
+						address: this._peerHost,
+						port: this._peerPort,
+						family: 'IPv4',
+						size: inner.length,
+					} as any
+					this.processInboundMessage(inner, rinfo)
+				}
+			} else if (
+				type === KNXIP.TUNNELING_CONNECT_RESPONSE &&
+				this._secureHandshakeState === 'connect'
+			) {
+				// Plain fallback CONNECT_RESPONSE (rare)
+				if (this._secureHandshakeConnectTimer) {
+					clearTimeout(this._secureHandshakeConnectTimer)
+					this._secureHandshakeConnectTimer = undefined
+				}
+				const ch = frame[6]
+				const status = frame[7]
+				if (status === 0) {
+					this._channelID = ch
+					this._connectionState = ConncetionState.CONNECTED
+					this._numFailedTelegramACK = 0
+					this.clearToSend = true
+					this.emit(KNXClientEvents.connected, this._options)
+					this.startHeartBeat()
+					this.handleKNXQueue()
+				}
+			} else {
+				// Other plaintext frames: route to parser if relevant
+				const rinfo: RemoteInfo = {
+					address: this._peerHost,
+					port: this._peerPort,
+					family: 'IPv4',
+					size: frame.length,
+				} as any
+				this.processInboundMessage(frame, rinfo)
+			}
+		}
+	}
 
-    private secureWrap(frame: Buffer): Buffer {
-        if (!this._secureSessionKey)
-            throw new Error('Secure session not established')
-        const seq = Buffer.alloc(SECURE_SEQ_LEN)
-        seq.writeUIntBE(this._secureWrapperSeq++, 0, SECURE_SEQ_LEN)
+	private secureWrap(frame: Buffer): Buffer {
+		if (!this._secureSessionKey)
+			throw new Error('Secure session not established')
+		const seq = Buffer.alloc(SECURE_SEQ_LEN)
+		seq.writeUIntBE(this._secureWrapperSeq++, 0, SECURE_SEQ_LEN)
 
-        const len = SECURE_WRAPPER_OVERHEAD + frame.length
-        const hdr = Buffer.concat([
-            KNXIP_HDR_SECURE_WRAPPER,
-            Buffer.from([len >> 8, len & 0xff]),
-        ])
-        const additionalData = Buffer.concat([
-            hdr,
-            Buffer.from([this._secureSessionId >> 8, this._secureSessionId & 0xff]),
-        ])
-        const block0 = Buffer.concat([
-            seq,
-            this._secureSerial,
-            SECURE_WRAPPER_TAG,
-            Buffer.from([frame.length >> 8, frame.length & 0xff]),
-        ])
-        const blocks = Buffer.concat([
-            block0,
-            Buffer.from([0x00, additionalData.length]),
-            additionalData,
-            frame,
-        ])
-        const padded = Buffer.concat([
-            blocks,
-            Buffer.alloc((16 - (blocks.length % 16)) % 16, 0),
-        ])
-        const cipher = crypto.createCipheriv(
-            'aes-128-cbc',
-            this._secureSessionKey,
-            Buffer.alloc(AES_BLOCK_LEN, 0),
-        )
-        cipher.setAutoPadding(false)
-        const encrypted = Buffer.concat([cipher.update(padded), cipher.final()])
-        const macCbc = encrypted.subarray(encrypted.length - MAC_LEN_FULL)
+		const len = SECURE_WRAPPER_OVERHEAD + frame.length
+		const hdr = Buffer.concat([
+			KNXIP_HDR_SECURE_WRAPPER,
+			Buffer.from([len >> 8, len & 0xff]),
+		])
+		const additionalData = Buffer.concat([
+			hdr,
+			Buffer.from([
+				this._secureSessionId >> 8,
+				this._secureSessionId & 0xff,
+			]),
+		])
+		const block0 = Buffer.concat([
+			seq,
+			this._secureSerial,
+			SECURE_WRAPPER_TAG,
+			Buffer.from([frame.length >> 8, frame.length & 0xff]),
+		])
+		const blocks = Buffer.concat([
+			block0,
+			Buffer.from([0x00, additionalData.length]),
+			additionalData,
+			frame,
+		])
+		const padded = Buffer.concat([
+			blocks,
+			Buffer.alloc((16 - (blocks.length % 16)) % 16, 0),
+		])
+		const cipher = crypto.createCipheriv(
+			'aes-128-cbc',
+			this._secureSessionKey,
+			Buffer.alloc(AES_BLOCK_LEN, 0),
+		)
+		cipher.setAutoPadding(false)
+		const encrypted = Buffer.concat([cipher.update(padded), cipher.final()])
+		const macCbc = encrypted.subarray(encrypted.length - MAC_LEN_FULL)
 
-        const ctr0 = Buffer.concat([
-            seq,
-            this._secureSerial,
-            SECURE_WRAPPER_CTR_SUFFIX,
-        ])
-        const ctr = crypto.createCipheriv('aes-128-ctr', this._secureSessionKey, ctr0)
-        const encMac = ctr.update(macCbc)
-        const encData = ctr.update(frame)
+		const ctr0 = Buffer.concat([
+			seq,
+			this._secureSerial,
+			SECURE_WRAPPER_CTR_SUFFIX,
+		])
+		const ctr = crypto.createCipheriv(
+			'aes-128-ctr',
+			this._secureSessionKey,
+			ctr0,
+		)
+		const encMac = ctr.update(macCbc)
+		const encData = ctr.update(frame)
 
-        return Buffer.concat([
-            hdr,
-            Buffer.from([this._secureSessionId >> 8, this._secureSessionId & 0xff]),
-            seq,
-            this._secureSerial,
-            SECURE_WRAPPER_TAG,
-            encData,
-            encMac,
-        ])
-    }
+		return Buffer.concat([
+			hdr,
+			Buffer.from([
+				this._secureSessionId >> 8,
+				this._secureSessionId & 0xff,
+			]),
+			seq,
+			this._secureSerial,
+			SECURE_WRAPPER_TAG,
+			encData,
+			encMac,
+		])
+	}
 
-    // ===== Logging level helpers =====
-    private getLoggerLevel(): LogLevel {
-        try {
-            const lvl = (this.sysLogger as any)?.level || 'info'
-            return String(lvl).toLowerCase() as LogLevel
-        } catch {
-            return 'info'
-        }
-    }
-    private isLevelEnabled(level: LogLevel): boolean {
-        const order: Record<LogLevel, number> = {
-            disable: 0,
-            error: 1,
-            warn: 2,
-            info: 3,
-            debug: 4,
-            trace: 5,
-        }
-        const cur = this.getLoggerLevel()
-        return order[cur] >= order[level]
-    }
+	// ===== Logging level helpers =====
+	private getLoggerLevel(): LogLevel {
+		try {
+			const lvl = (this.sysLogger as any)?.level || 'info'
+			return String(lvl).toLowerCase() as LogLevel
+		} catch {
+			return 'info'
+		}
+	}
 
-    private secureDecrypt(frame: Buffer): Buffer {
-        if (!this._secureSessionKey)
-            throw new Error('Secure session not established')
-        const seq = frame.subarray(8, 14)
-        const serial = frame.subarray(14, 20)
-        const tag = frame.subarray(20, 22)
-        const data = frame.subarray(22, frame.length - 16)
-        const ctr0 = Buffer.concat([seq, serial, tag, SECURE_WRAPPER_MAC_SUFFIX])
-        const dec = crypto.createDecipheriv(
-            'aes-128-ctr',
-            this._secureSessionKey,
-            ctr0,
-        )
-        dec.update(frame.subarray(frame.length - MAC_LEN_FULL))
-        return dec.update(data)
-    }
+	private isLevelEnabled(level: LogLevel): boolean {
+		const order: Record<LogLevel, number> = {
+			disable: 0,
+			error: 1,
+			warn: 2,
+			info: 3,
+			debug: 4,
+			trace: 5,
+		}
+		const cur = this.getLoggerLevel()
+		return order[cur] >= order[level]
+	}
 
-    private secureBuildSessionRequest(): Buffer {
-        // 06 10 | 09 51 | len | HPAI | <client public key 32B>
-        const bodyLen = HPAI_CONTROL_ENDPOINT_EMPTY.length + PUBLIC_KEY_LEN
-        const len = bodyLen + KNXIP_HEADER_LEN
-        return Buffer.concat([
-            KNXIP_HDR_SECURE_SESSION_REQUEST,
-            Buffer.from([(len >> 8) & 0xff, len & 0xff]),
-            HPAI_CONTROL_ENDPOINT_EMPTY,
-            this._securePublicKey!,
-        ])
-    }
+	private secureDecrypt(frame: Buffer): Buffer {
+		if (!this._secureSessionKey)
+			throw new Error('Secure session not established')
+		const seq = frame.subarray(8, 14)
+		const serial = frame.subarray(14, 20)
+		const tag = frame.subarray(20, 22)
+		const data = frame.subarray(22, frame.length - 16)
+		const ctr0 = Buffer.concat([
+			seq,
+			serial,
+			tag,
+			SECURE_WRAPPER_MAC_SUFFIX,
+		])
+		const dec = crypto.createDecipheriv(
+			'aes-128-ctr',
+			this._secureSessionKey,
+			ctr0,
+		)
+		dec.update(frame.subarray(frame.length - MAC_LEN_FULL))
+		return dec.update(data)
+	}
 
-    private secureBuildSessionAuthenticate(serverPublicKey: Buffer): Buffer {
-        const xor = Buffer.alloc(PUBLIC_KEY_LEN)
-        for (let i = 0; i < PUBLIC_KEY_LEN; i++)
-            xor[i] = this._securePublicKey![i] ^ serverPublicKey[i]
+	private secureBuildSessionRequest(): Buffer {
+		// 06 10 | 09 51 | len | HPAI | <client public key 32B>
+		const bodyLen = HPAI_CONTROL_ENDPOINT_EMPTY.length + PUBLIC_KEY_LEN
+		const len = bodyLen + KNXIP_HEADER_LEN
+		return Buffer.concat([
+			KNXIP_HDR_SECURE_SESSION_REQUEST,
+			Buffer.from([(len >> 8) & 0xff, len & 0xff]),
+			HPAI_CONTROL_ENDPOINT_EMPTY,
+			this._securePublicKey!,
+		])
+	}
 
-        const additionalData = Buffer.concat([
-            KNXIP_HDR_SECURE_SESSION_AUTHENTICATE,
-            Buffer.from([0x00, 0x18]),
-            Buffer.from([0x00, this._secureUserId]),
-            xor,
-        ])
-        const block0 = Buffer.alloc(AES_BLOCK_LEN, 0)
-        const blocks = Buffer.concat([
-            block0,
-            Buffer.from([0x00, additionalData.length]),
-            additionalData,
-        ])
-        const padded = Buffer.concat([
-            blocks,
-            Buffer.alloc(
-                (AES_BLOCK_LEN - (blocks.length % AES_BLOCK_LEN)) % AES_BLOCK_LEN,
-                0,
-            ),
-        ])
-        const cipher = crypto.createCipheriv(
-            'aes-128-cbc',
-            this._secureUserPasswordKey!,
-            Buffer.alloc(AES_BLOCK_LEN, 0),
-        )
-        cipher.setAutoPadding(false)
-        const encrypted = Buffer.concat([cipher.update(padded), cipher.final()])
-        const macCbc = encrypted.subarray(encrypted.length - AES_BLOCK_LEN)
-        const ctr = crypto.createCipheriv(
-            'aes-128-ctr',
-            this._secureUserPasswordKey!,
-            AUTH_CTR_IV,
-        )
-        const mac = ctr.update(macCbc)
-        const authBodyLen = 1 + 1 + AES_BLOCK_LEN
-        const authLen = authBodyLen + KNXIP_HEADER_LEN
-        return Buffer.concat([
-            KNXIP_HDR_SECURE_SESSION_AUTHENTICATE,
-            Buffer.from([(authLen >> 8) & 0xff, authLen & 0xff]),
-            Buffer.from([0x00]),
-            Buffer.from([this._secureUserId]),
-            mac,
-        ])
-    }
+	private secureBuildSessionAuthenticate(serverPublicKey: Buffer): Buffer {
+		const xor = Buffer.alloc(PUBLIC_KEY_LEN)
+		for (let i = 0; i < PUBLIC_KEY_LEN; i++)
+			xor[i] = this._securePublicKey![i] ^ serverPublicKey[i]
 
-    private secureBuildConnectRequest(): Buffer {
-        // 06 10 | 02 05 | len | HPAI ctrl | HPAI data | CRD (04 04 02 00)
-        const bodyLen =
-            HPAI_CONTROL_ENDPOINT_EMPTY.length +
-            HPAI_DATA_ENDPOINT_EMPTY.length +
-            CRD_TUNNEL_LINKLAYER.length
-        const len = bodyLen + KNXIP_HEADER_LEN
-        return Buffer.concat([
-            KNXIP_HDR_TUNNELING_CONNECT_REQUEST,
-            Buffer.from([(len >> 8) & 0xff, len & 0xff]),
-            HPAI_CONTROL_ENDPOINT_EMPTY,
-            HPAI_DATA_ENDPOINT_EMPTY,
-            CRD_TUNNEL_LINKLAYER,
-        ])
-    }
+		const additionalData = Buffer.concat([
+			KNXIP_HDR_SECURE_SESSION_AUTHENTICATE,
+			Buffer.from([0x00, 0x18]),
+			Buffer.from([0x00, this._secureUserId]),
+			xor,
+		])
+		const block0 = Buffer.alloc(AES_BLOCK_LEN, 0)
+		const blocks = Buffer.concat([
+			block0,
+			Buffer.from([0x00, additionalData.length]),
+			additionalData,
+		])
+		const padded = Buffer.concat([
+			blocks,
+			Buffer.alloc(
+				(AES_BLOCK_LEN - (blocks.length % AES_BLOCK_LEN)) %
+					AES_BLOCK_LEN,
+				0,
+			),
+		])
+		const cipher = crypto.createCipheriv(
+			'aes-128-cbc',
+			this._secureUserPasswordKey!,
+			Buffer.alloc(AES_BLOCK_LEN, 0),
+		)
+		cipher.setAutoPadding(false)
+		const encrypted = Buffer.concat([cipher.update(padded), cipher.final()])
+		const macCbc = encrypted.subarray(encrypted.length - AES_BLOCK_LEN)
+		const ctr = crypto.createCipheriv(
+			'aes-128-ctr',
+			this._secureUserPasswordKey!,
+			AUTH_CTR_IV,
+		)
+		const mac = ctr.update(macCbc)
+		const authBodyLen = 1 + 1 + AES_BLOCK_LEN
+		const authLen = authBodyLen + KNXIP_HEADER_LEN
+		return Buffer.concat([
+			KNXIP_HDR_SECURE_SESSION_AUTHENTICATE,
+			Buffer.from([(authLen >> 8) & 0xff, authLen & 0xff]),
+			Buffer.from([0x00]),
+			Buffer.from([this._secureUserId]),
+			mac,
+		])
+	}
 
-    // Data Secure helpers (available for future use)
-    private secureBuildSecureApdu(
-        groupAddr: number,
-        plainApdu: Buffer,
-        cemiFlags: number,
-        srcIa: number,
-    ): Buffer {
-        const key = this._secureGroupKeys.get(groupAddr)
-        if (!key)
-            throw new Error(
-                `No Data Secure key for GA ${this.secureFormatGroupAddress(groupAddr)}`,
-            )
-        const seq = Buffer.alloc(SECURE_SEQ_LEN)
-        const current = this._secureSendSeq48 & 0xffffffffffffn
-        seq.writeUIntBE(Number(current), 0, 6)
-        this._secureSendSeq48 = (this._secureSendSeq48 + 1n) & 0xffffffffffffn
-        const addrFields = Buffer.from([
-            (srcIa >> 8) & 0xff,
-            srcIa & 0xff,
-            (groupAddr >> 8) & 0xff,
-            groupAddr & 0xff,
-        ])
-        const frameFlagsMasked = cemiFlags & 0xffff
-        const block0 = Buffer.concat([
-            seq,
-            addrFields,
-            Buffer.from([
-                0x00,
-                frameFlagsMasked & 0xff & SEC_CEMI.CTRL2_RELEVANT_MASK,
-                (TPCI_DATA << 2) + APCI_SEC.HIGH,
-                APCI_SEC.LOW,
-                0x00,
-                plainApdu.length,
-            ]),
-        ])
-        const macCbcFull = calculateMessageAuthenticationCodeCBC(
-            key,
-            Buffer.from([SCF_ENCRYPTION_S_A_DATA]),
-            plainApdu,
-            block0,
-        )
-        const macCbc4 = macCbcFull.subarray(0, 4)
-        const counter0 = Buffer.concat([seq, addrFields, DATA_SECURE_CTR_SUFFIX])
-        const [encPayload, encMac] = encryptDataCtr(
-            key,
-            counter0,
-            macCbc4,
-            plainApdu,
-        )
-        // Optional deep debug for Data Secure, helpful to compare with reference implementation
-        try {
-            if (this.isLevelEnabled('debug')) {
-                const iaStr = `${(srcIa >> 12) & 0x0f}.${(srcIa >> 8) & 0x0f}.${srcIa & 0xff}`
-                this.sysLogger.debug(
-                    `[${getTimestamp()}] DS build: dst=${this.secureFormatGroupAddress(groupAddr)} src=${iaStr} flags=0x${(cemiFlags & 0xffff).toString(16)} plain=${plainApdu.toString('hex')} seq48=${seq.toString('hex')} block0=${block0.toString('hex')} ctr0=${counter0.toString('hex')}`,
-                )
-            }
-        } catch {}
-        return Buffer.concat([APCI_SEC.HEADER, Buffer.from([SCF_ENCRYPTION_S_A_DATA]), seq, encPayload, encMac])
-    }
+	private secureBuildConnectRequest(): Buffer {
+		// 06 10 | 02 05 | len | HPAI ctrl | HPAI data | CRD (04 04 02 00)
+		const bodyLen =
+			HPAI_CONTROL_ENDPOINT_EMPTY.length +
+			HPAI_DATA_ENDPOINT_EMPTY.length +
+			CRD_TUNNEL_LINKLAYER.length
+		const len = bodyLen + KNXIP_HEADER_LEN
+		return Buffer.concat([
+			KNXIP_HDR_TUNNELING_CONNECT_REQUEST,
+			Buffer.from([(len >> 8) & 0xff, len & 0xff]),
+			HPAI_CONTROL_ENDPOINT_EMPTY,
+			HPAI_DATA_ENDPOINT_EMPTY,
+			CRD_TUNNEL_LINKLAYER,
+		])
+	}
 
-    private secureBuildLDataReq(
-        secureApdu: Buffer,
-        srcIa: number,
-        ga: number,
-        flags: number,
-    ): Buffer {
-        return Buffer.concat([
-            Buffer.from([SEC_CEMI.L_DATA_REQ, SEC_CEMI.ADDITIONAL_INFO_NONE]),
-            Buffer.from([(flags >> 8) & 0xff, flags & 0xff]),
-            Buffer.from([(srcIa >> 8) & 0xff, srcIa & 0xff]),
-            Buffer.from([(ga >> 8) & 0xff, ga & 0xff]),
-            Buffer.from([secureApdu.length - 1]),
-            secureApdu,
-        ])
-    }
+	// Data Secure helpers (available for future use)
+	private secureBuildSecureApdu(
+		groupAddr: number,
+		plainApdu: Buffer,
+		cemiFlags: number,
+		srcIa: number,
+	): Buffer {
+		const key = this._secureGroupKeys.get(groupAddr)
+		if (!key)
+			throw new Error(
+				`No Data Secure key for GA ${this.secureFormatGroupAddress(groupAddr)}`,
+			)
+		const seq = Buffer.alloc(SECURE_SEQ_LEN)
+		const current = this._secureSendSeq48 & 0xffffffffffffn
+		seq.writeUIntBE(Number(current), 0, 6)
+		this._secureSendSeq48 = (this._secureSendSeq48 + 1n) & 0xffffffffffffn
+		const addrFields = Buffer.from([
+			(srcIa >> 8) & 0xff,
+			srcIa & 0xff,
+			(groupAddr >> 8) & 0xff,
+			groupAddr & 0xff,
+		])
+		const frameFlagsMasked = cemiFlags & 0xffff
+		const block0 = Buffer.concat([
+			seq,
+			addrFields,
+			Buffer.from([
+				0x00,
+				frameFlagsMasked & 0xff & SEC_CEMI.CTRL2_RELEVANT_MASK,
+				(TPCI_DATA << 2) + APCI_SEC.HIGH,
+				APCI_SEC.LOW,
+				0x00,
+				plainApdu.length,
+			]),
+		])
+		const macCbcFull = calculateMessageAuthenticationCodeCBC(
+			key,
+			Buffer.from([SCF_ENCRYPTION_S_A_DATA]),
+			plainApdu,
+			block0,
+		)
+		const macCbc4 = macCbcFull.subarray(0, 4)
+		const counter0 = Buffer.concat([
+			seq,
+			addrFields,
+			DATA_SECURE_CTR_SUFFIX,
+		])
+		const [encPayload, encMac] = encryptDataCtr(
+			key,
+			counter0,
+			macCbc4,
+			plainApdu,
+		)
+		// Optional deep debug for Data Secure, helpful to compare with reference implementation
+		try {
+			if (this.isLevelEnabled('debug')) {
+				const iaStr = `${(srcIa >> 12) & 0x0f}.${(srcIa >> 8) & 0x0f}.${srcIa & 0xff}`
+				this.sysLogger.debug(
+					`[${getTimestamp()}] DS build: dst=${this.secureFormatGroupAddress(groupAddr)} src=${iaStr} flags=0x${(cemiFlags & 0xffff).toString(16)} plain=${plainApdu.toString('hex')} seq48=${seq.toString('hex')} block0=${block0.toString('hex')} ctr0=${counter0.toString('hex')}`,
+				)
+			}
+		} catch {}
+		return Buffer.concat([
+			APCI_SEC.HEADER,
+			Buffer.from([SCF_ENCRYPTION_S_A_DATA]),
+			seq,
+			encPayload,
+			encMac,
+		])
+	}
 
-    private secureParseGroupAddress(ga: string): number {
-        const [m, mi, s] = ga.split('/').map(Number)
-        return ((m & 0x1f) << 11) | ((mi & 0x07) << 8) | (s & 0xff)
-    }
-    private secureFormatGroupAddress(raw: number): string {
-        const m = (raw >> 11) & 0x1f
-        const mi = (raw >> 8) & 0x07
-        const s = raw & 0xff
-        return `${m}/${mi}/${s}`
-    }
-    private secureParseIndividualAddress(ia: string): number {
-        const [a, l, d] = ia.split('.').map(Number)
-        return ((a & 0x0f) << 12) | ((l & 0x0f) << 8) | (d & 0xff)
-    }
+	private secureBuildLDataReq(
+		secureApdu: Buffer,
+		srcIa: number,
+		ga: number,
+		flags: number,
+	): Buffer {
+		return Buffer.concat([
+			Buffer.from([SEC_CEMI.L_DATA_REQ, SEC_CEMI.ADDITIONAL_INFO_NONE]),
+			Buffer.from([(flags >> 8) & 0xff, flags & 0xff]),
+			Buffer.from([(srcIa >> 8) & 0xff, srcIa & 0xff]),
+			Buffer.from([(ga >> 8) & 0xff, ga & 0xff]),
+			Buffer.from([secureApdu.length - 1]),
+			secureApdu,
+		])
+	}
 
-    // Apply Data Secure to an outgoing cEMI if GA has a key in keyring
-    private maybeApplyDataSecure(cemi: any) {
-        try {
-            if (this._options.hostProtocol !== 'TunnelTCP') return
-            if (!this._options.isSecureKNXEnabled) return
-            if (this._options.secureTunnelConfig?.disableDataSecure) return
-            if (!this._secureGroupKeys || this._secureGroupKeys.size === 0) return
-            // Already secure? don't re-apply (avoid consuming a new seq48)
-            if (
-                cemi?.npdu &&
-                (cemi.npdu.tpci & 0xff) === APCI_SEC.HIGH &&
-                (cemi.npdu.apci & 0xff) === APCI_SEC.LOW
-            )
-                return
-            const dst = cemi?.dstAddress?.get?.() as number
-            if (typeof dst !== 'number') return
-            if (!this._secureGroupKeys.has(dst)) return
-            const src = (this._secureAssignedIa || (cemi?.srcAddress?.get?.() as number)) as number
-            if (typeof src !== 'number') return
-            const ctrlBuf: Buffer = cemi?.control?.toBuffer?.()
-            if (!Buffer.isBuffer(ctrlBuf) || ctrlBuf.length < 2) return
-            const flags16 = (ctrlBuf[0] << 8) | ctrlBuf[1]
-            const npdu = cemi?.npdu
-            if (!npdu) return
-            const dataPart: Buffer = npdu.dataBuffer ? npdu.dataBuffer.value : Buffer.alloc(0)
-            const plainApdu = Buffer.concat([
-                Buffer.from([npdu.tpci & 0xff, npdu.apci & 0xff]),
-                dataPart,
-            ])
-            const secureApduFull = this.secureBuildSecureApdu(dst, plainApdu, flags16, src)
-            // Replace NPDU header + data with SecureAPDU
-            npdu.tpci = APCI_SEC.HIGH
-            npdu.apci = APCI_SEC.LOW
-            npdu.data = new KNXDataBuffer(secureApduFull.subarray(2))
-            // Ensure srcAddress reflects the assigned IA used on the bus
-            try {
-                if (this._secureAssignedIa) {
-                    cemi.srcAddress = new KNXAddress(
-                        this._secureAssignedIa,
-                        KNXAddress.TYPE_INDIVIDUAL,
-                    )
-                }
-            } catch {}
-            // Update cEMI message length to reflect the new NPDU size
-            try {
-                cemi.length = CEMIMessage.GetLength(
-                    cemi.additionalInfo,
-                    cemi.control,
-                    cemi.srcAddress,
-                    cemi.dstAddress,
-                    cemi.npdu,
-                )
-            } catch {}
-        } catch (e) {
-            this.sysLogger.error(`maybeApplyDataSecure error: ${(e as Error).message}`)
-        }
-    }
+	private secureParseGroupAddress(ga: string): number {
+		const [m, mi, s] = ga.split('/').map(Number)
+		return ((m & 0x1f) << 11) | ((mi & 0x07) << 8) | (s & 0xff)
+	}
 
-    // Decrypt incoming Data Secure NPDU in-place if applicable
-    private maybeDecryptDataSecure(cemi: any) {
-        try {
-            if (this._options.hostProtocol !== 'TunnelTCP') return
-            if (!this._options.isSecureKNXEnabled) return
-            if (!this._secureGroupKeys || this._secureGroupKeys.size === 0) return
-            const npdu = cemi?.npdu
-            if (!npdu) return
-            if ((npdu.tpci & 0xff) !== APCI_SEC.HIGH || (npdu.apci & 0xff) !== APCI_SEC.LOW) return
-            const dst = cemi?.dstAddress?.get?.() as number
-            const src = cemi?.srcAddress?.get?.() as number
-            if (typeof dst !== 'number' || typeof src !== 'number') return
-            const key = this._secureGroupKeys.get(dst)
-            if (!key) return
-            const ctrlBuf: Buffer = cemi?.control?.toBuffer?.()
-            if (!Buffer.isBuffer(ctrlBuf) || ctrlBuf.length < 2) return
-            const flags2 = ctrlBuf[1] & SEC_CEMI.CTRL2_RELEVANT_MASK
+	private secureFormatGroupAddress(raw: number): string {
+		const m = (raw >> 11) & 0x1f
+		const mi = (raw >> 8) & 0x07
+		const s = raw & 0xff
+		return `${m}/${mi}/${s}`
+	}
 
-            const dataPart: Buffer = npdu.dataBuffer ? npdu.dataBuffer.value : Buffer.alloc(0)
-            if (dataPart.length < 1 + SECURE_SEQ_LEN + 4) return
-            const scf = dataPart[0]
-            const seq = dataPart.subarray(1, 1 + SECURE_SEQ_LEN)
-            const encPayloadAndMac = dataPart.subarray(1 + SECURE_SEQ_LEN)
-            const encMac = encPayloadAndMac.subarray(-MAC_LEN_SHORT)
-            const encPayload = encPayloadAndMac.subarray(0, encPayloadAndMac.length - MAC_LEN_SHORT)
-            const addrFields = Buffer.from([
-                (src >> 8) & 0xff,
-                src & 0xff,
-                (dst >> 8) & 0xff,
-                dst & 0xff,
-            ])
-            const counter0 = Buffer.concat([seq, addrFields, DATA_SECURE_CTR_SUFFIX])
-            const [decPayload, macTr] = decryptCtr(key, counter0, encMac, encPayload)
-            const block0 = Buffer.concat([
-                seq,
-                addrFields,
-                Buffer.from([
-                    0x00,
-                    flags2,
-                    (TPCI_DATA << 2) + APCI_SEC.HIGH,
-                    APCI_SEC.LOW,
-                    0x00,
-                    decPayload.length,
-                ]),
-            ])
-            const macCbc = calculateMessageAuthenticationCodeCBC(
-                key,
-                Buffer.from([scf]),
-                decPayload,
-                block0,
-            ).subarray(0, MAC_LEN_SHORT)
-            if (!macCbc.equals(macTr)) return
-            // Rebuild plain NPDU: TPCI=0x00, APCI=second byte, data after first 2 bytes
-            npdu.tpci = TPCI_DATA
-            if (decPayload.length >= 2) {
-                npdu.apci = decPayload[1]
-                const rest = decPayload.length > 2 ? decPayload.subarray(2) : null
-                npdu.data = rest ? new KNXDataBuffer(rest) : null
-            } else {
-                // Should not happen; fallback
-                npdu.apci = 0
-                npdu.data = null
-            }
-        } catch (e) {
-            this.sysLogger.error(`maybeDecryptDataSecure error: ${(e as Error).message}`)
-        }
-    }
+	private secureParseIndividualAddress(ia: string): number {
+		const [a, l, d] = ia.split('.').map(Number)
+		return ((a & 0x0f) << 12) | ((l & 0x0f) << 8) | (d & 0xff)
+	}
+
+	// Apply Data Secure to an outgoing cEMI if GA has a key in keyring
+	private maybeApplyDataSecure(cemi: any) {
+		try {
+			if (this._options.hostProtocol !== 'TunnelTCP') return
+			if (!this._options.isSecureKNXEnabled) return
+			if (this._options.secureTunnelConfig?.disableDataSecure) return
+			if (!this._secureGroupKeys || this._secureGroupKeys.size === 0)
+				return
+			// Already secure? don't re-apply (avoid consuming a new seq48)
+			if (
+				cemi?.npdu &&
+				(cemi.npdu.tpci & 0xff) === APCI_SEC.HIGH &&
+				(cemi.npdu.apci & 0xff) === APCI_SEC.LOW
+			)
+				return
+			const dst = cemi?.dstAddress?.get?.() as number
+			if (typeof dst !== 'number') return
+			if (!this._secureGroupKeys.has(dst)) return
+			const src = (this._secureAssignedIa ||
+				(cemi?.srcAddress?.get?.() as number)) as number
+			if (typeof src !== 'number') return
+			const ctrlBuf: Buffer = cemi?.control?.toBuffer?.()
+			if (!Buffer.isBuffer(ctrlBuf) || ctrlBuf.length < 2) return
+			const flags16 = (ctrlBuf[0] << 8) | ctrlBuf[1]
+			const npdu = cemi?.npdu
+			if (!npdu) return
+			const dataPart: Buffer = npdu.dataBuffer
+				? npdu.dataBuffer.value
+				: Buffer.alloc(0)
+			const plainApdu = Buffer.concat([
+				Buffer.from([npdu.tpci & 0xff, npdu.apci & 0xff]),
+				dataPart,
+			])
+			const secureApduFull = this.secureBuildSecureApdu(
+				dst,
+				plainApdu,
+				flags16,
+				src,
+			)
+			// Replace NPDU header + data with SecureAPDU
+			npdu.tpci = APCI_SEC.HIGH
+			npdu.apci = APCI_SEC.LOW
+			npdu.data = new KNXDataBuffer(secureApduFull.subarray(2))
+			// Ensure srcAddress reflects the assigned IA used on the bus
+			try {
+				if (this._secureAssignedIa) {
+					cemi.srcAddress = new KNXAddress(
+						this._secureAssignedIa,
+						KNXAddress.TYPE_INDIVIDUAL,
+					)
+				}
+			} catch {}
+			// Update cEMI message length to reflect the new NPDU size
+			try {
+				cemi.length = CEMIMessage.GetLength(
+					cemi.additionalInfo,
+					cemi.control,
+					cemi.srcAddress,
+					cemi.dstAddress,
+					cemi.npdu,
+				)
+			} catch {}
+		} catch (e) {
+			this.sysLogger.error(
+				`maybeApplyDataSecure error: ${(e as Error).message}`,
+			)
+		}
+	}
+
+	// Decrypt incoming Data Secure NPDU in-place if applicable
+	private maybeDecryptDataSecure(cemi: any) {
+		try {
+			if (this._options.hostProtocol !== 'TunnelTCP') return
+			if (!this._options.isSecureKNXEnabled) return
+			if (!this._secureGroupKeys || this._secureGroupKeys.size === 0)
+				return
+			const npdu = cemi?.npdu
+			if (!npdu) return
+			if (
+				(npdu.tpci & 0xff) !== APCI_SEC.HIGH ||
+				(npdu.apci & 0xff) !== APCI_SEC.LOW
+			)
+				return
+			const dst = cemi?.dstAddress?.get?.() as number
+			const src = cemi?.srcAddress?.get?.() as number
+			if (typeof dst !== 'number' || typeof src !== 'number') return
+			const key = this._secureGroupKeys.get(dst)
+			if (!key) return
+			const ctrlBuf: Buffer = cemi?.control?.toBuffer?.()
+			if (!Buffer.isBuffer(ctrlBuf) || ctrlBuf.length < 2) return
+			const flags2 = ctrlBuf[1] & SEC_CEMI.CTRL2_RELEVANT_MASK
+
+			const dataPart: Buffer = npdu.dataBuffer
+				? npdu.dataBuffer.value
+				: Buffer.alloc(0)
+			if (dataPart.length < 1 + SECURE_SEQ_LEN + 4) return
+			const scf = dataPart[0]
+			const seq = dataPart.subarray(1, 1 + SECURE_SEQ_LEN)
+			const encPayloadAndMac = dataPart.subarray(1 + SECURE_SEQ_LEN)
+			const encMac = encPayloadAndMac.subarray(-MAC_LEN_SHORT)
+			const encPayload = encPayloadAndMac.subarray(
+				0,
+				encPayloadAndMac.length - MAC_LEN_SHORT,
+			)
+			const addrFields = Buffer.from([
+				(src >> 8) & 0xff,
+				src & 0xff,
+				(dst >> 8) & 0xff,
+				dst & 0xff,
+			])
+			const counter0 = Buffer.concat([
+				seq,
+				addrFields,
+				DATA_SECURE_CTR_SUFFIX,
+			])
+			const [decPayload, macTr] = decryptCtr(
+				key,
+				counter0,
+				encMac,
+				encPayload,
+			)
+			const block0 = Buffer.concat([
+				seq,
+				addrFields,
+				Buffer.from([
+					0x00,
+					flags2,
+					(TPCI_DATA << 2) + APCI_SEC.HIGH,
+					APCI_SEC.LOW,
+					0x00,
+					decPayload.length,
+				]),
+			])
+			const macCbc = calculateMessageAuthenticationCodeCBC(
+				key,
+				Buffer.from([scf]),
+				decPayload,
+				block0,
+			).subarray(0, MAC_LEN_SHORT)
+			if (!macCbc.equals(macTr)) return
+			// Rebuild plain NPDU: TPCI=0x00, APCI=second byte, data after first 2 bytes
+			npdu.tpci = TPCI_DATA
+			if (decPayload.length >= 2) {
+				npdu.apci = decPayload[1]
+				const rest =
+					decPayload.length > 2 ? decPayload.subarray(2) : null
+				npdu.data = rest ? new KNXDataBuffer(rest) : null
+			} else {
+				// Should not happen; fallback
+				npdu.apci = 0
+				npdu.data = null
+			}
+		} catch (e) {
+			this.sysLogger.error(
+				`maybeDecryptDataSecure error: ${(e as Error).message}`,
+			)
+		}
+	}
 
 	private sendDescriptionRequestMessage() {
 		this.send(
