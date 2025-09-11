@@ -143,5 +143,5 @@ export default class KNXProtocol {
 		return new KNXRoutingIndication(cEMIMessage)
 	}
 
-    // Legacy SecureSessionRequest factory removed
+	// Legacy SecureSessionRequest factory removed
 }

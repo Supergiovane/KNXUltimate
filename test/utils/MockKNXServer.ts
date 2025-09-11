@@ -141,7 +141,7 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 		)
 
 		const res = this.expectedTelegrams[resIndex]
-
+		this.log(`BANANA ${resIndex}`)
 		// Update lastIndex if we found a matching request
 		if (resIndex >= 0) {
 			this.lastIndex = resIndex + 1

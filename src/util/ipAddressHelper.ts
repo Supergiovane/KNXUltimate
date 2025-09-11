@@ -6,11 +6,10 @@ const logger = module('ipAddressHelper')
 
 export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 	const candidateInterfaces: { [key: string]: NetworkInterfaceInfo } = {}
-	let interfaces: Record<string, NetworkInterfaceInfo[]> =
-		os.networkInterfaces()
+	let interfaces: Record<string, NetworkInterfaceInfo[]>
 
+	// In CI, avoid touching real OS network and provide a deterministic interface
 	if (process.env.CI) {
-		// create a fake interface for CI
 		interfaces = {
 			eth0: [
 				{
@@ -22,6 +21,16 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 					cidr: '192.168.1.58/24',
 				},
 			],
+		}
+	} else {
+		try {
+			interfaces = os.networkInterfaces()
+		} catch (e) {
+			logger.error(
+				'getIPv4Interfaces: os.networkInterfaces failed: %s',
+				(e as Error)?.message || e,
+			)
+			throw e
 		}
 	}
 	for (const iface in interfaces) {

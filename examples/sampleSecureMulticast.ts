@@ -1,7 +1,11 @@
 import KNXClient, { SecureConfig } from '../src/KNXClient'
 import CEMIConstants from '../src/protocol/cEMI/CEMIConstants'
 
-async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): Promise<number> {
+async function waitForStatus(
+  client: KNXClient,
+  ga: string,
+  timeoutMs = 5000,
+): Promise<number> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       client.off('indication', onInd)
@@ -13,7 +17,6 @@ async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): P
         const cemi = packet?.cEMIMessage
         if (!cemi || cemi.msgCode !== CEMIConstants.L_DATA_IND) return
         if (cemi.dstAddress?.toString?.() !== ga) return
-        // Consider both GroupValueResponse and GroupValueWrite as valid status
         const isResp = cemi.npdu?.isGroupResponse
         const isWrite = cemi.npdu?.isGroupWrite
         if (isResp || isWrite) {
@@ -30,23 +33,26 @@ async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): P
 }
 
 async function main() {
-  // KNX Secure + Data Secure configuration
+  console.log('🚀 Connecting KNX/IP (Multicast, Secure Routing)')
+
+  // KNX Secure routing (multicast) config - uses Backbone key from ETS keyring
   const secureCfg: SecureConfig = {
-    tunnelInterfaceIndividualAddress: '1.1.254',
-    knxkeys_file_path: '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
-    knxkeys_password: 'passwordprogetto',
+    knxkeys_file_path:
+      '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
+    knxkeys_password: 'passwordprogetto'
   }
 
   const client = new KNXClient({
-    hostProtocol: 'TunnelTCP',
-    ipAddr: '192.168.1.4',
+    hostProtocol: 'Multicast',
+    ipAddr: '224.0.23.12',
     ipPort: 3671,
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,
-    loglevel: 'info'
+    loglevel: 'debug',
+    physAddr:"1.1.250"
   })
 
-  client.on('connected', () => console.log('✓ KNXClient connected (secure)'))
+  client.on('connected', () => console.log('✓ KNXClient connected (secure multicast)'))
   client.on('error', (e) => console.error('Error:', e.message))
   client.on('disconnected', (reason) => console.log('Disconnected:', reason))
 
@@ -54,27 +60,34 @@ async function main() {
     client.Connect()
     await new Promise<void>((resolve) => client.once('connected', () => resolve()))
 
-    console.log('\nTEST: ON/OFF 1/1/1 with status check 1/1/2')
+    // Give the router a moment to emit TimerNotify (0955) and align our timer
+    await new Promise((r) => setTimeout(r, 1000))
+
+    // Example GA - adjust to your installation
+    const cmdGA = '1/1/1'
+    const statusGA = '1/1/2'
+
+    console.log(`\nTEST (secure multicast): ON/OFF ${cmdGA} with status ${statusGA}`)
+
     // ON
-    client.write('1/1/1', true, '1.001')
-    // Small delay before reading status to avoid racing immediately after write
-    await new Promise((r) => setTimeout(r, 150))
-    client.read('1/1/2')
-    const onVal = await waitForStatus(client, '1/1/2', 5000)
+    client.write(cmdGA, true, '1.001')
+    await new Promise((r) => setTimeout(r, 200))
+    client.read(statusGA)
+    const onVal = await waitForStatus(client, statusGA, 5000)
     console.log(`Status after ON: ${onVal ? 'ON' : 'OFF'}`)
     if (onVal !== 1) throw new Error('Unexpected status after ON (expected ON)')
 
     // OFF
-    client.write('1/1/1', false, '1.001')
-    await new Promise((r) => setTimeout(r, 150))
-    client.read('1/1/2')
-    const offVal = await waitForStatus(client, '1/1/2', 5000)
+    client.write(cmdGA, false, '1.001')
+    await new Promise((r) => setTimeout(r, 200))
+    client.read(statusGA)
+    const offVal = await waitForStatus(client, statusGA, 5000)
     console.log(`Status after OFF: ${offVal ? 'ON' : 'OFF'}`)
     if (offVal !== 0) throw new Error('Unexpected status after OFF (expected OFF)')
 
-    console.log('\nCommands sent and status verified correctly.')
-    console.log('Waiting 5s before closing the connection (KNX spec).')
-    await new Promise((r) => setTimeout(r, 5000))
+    console.log('\nCommands sent and status verified correctly (secure multicast).')
+    console.log('Waiting 3s before closing...')
+    await new Promise((r) => setTimeout(r, 3000))
   } catch (err) {
     console.error('\nError:', err)
   } finally {
@@ -83,3 +96,4 @@ async function main() {
 }
 
 main().catch(console.error)
+

@@ -306,3 +306,16 @@
 * securwe keyring ([0b1a250](https://github.com/Supergiovane/KNXUltimate/commit/0b1a250aa5ce46c18c6fcee3528b2069d3e06d5e))
 * typed event emitter ([2360e63](https://github.com/Supergiovane/KNXUltimate/commit/2360e632dcadd58acb2aec4fd9785ceae8f7f761))
 * typescript refactor ([ec8e26b](https://github.com/Supergiovane/KNXUltimate/commit/ec8e26b5601a0af96faac8e967ff95a96ed8e605))
+## [Unreleased]
+
+### Fixes
+
+- TunnelUDP keeps using configured `physAddr` as source IA; the tunnel-assigned IA from `CONNECT_RESPONSE` is now applied only for TunnelTCP (secure). Improves compatibility and restores legacy behavior expected by tools/tests.
+
+### Tests/CI
+
+- Stabilized integration tests by avoiding real `os.networkInterfaces()` in CI and lowering log verbosity during tests.
+
+### Docs
+
+- Clarified IA behavior for TunnelUDP vs TunnelTCP in README, plus tips for UDP tunnelling (ACK suppression and `localIPAddress`).
