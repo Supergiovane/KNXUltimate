@@ -36,8 +36,8 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 | --------------------- | -------------------------------------------------------------------- |
 | KNX Tunnelling (UDP)  | ![](https://placehold.co/200x20/green/white?text=YES)                |
 | KNX Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES)              |
-| KNX Secure Tunnelling (TCP) | ![](https://placehold.co/200x20/green/white?text=YES)         |
-| KNX Secure Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES)      |
+| KNX Secure Tunnelling (TCP) | ![](https://placehold.co/200x20/orange/white?text=YES+IN+THE+BETA+BELOW)         |
+| KNX Secure Routing (Multicast) | ![](https://placehold.co/200x20/orange/white?text=YES+IN+THE+BETA+BELOW)      |
 
   Try the new 5.0.0-beta to test KNX SECURE https://www.npmjs.com/package/knxultimate/v/5.0.0-beta.1
 
