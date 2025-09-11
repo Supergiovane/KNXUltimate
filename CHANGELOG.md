@@ -1,5 +1,114 @@
 
 
+# [5.0.0-beta.0](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.3...v5.0.0-beta.0) (2025-09-11)
+
+
+### Bug Fixes
+
+* [#23](https://github.com/Supergiovane/KNXUltimate/issues/23) writeRaw broken with length <= 6bits ([#24](https://github.com/Supergiovane/KNXUltimate/issues/24)) ([bfbc7ab](https://github.com/Supergiovane/KNXUltimate/commit/bfbc7abde6f68ac4e8d39f386db073493311684d))
+* [#30](https://github.com/Supergiovane/KNXUltimate/issues/30) short value 0x3f decoding ([#29](https://github.com/Supergiovane/KNXUltimate/issues/29)) ([34b21be](https://github.com/Supergiovane/KNXUltimate/commit/34b21bee58106c43229c29ee4656eb0a431aa3c2))
+* add build step to ci ([0618bc7](https://github.com/Supergiovane/KNXUltimate/commit/0618bc7dbf3be13ccb87c269f2cdfe4592599e33))
+* add missing helps in dpts ([be3dee3](https://github.com/Supergiovane/KNXUltimate/commit/be3dee3381cfa14abd17f13cfd3700119e89e530))
+* async closeSocket thtows an error if the socket is already closed. ([f81d1d0](https://github.com/Supergiovane/KNXUltimate/commit/f81d1d00c1459da71d34c49786d690e1ed878cf6))
+* better checks of socket ready state ([#39](https://github.com/Supergiovane/KNXUltimate/issues/39)) ([a65d4b1](https://github.com/Supergiovane/KNXUltimate/commit/a65d4b1f9825991a9d113d5508e2680138722358))
+* better rounding on dpt 9.001 ([#33](https://github.com/Supergiovane/KNXUltimate/issues/33)) ([30fe11d](https://github.com/Supergiovane/KNXUltimate/commit/30fe11dc9f6a5d96d061bb2a54b7cc2a34dba3d3)), closes [#32](https://github.com/Supergiovane/KNXUltimate/issues/32)
+* better timers management for race conditions and leak prevention ([#17](https://github.com/Supergiovane/KNXUltimate/issues/17)) ([8ffcd93](https://github.com/Supergiovane/KNXUltimate/commit/8ffcd9308ac4e5dcc2e7debc3b7f9748a1cdc364))
+* clear the queueitem in case of errors ([e7a718d](https://github.com/Supergiovane/KNXUltimate/commit/e7a718d482db9917b252f97f8132a97c176f9367))
+* client close ([fd91d96](https://github.com/Supergiovane/KNXUltimate/commit/fd91d96898f3ad16f4a8e31ad2dc024fb53a7f45))
+* disconnect request not sent properly in KNXClient.ts ([#55](https://github.com/Supergiovane/KNXUltimate/issues/55)) ([0de4c00](https://github.com/Supergiovane/KNXUltimate/commit/0de4c005e1b24b82b882d6d6f7f6c9cdac23f58d))
+* ensure _clearToSend is correctly set during discovery ([#34](https://github.com/Supergiovane/KNXUltimate/issues/34)) ([5d4a2e4](https://github.com/Supergiovane/KNXUltimate/commit/5d4a2e4d8581c87c67f0c8c98ec14d43ba208e64))
+* examples ([4c26f5a](https://github.com/Supergiovane/KNXUltimate/commit/4c26f5a87f3a822d4309448029924d5b886773e6))
+* exiting the queue loop after error ([6d67807](https://github.com/Supergiovane/KNXUltimate/commit/6d678071442c50e9cf9e9ceb6464abfa44f0f88a))
+* export all packet types ([196f712](https://github.com/Supergiovane/KNXUltimate/commit/196f712e757721031026383c191c1a7de6c6b60d))
+* export dptlib ([a32d2ec](https://github.com/Supergiovane/KNXUltimate/commit/a32d2ec7355106677e88ff1a5fe3f1a59af34d82))
+* finish conversion of curve25519 ([1e2743a](https://github.com/Supergiovane/KNXUltimate/commit/1e2743a6d8583b1a60fcfa53ee14be0a72f7e00b))
+* fix DPT10.001 Time error when time passed as string ([ad2c314](https://github.com/Supergiovane/KNXUltimate/commit/ad2c314dab3a407df194eb0ab1f88a8af5a183ba))
+* fix missing "test" folder ([f24f5f2](https://github.com/Supergiovane/KNXUltimate/commit/f24f5f240c0afa6ee6166626d7b370a887de1fd4))
+* fix multicast socket, by removing the local ip interface from the binding ([99e1176](https://github.com/Supergiovane/KNXUltimate/commit/99e11766df74ccf956fdbd291bf0ec42a23da3ea))
+* fixed an issue when "suppress ACK request" was set to true. ([1c70745](https://github.com/Supergiovane/KNXUltimate/commit/1c7074577a0517c1f46099bfd3a9808c90d0b19e))
+* fixed an uncaught exception ([f9645c4](https://github.com/Supergiovane/KNXUltimate/commit/f9645c44bf5baefcb31ddd86ff9cf81ee411d876))
+* fixed base beta release ([56e7f96](https://github.com/Supergiovane/KNXUltimate/commit/56e7f968758eef7401e1f135a7059d5b5b685904))
+* fixed DPT6002 not showing up ([a4e95dd](https://github.com/Supergiovane/KNXUltimate/commit/a4e95ddb682dc6389ce64cb4d6fa5234a3764080))
+* Fixed import issue ([c666954](https://github.com/Supergiovane/KNXUltimate/commit/c666954354707ca896ceb3597e53340809f33414))
+* fixed lint issues in new DPT 6002 ([1b30857](https://github.com/Supergiovane/KNXUltimate/commit/1b308574dc046f677651946517c64885c2d27d11))
+* fixed queue ACK issue. Now, the replies from request coming from the KNX Gateway, are put as priority item in the kNX output queue. ([76ded4b](https://github.com/Supergiovane/KNXUltimate/commit/76ded4baf0a8a8a62c8634135c070b63df786119))
+* improve messages types ([b6c9f49](https://github.com/Supergiovane/KNXUltimate/commit/b6c9f49e4c86ce5ae626f4023b191ca62adb33c3))
+* improved disconnect logic ([8e55945](https://github.com/Supergiovane/KNXUltimate/commit/8e5594544895aefa98c8d24d6b1fc8dc0f607a4c))
+* improved types of events ([4658b45](https://github.com/Supergiovane/KNXUltimate/commit/4658b4565aa473d7e2eed242c5d9706069300404))
+* index.ts of dtplib was whrowing an unmeaningful error. ([#47](https://github.com/Supergiovane/KNXUltimate/issues/47)) ([d517a82](https://github.com/Supergiovane/KNXUltimate/commit/d517a828ae11a54e7ba20fe85dfc3e6fe81dd767))
+* ipAddressHelper uncatched error when running on raspberry pi, having interfaces without any ip. ([#44](https://github.com/Supergiovane/KNXUltimate/issues/44)) ([4b29af6](https://github.com/Supergiovane/KNXUltimate/commit/4b29af6f0ab86686e5510d9d57f6152975e063eb))
+* issue where DPT9 was giving error ([#21](https://github.com/Supergiovane/KNXUltimate/issues/21)) ([f0c9120](https://github.com/Supergiovane/KNXUltimate/commit/f0c91207dd95a4ca1b0e48567bdfb264f984b93e))
+* limiter improvements ([#28](https://github.com/Supergiovane/KNXUltimate/issues/28)) ([90ca11f](https://github.com/Supergiovane/KNXUltimate/commit/90ca11fa47e903e41cdefcf0cf2ed9a7e0518252))
+* logger and deprecated buffer `slice` to `subarray` ([ddd6733](https://github.com/Supergiovane/KNXUltimate/commit/ddd6733be7852621a350654ac44d41ea2481247b))
+* make release-it adding a patch release instead of main release. ([#51](https://github.com/Supergiovane/KNXUltimate/issues/51)) ([22bf2e9](https://github.com/Supergiovane/KNXUltimate/commit/22bf2e947f0d209da7f98ece081d6df2370b39f8))
+* refactor method names and added js docs ([#19](https://github.com/Supergiovane/KNXUltimate/issues/19)) ([0bf6af4](https://github.com/Supergiovane/KNXUltimate/commit/0bf6af436fdcca6078dc786bf3336496f01f48e5))
+* remove many useless try catches ([3c528f1](https://github.com/Supergiovane/KNXUltimate/commit/3c528f17ef896a7d01049780dd35185de29dae7a))
+* remove references to `KNXEthInterface` ([2c1912f](https://github.com/Supergiovane/KNXUltimate/commit/2c1912f805d344edf3ea820e2035c669002e5bfd))
+* removed the "test" folder from the include array ([b7341c9](https://github.com/Supergiovane/KNXUltimate/commit/b7341c961128aa7430d48f4a1cb99ec8ac464470))
+* removed unwanted "desc" prop from DatapointConfig root. ([#48](https://github.com/Supergiovane/KNXUltimate/issues/48)) ([16d7538](https://github.com/Supergiovane/KNXUltimate/commit/16d753839771469b281720630548c85fdc0a7e14))
+* socket end ([64a6296](https://github.com/Supergiovane/KNXUltimate/commit/64a62962395b080d7ef3d73d00b4a050dc783e94))
+* some other types ([5d84716](https://github.com/Supergiovane/KNXUltimate/commit/5d847160fa3bcdb8c71c205c65cc38d47e73a282))
+* some types ([b01ef85](https://github.com/Supergiovane/KNXUltimate/commit/b01ef8594384a6209dd276cc6873aa42b95154c6))
+* test connect/disconnect ([b378c6a](https://github.com/Supergiovane/KNXUltimate/commit/b378c6a8a13ea48ab3ce1fe592fb1c06ec362bd4))
+* the loglevel is now fixed. ([4faeab4](https://github.com/Supergiovane/KNXUltimate/commit/4faeab49dad6a4e4c7bfa27cb7131d20f5b67368))
+* the tunnel socket creation function (createSocket), adding reusable option and specifying the port. This will likely prevent some UDP packets not arriving at the socket,  due to operating system routing restrictions. ([fed7e20](https://github.com/Supergiovane/KNXUltimate/commit/fed7e20f72bf6d614cc159b0b1c291878ff9117a))
+* tlvinfo type ([1972fee](https://github.com/Supergiovane/KNXUltimate/commit/1972fee658364a2abb71d46c7e4a7305c99ccd59))
+* typo ([f5c461c](https://github.com/Supergiovane/KNXUltimate/commit/f5c461cf01984a9b352d27bd8b2ff5ab3e8644ce))
+* typo on knx client ([53e6b1b](https://github.com/Supergiovane/KNXUltimate/commit/53e6b1b65a35a2a68b697d5987b151c27bc39096))
+* updated gitignore to exclude some personal keys ([f4b7d09](https://github.com/Supergiovane/KNXUltimate/commit/f4b7d09a68eef6e9253382f27d22d390f6b0dba2))
+* use destroy for TCP socket close ([d00359f](https://github.com/Supergiovane/KNXUltimate/commit/d00359fa12f35e2bbbbb5a11a9fc11901b37a8b2))
+* useless statics ([8da73f2](https://github.com/Supergiovane/KNXUltimate/commit/8da73f23d8bf51074735c03f2c618f77fb8524c1))
+* vscode default fomatter ([c267cbf](https://github.com/Supergiovane/KNXUltimate/commit/c267cbff8681d07bc8de880b4d80b9489b017216))
+* wrong address parsing ([e529650](https://github.com/Supergiovane/KNXUltimate/commit/e52965061adbf56e645ad63f48f902c0add00cac))
+* wrong overload of `discovery` method ([709b7d1](https://github.com/Supergiovane/KNXUltimate/commit/709b7d1827b3fec995cf5f1f553651eb59f3587e))
+
+
+* feat!: implemented KNX routing secure (#60) ([18671d6](https://github.com/Supergiovane/KNXUltimate/commit/18671d6c1f77c331f0ce513bddb14fa51e1a087a)), closes [#60](https://github.com/Supergiovane/KNXUltimate/issues/60)
+
+
+### Features
+
+* Ad DPT 14.1200 ([#50](https://github.com/Supergiovane/KNXUltimate/issues/50)) ([7830ae3](https://github.com/Supergiovane/KNXUltimate/commit/7830ae3bc994cafa799b9b7d25c2235a5399d5d8))
+* Add Hager TXA223/225 custom status DPT 60002 ([cb66cdd](https://github.com/Supergiovane/KNXUltimate/commit/cb66cddceed04b8c9091feed059b6a11fc823587))
+* added all subtypes to datapoint 20.x ([#45](https://github.com/Supergiovane/KNXUltimate/issues/45)) ([ce436c0](https://github.com/Supergiovane/KNXUltimate/commit/ce436c0df3cbd778dcb6f818f3f9b0a35853d8b3))
+* Added first files for support to KNX Secure and Data Secure Tunneling ([e4fa892](https://github.com/Supergiovane/KNXUltimate/commit/e4fa89202ca5b05031f4f46774456b9fe9cf30cc))
+* added getGatewayDescription method, to gather infos of the connected gateway ([9c6ae5d](https://github.com/Supergiovane/KNXUltimate/commit/9c6ae5d7abb12c568515a3790f16827e23199907))
+* added src and destination addresses in the LDataInd LOG. ([#46](https://github.com/Supergiovane/KNXUltimate/issues/46)) ([a2f53e2](https://github.com/Supergiovane/KNXUltimate/commit/a2f53e21f934a971e8f2340831f812390f7ad863))
+* added the gatewaydescription.ts sample ([b68427c](https://github.com/Supergiovane/KNXUltimate/commit/b68427cf88bd3e6d7e09f5b0ebd50b1fc165af92))
+* added the KNX/IP Gateway description gatherer, wich contains the gateway's name, tunneling/routing modes etc.. ([97c5bdc](https://github.com/Supergiovane/KNXUltimate/commit/97c5bdc9a54a387f2466da2c6f60242d808370e4))
+* client and other types ([06ea902](https://github.com/Supergiovane/KNXUltimate/commit/06ea9028e3018e596042b36719bcf7fa5273b4c3))
+* device info in "discover", added KNXClient.getGatewayDescription ([#40](https://github.com/Supergiovane/KNXUltimate/issues/40)) ([06c7ed6](https://github.com/Supergiovane/KNXUltimate/commit/06c7ed661f0cdec141d95feb6a49685e0fd41cff)), closes [/github.com/Supergiovane/KNXUltimate/pull/40#discussion_r1850563396](https://github.com//github.com/Supergiovane/KNXUltimate/pull/40/issues/discussion_r1850563396)
+* discovery ([#15](https://github.com/Supergiovane/KNXUltimate/issues/15)) ([087477e](https://github.com/Supergiovane/KNXUltimate/commit/087477ed86ab62951d5cb09d81f0918b326d9251))
+* eslint + prettier ([6c10385](https://github.com/Supergiovane/KNXUltimate/commit/6c1038555430c11fb1b681d60ccb54a43639e328))
+* finish converting dptlib ([6d5e75b](https://github.com/Supergiovane/KNXUltimate/commit/6d5e75bea73bda60b2e65159e6ed3641c2f0a218))
+* going on ([7ebdec3](https://github.com/Supergiovane/KNXUltimate/commit/7ebdec3e4f82a53f79964f45405491eea8c9e8cb))
+* going on with protcol ([0fe5d62](https://github.com/Supergiovane/KNXUltimate/commit/0fe5d6290f17c1424c7cccf1436f07d91c2dc9e5))
+* going on with refactor ([a57efb3](https://github.com/Supergiovane/KNXUltimate/commit/a57efb35845096fca27747303a57f4e0815262d4))
+* Preliminary support for knx virtual & ACK fix ([#53](https://github.com/Supergiovane/KNXUltimate/issues/53)) ([abd36a9](https://github.com/Supergiovane/KNXUltimate/commit/abd36a92040cc56906c1ecbfdd5267780f6b6b6a))
+* protocol cemi conversion ([5e31a0a](https://github.com/Supergiovane/KNXUltimate/commit/5e31a0ad11f63fa3a8b34b98f6e37f2068b21d8a))
+* refactor errors ([c8623e1](https://github.com/Supergiovane/KNXUltimate/commit/c8623e1b49e87404bb20cd626f399ebf18673529))
+* securwe keyring ([3574fe0](https://github.com/Supergiovane/KNXUltimate/commit/3574fe0fedebb7f8e2de5c2dfbaf67d7a5f24a2d))
+* transparent KNX queue. The sent telegrams are now queued and transmitted to the bus by obeying the time interval specified by the new property "KNXQueueSendIntervalMilliseconds" ([d4e8fd3](https://github.com/Supergiovane/KNXUltimate/commit/d4e8fd3e182e2db282e5bf151604d1777846f3be))
+* Turn unknown error 0x25 to E_NO_MORE_UNIQUE_CONNECTIONS ([deabcfd](https://github.com/Supergiovane/KNXUltimate/commit/deabcfdfda802a116f3955e99403546a08ce81b1))
+* typed event emitter ([ea29beb](https://github.com/Supergiovane/KNXUltimate/commit/ea29bebffaaf448f5928683167b1ea00992178d7))
+* typescript refactor ([81d00af](https://github.com/Supergiovane/KNXUltimate/commit/81d00afe218314e33cbfd5fef059352f6a63dc13))
+* zio cantante aggiungere qui la porca di quella merdassa perchè non committa vacca mincha merdosa ([f2fe52c](https://github.com/Supergiovane/KNXUltimate/commit/f2fe52c3b83442fc7f05318cfc8500f89c89c21f))
+
+
+### BREAKING CHANGES
+
+* deleted the echoLocalTelegramsInTunneling property. If you don't know what it is, it's not a breaking change for you.
+
+* doc: updated docs.
+
+* fix: fixed test fails
+
+* fix: lint da figa!!
+
+* chore: workaround test
+
+* fix: caxxo
+
 ## [4.1.3](https://github.com/Supergiovane/KNXUltimate/compare/v4.1.2...v4.1.3) (2025-05-16)
 
 
