@@ -23,7 +23,7 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 
 <p align='center'>
 <img width="110px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/KNX_CERTI_MARK_RGB.jpg" ></br>
-<img width="110px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/knxsecure.png" ></br>
+<img width="100px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/knxsecure.png" ></br>
 <span style="font-size:0.7em;color:grey;">Authorized KNX logo by KNX Association*</span>
 </p>
 
@@ -38,6 +38,8 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 | KNX Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES)              |
 | KNX Secure Tunnelling (TCP) | ![](https://placehold.co/200x20/green/white?text=YES)         |
 | KNX Secure Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES)      |
+
+  Try the new 5.0.0-beta to test KNX SECURE https://www.npmjs.com/package/knxultimate/v/5.0.0-beta.1
 
 ## CONNECTION SETUP
 
