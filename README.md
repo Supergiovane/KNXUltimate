@@ -63,7 +63,7 @@ Secure configuration object (`secureTunnelConfig`):
 
 | Field                                   | Description |
 | --------------------------------------- | ----------- |
-| `tunnelInterfaceIndividualAddress` (string) Optional| Individual address of the KNX/IP Secure interface as in ETS (for session auth and Data Secure). Leave this undefined for Multicast protocol (Multicast won't use tunnels) |
+| `tunnelInterfaceIndividualAddress` (string) Optional| Individual address of the KNX/IP Secure interface as in ETS (for session auth and Data Secure). Leave this unset (undefined) when using Multicast protocol (Multicast won't use tunnels) |
 | `knxkeys_file_path` (string)            | Path to ETS keyring `.knxkeys` file. |
 | `knxkeys_password` (string)             | ETS project password to decrypt the keyring. |
 
