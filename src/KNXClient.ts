@@ -2056,7 +2056,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						) {
 							const assignedIa =
 								knxConnectResponse?.crd?.knxAddress?.get?.()
-							if (typeof assignedIa === 'number' && assignedIa > 0) {
+							if (
+								typeof assignedIa === 'number' &&
+								assignedIa > 0
+							) {
 								this.physAddr = new KNXAddress(
 									assignedIa,
 									KNXAddress.TYPE_INDIVIDUAL,
