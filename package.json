@@ -4,7 +4,7 @@
   "version": "4.1.3",
   "main": "./build/index.js",
   "engines": {
-    "node": ">=16"
+    "node": ">=18.0.0"
   },
   "private": false,
   "repository": {
@@ -79,7 +79,8 @@
     "eib",
     "knx-ultimate",
     "knxultimate",
-    "iot"
+    "iot",
+    "knx secure"
   ],
   "dependencies": {
     "binary-parser": "2.2.1",
