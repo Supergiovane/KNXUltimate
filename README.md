@@ -29,7 +29,7 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 | KNX Tunnelling        | ![](https://placehold.co/200x20/green/white?text=YES)                |
 | KNX Routing           | ![](https://placehold.co/200x20/green/white?text=YES)                |
 | KNX Secure Tunnelling | ![](https://placehold.co/200x20/green/white?text=YES) |
-| KNX Secure Routing    | ![](https://placehold.co/200x20/red/white?text=NO)                   |
+| KNX Secure Routing    | ![](https://placehold.co/200x20/orange/white?text=EVALUATING)                   |
 
 ## CONNECTION SETUP
 
