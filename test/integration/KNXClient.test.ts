@@ -1,7 +1,4 @@
 // Ensure deterministic behavior in CI-like environments and lower log verbosity
-process.env.CI = process.env.CI || '1'
-process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'warn'
-
 import { test, describe, after } from 'node:test'
 import assert from 'node:assert'
 import sinon from 'sinon'
@@ -9,6 +6,9 @@ import { dptlib, KNXClient, KNXClientEvents, SnifferPacket } from '../../src'
 import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
 import MockKNXServer from 'test/utils/MockKNXServer'
 import { networkInterfaces } from 'node:os'
+
+process.env.CI = process.env.CI || '1'
+process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'warn'
 
 const ciIP = '192.168.1.58'
 
@@ -201,8 +201,10 @@ const getMockPacketsForDisconnectRequestTest: SnifferPacket[] = [
 	},
 ]
 
+const TEST_TIMEOUT = 20_000
+
 describe('KNXClient Tests', () => {
-	test('should discover KNX interfaces', async () => {
+	test('should discover KNX interfaces', { timeout: TEST_TIMEOUT }, async () => {
 		const clock = sinon.useFakeTimers({ shouldAdvanceTime: true })
 
 		try {
@@ -266,14 +268,17 @@ describe('KNXClient Tests', () => {
 		}
 	})
 
-	test('should perform toggle operation', async () => {
+	test('should perform toggle operation', { timeout: TEST_TIMEOUT }, async () => {
 		const clock = sinon.useFakeTimers({ shouldAdvanceTime: true })
 		const groupId = '0/0/1'
 		const dpt = '1.001'
 		let client: KNXClient
 
 		const waitForIndication = async (expectedValue: any): Promise<void> => {
-			return new Promise<void>((resolve) => {
+			return new Promise<void>((resolve, reject) => {
+				const to = setTimeout(() => {
+					reject(new Error('Timeout waiting for indication'))
+				}, TEST_TIMEOUT)
 				client.once('indication', (packet) => {
 					const { npdu } = packet.cEMIMessage
 					const dest = packet.cEMIMessage.dstAddress.toString()
@@ -286,6 +291,7 @@ describe('KNXClient Tests', () => {
 					if (npdu.isGroupRead || npdu.isGroupWrite) {
 						const value = dptlib.resolve(dpt).fromBuffer(data)
 						assert.equal(value, expectedValue)
+						clearTimeout(to)
 						resolve()
 					}
 				})
@@ -303,13 +309,8 @@ describe('KNXClient Tests', () => {
 				(c: KNXClient) => {
 					const server = new MockKNXServer(mockToggleResponses, c)
 					server.on('error', (error) => {
-						if (
-							!error.message.includes(
-								'No matching response found',
-							)
-						) {
-							throw error
-						}
+						// Fail fast on any mock mismatch to avoid hangs
+						throw new Error(`MockKNXServer error: ${error.message}`)
 					})
 					server.createFakeSocket()
 				},
@@ -354,7 +355,7 @@ describe('KNXClient Tests', () => {
 		}
 	})
 
-	test('should handle long network disconnection leading to auto-disconnect', async () => {
+	test('should handle long network disconnection leading to auto-disconnect', { timeout: TEST_TIMEOUT }, async () => {
 		const clock = sinon.useFakeTimers({
 			shouldAdvanceTime: true,
 			toFake: [
@@ -511,7 +512,7 @@ describe('KNXClient Tests', () => {
 		}
 	})
 
-	test('should send a disconnect request', async () => {
+	test('should send a disconnect request', { timeout: TEST_TIMEOUT }, async () => {
 		const events: string[] = []
 		let server: MockKNXServer
 		let disconnectReason = ''
