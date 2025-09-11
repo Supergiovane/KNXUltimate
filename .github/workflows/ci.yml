@@ -38,7 +38,8 @@ jobs:
       env: 
         CI: true
       run: npm run test:coverage
-      timeout-minutes: 1
+      # Allow slower runners; tests + coverage can exceed 1 minute on CI
+      timeout-minutes: 5
 
     - name: Coveralls
       uses: coverallsapp/github-action@v2.3.4
@@ -48,5 +49,4 @@ jobs:
 
 
   
-
 

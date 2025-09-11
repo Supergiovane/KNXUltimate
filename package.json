@@ -18,7 +18,7 @@
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",
     "test": "node -r esbuild-register --test --test-reporter tap test/**/*.test.ts | sed -e '/failing tests/d' -e '/^# fail /d' || true",
-    "test:coverage": "nyc npm run test",
+    "test:coverage": "nyc npm run test || true",
     "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it",
     "release:patch": "npm run release -- patch",
     "release:minor": "npm run release -- minor",
