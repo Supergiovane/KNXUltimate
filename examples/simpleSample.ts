@@ -11,7 +11,6 @@ let knxUltimateClientProperties: KNXClientOptions = {
     loglevel: "error", // 'disable', 'error', 'warn', 'info', 'debug'
     hostProtocol: "Multicast", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
     isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
-    jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
     KNXQueueSendIntervalMilliseconds:25 // Optrional. Queue interval between each KNX telegram. Default is 1 telegram each 25ms
 };
@@ -74,4 +73,3 @@ setTimeout(() => {
     knxUltimateClient.Disconnect();
     process.exit
 }, 20000);
-

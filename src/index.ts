@@ -1,5 +1,3 @@
-import KNXSecureKeyring from './KNXsecureKeyring'
-
 import KNXClient from './KNXClient'
 import * as dptlib from './dptlib'
 import { logStream } from './KnxLog'
@@ -7,9 +5,4 @@ import { logStream } from './KnxLog'
 export * from './KNXClient'
 export * from './protocol'
 
-export {
-	KNXClient,
-	dptlib,
-	logStream,
-	// KNXSecureKeyring
-}
+export { KNXClient, dptlib, logStream }

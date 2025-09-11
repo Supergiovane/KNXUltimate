@@ -23,7 +23,9 @@
     "release:major": "npm run release -- major",
     "newbetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it patch --preRelease=beta",
     "consecutivebetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it --preRelease",
-    "clean": "node -e \"const fs = require('fs'); fs.existsSync('build') && fs.rm('build', { recursive: true }, () => process.exit(0))\""
+    "clean": "node -e \"const fs = require('fs'); fs.existsSync('build') && fs.rm('build', { recursive: true }, () => process.exit(0))\"",
+    "secure:data": "npm --prefix Codex/nodejs run secure:data",
+    "secure:data:e2e": "npm --prefix Codex/nodejs run secure:data:e2e"
   },
   "release-it": {
     "github": {
@@ -88,7 +90,7 @@
   "devDependencies": {
     "@release-it/conventional-changelog": "^8.0.1",
     "@types/crypto-js": "^4.2.2",
-    "@types/node": "^20.12.7",
+    "@types/node": "^22.7.4",
     "@types/sinon": "^17.0.3",
     "@types/xml2js": "^0.4.14",
     "@typescript-eslint/eslint-plugin": "^7.7.0",
@@ -104,6 +106,6 @@
     "prettier": "^3.2.5",
     "release-it": "^17.2.0",
     "sinon": "^19.0.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.6.2"
   }
 }

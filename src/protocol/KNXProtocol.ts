@@ -12,7 +12,7 @@ import KNXDisconnectResponse from './KNXDisconnectResponse'
 import KNXTunnelingRequest from './KNXTunnelingRequest'
 import KNXTunnelingAck from './KNXTunnelingAck'
 import KNXRoutingIndication from './KNXRoutingIndication'
-import KNXSecureSessionRequest from './KNXSecureSessionRequest'
+// Legacy SecureSessionRequest removed; use SecureTunnelTCP instead
 import HPAI from './HPAI'
 import { KNX_CONSTANTS } from './KNXConstants'
 import TunnelCRI from './TunnelCRI'
@@ -143,11 +143,5 @@ export default class KNXProtocol {
 		return new KNXRoutingIndication(cEMIMessage)
 	}
 
-	static newKNXSecureSessionRequest(
-		cri: TunnelCRI,
-		hpaiData: HPAI = HPAI.NULLHPAI,
-		jKNXSecureKeyring?: any,
-	) {
-		return new KNXSecureSessionRequest(cri, hpaiData, jKNXSecureKeyring)
-	}
+    // Legacy SecureSessionRequest factory removed
 }

@@ -15,6 +15,15 @@ module.exports = {
 		sourceType: 'module',
 		tsconfigRootDir: __dirname
 	},
+	overrides: [
+		{
+			files: ['Codex/nodejs/**/*.ts'],
+			parserOptions: {
+				project: ['Codex/nodejs/tsconfig.json'],
+				tsconfigRootDir: __dirname,
+			},
+		},
+	],
 	rules: {
 		'global-require': 'off',
 		'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
