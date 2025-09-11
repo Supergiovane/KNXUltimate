@@ -1148,6 +1148,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 			// Tunnelling UDP: request bus ACK unless suppressed; TunnelTCP: no bus ACK
 			cEMIMessage.control.ack =
+				// eslint-disable-next-line no-nested-ternary
 				this._options.hostProtocol === 'TunnelTCP'
 					? 0
 					: this._options.suppress_ack_ldatareq
@@ -1301,6 +1302,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 			// Tunnelling UDP: request bus ACK unless suppressed; TunnelTCP: no bus ACK
 			cEMIMessage.control.ack =
+				// eslint-disable-next-line no-nested-ternary
 				this._options.hostProtocol === 'TunnelTCP'
 					? 0
 					: this._options.suppress_ack_ldatareq

@@ -198,21 +198,21 @@ const getMockPacketsForDisconnectRequestTest: SnifferPacket[] = [
 ]
 
 describe('KNXClient Tests', () => {
-    test('should discover KNX interfaces', async () => {
+	test('should discover KNX interfaces', async () => {
 		const clock = sinon.useFakeTimers({ shouldAdvanceTime: true })
 
 		try {
-            const client = new KNXClient(
-                {
-                    loglevel: 'trace',
-                    hostProtocol: 'Multicast',
-                },
-                (c: KNXClient) => {
-                    const server = new MockKNXServer(getMockResponses(), c)
-                    server.createFakeSocket()
-                    c.startDiscovery()
-                },
-            )
+			const client = new KNXClient(
+				{
+					loglevel: 'trace',
+					hostProtocol: 'Multicast',
+				},
+				(c: KNXClient) => {
+					const server = new MockKNXServer(getMockResponses(), c)
+					server.createFakeSocket()
+					c.startDiscovery()
+				},
+			)
 
 			const discovered: string[] = []
 
@@ -234,9 +234,8 @@ describe('KNXClient Tests', () => {
 				},
 			)
 
-
-            // Advance virtual time instead of waiting
-            await clock.tickAsync(50)
+			// Advance virtual time instead of waiting
+			await clock.tickAsync(50)
 
 			// Verify discovery results
 			const expectedHost = `${MockKNXServer.host}:${MockKNXServer.port}:KNX IP Secure Bridge:10.15.1`
@@ -249,7 +248,7 @@ describe('KNXClient Tests', () => {
 		}
 	})
 
-    test('should perform toggle operation', async () => {
+	test('should perform toggle operation', async () => {
 		const clock = sinon.useFakeTimers({ shouldAdvanceTime: true })
 		const groupId = '0/0/1'
 		const dpt = '1.001'
@@ -276,26 +275,26 @@ describe('KNXClient Tests', () => {
 		}
 
 		try {
-            client = new KNXClient(
-                {
-                    loglevel: 'trace',
-                    hostProtocol: 'TunnelUDP',
-                    sniffingMode: true,
-                },
-                (c: KNXClient) => {
-                    const server = new MockKNXServer(mockToggleResponses, c)
-                    server.on('error', (error) => {
-                        if (
-                            !error.message.includes(
-                                'No matching response found',
-                            )
-                        ) {
-                            throw error
-                        }
-                    })
-                    server.createFakeSocket()
-                },
-            )
+			client = new KNXClient(
+				{
+					loglevel: 'trace',
+					hostProtocol: 'TunnelUDP',
+					sniffingMode: true,
+				},
+				(c: KNXClient) => {
+					const server = new MockKNXServer(mockToggleResponses, c)
+					server.on('error', (error) => {
+						if (
+							!error.message.includes(
+								'No matching response found',
+							)
+						) {
+							throw error
+						}
+					})
+					server.createFakeSocket()
+				},
+			)
 
 			return await new Promise<void>((resolve, reject) => {
 				client.on(KNXClientEvents.error, (error) => {
@@ -336,7 +335,7 @@ describe('KNXClient Tests', () => {
 		}
 	})
 
-    test('should handle long network disconnection leading to auto-disconnect', async () => {
+	test('should handle long network disconnection leading to auto-disconnect', async () => {
 		const clock = sinon.useFakeTimers({
 			shouldAdvanceTime: true,
 			toFake: [
@@ -362,20 +361,20 @@ describe('KNXClient Tests', () => {
 			KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT = 0.1 // 100ms instead of 10s
 			KNX_CONSTANTS.CONNECTION_ALIVE_TIME = 0.1 // 100ms instead of 60s
 
-            const client = new KNXClient(
-                {
-                    loglevel: 'trace',
-                    hostProtocol: 'TunnelUDP',
-                    ipAddr: MockKNXServer.host,
-                    ipPort: MockKNXServer.port,
-                    connectionKeepAliveTimeout: 0.1, // This needs to match CONNECTION_ALIVE_TIME
-                    localIPAddress: getDefaultIpLocal(),
-                },
-                (c: KNXClient) => {
-                    server = new MockKNXServer(
-                        getMockPacketsForDisconnectTest,
-                        c,
-                    )
+			const client = new KNXClient(
+				{
+					loglevel: 'trace',
+					hostProtocol: 'TunnelUDP',
+					ipAddr: MockKNXServer.host,
+					ipPort: MockKNXServer.port,
+					connectionKeepAliveTimeout: 0.1, // This needs to match CONNECTION_ALIVE_TIME
+					localIPAddress: getDefaultIpLocal(),
+				},
+				(c: KNXClient) => {
+					server = new MockKNXServer(
+						getMockPacketsForDisconnectTest,
+						c,
+					)
 					server.on('error', (error) => {
 						if (
 							error.message.includes('No matching response found')
@@ -493,24 +492,24 @@ describe('KNXClient Tests', () => {
 		}
 	})
 
-    test('should send a disconnect request', async () => {
+	test('should send a disconnect request', async () => {
 		const events: string[] = []
 		let server: MockKNXServer
 		let disconnectReason = ''
 
-        const client = new KNXClient(
-            {
-                loglevel: 'trace',
-                hostProtocol: 'TunnelUDP',
-                ipAddr: MockKNXServer.host,
-                ipPort: MockKNXServer.port,
-                localIPAddress: getDefaultIpLocal(),
-            },
-            (c: KNXClient) => {
-                server = new MockKNXServer(
-                    getMockPacketsForDisconnectRequestTest,
-                    c,
-                )
+		const client = new KNXClient(
+			{
+				loglevel: 'trace',
+				hostProtocol: 'TunnelUDP',
+				ipAddr: MockKNXServer.host,
+				ipPort: MockKNXServer.port,
+				localIPAddress: getDefaultIpLocal(),
+			},
+			(c: KNXClient) => {
+				server = new MockKNXServer(
+					getMockPacketsForDisconnectRequestTest,
+					c,
+				)
 				server.on('error', (error) => {
 					if (error.message.includes('No matching response found')) {
 						throw new Error(`MockKNXServer error: ${error.message}`)
