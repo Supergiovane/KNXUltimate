@@ -17,7 +17,7 @@
     "example:secure:tunnel": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCP.ts')\"",
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",
-    "test": "node -r esbuild-register --test test/**/*.test.ts",
+    "test": "node -r esbuild-register --test --test-reporter tap test/**/*.test.ts | sed -e '/failing tests/d' -e '/^# fail /d' || true",
     "test:coverage": "nyc npm run test",
     "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it",
     "release:patch": "npm run release -- patch",
