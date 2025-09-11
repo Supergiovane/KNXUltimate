@@ -315,8 +315,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	// ==== KNX/IP Secure Group (routing over multicast) ====
 	private _secureBackboneKey?: Buffer
+
 	private _secureRoutingTimerOffsetMs: number = 0
+
 	private _secureRoutingTimerAuthenticated: boolean = false
+
 	private _secureRoutingLatencyMs: number = 1000
 
 	// Logging helpers use KNXClient loglevel; no separate boolean
@@ -432,17 +435,22 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				type: 'udp4',
 				reuseAddr: true,
 			}) as UDPSocket
-			this.udpSocket.on(SocketEvents.message, (msg: Buffer, rinfo: RemoteInfo) => {
-				try {
-					// TunnelUDP never uses IP Secure wrapper; pass through
-					this.processInboundMessage(msg, rinfo)
-				} catch (e) {
-					this.emit(
-						KNXClientEvents.error,
-						e instanceof Error ? e : new Error('UDP data error'),
-					)
-				}
-			})
+			this.udpSocket.on(
+				SocketEvents.message,
+				(msg: Buffer, rinfo: RemoteInfo) => {
+					try {
+						// TunnelUDP never uses IP Secure wrapper; pass through
+						this.processInboundMessage(msg, rinfo)
+					} catch (e) {
+						this.emit(
+							KNXClientEvents.error,
+							e instanceof Error
+								? e
+								: new Error('UDP data error'),
+						)
+					}
+				},
+			)
 			this.udpSocket.on(SocketEvents.error, (error) => {
 				this.socketReady = false
 				this.emit(KNXClientEvents.error, error)
@@ -538,20 +546,25 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.emit(KNXClientEvents.connected, this._options)
 				}
 			})
-			this.udpSocket.on(SocketEvents.message, (msg: Buffer, rinfo: RemoteInfo) => {
-				try {
-					if (this._options.isSecureKNXEnabled) {
-						this.secureOnUdpData(msg, rinfo)
-						return
+			this.udpSocket.on(
+				SocketEvents.message,
+				(msg: Buffer, rinfo: RemoteInfo) => {
+					try {
+						if (this._options.isSecureKNXEnabled) {
+							this.secureOnUdpData(msg, rinfo)
+							return
+						}
+						this.processInboundMessage(msg, rinfo)
+					} catch (e) {
+						this.emit(
+							KNXClientEvents.error,
+							e instanceof Error
+								? e
+								: new Error('UDP data error'),
+						)
 					}
-					this.processInboundMessage(msg, rinfo)
-				} catch (e) {
-					this.emit(
-						KNXClientEvents.error,
-						e instanceof Error ? e : new Error('UDP data error'),
-					)
-				}
-			})
+				},
+			)
 			this.udpSocket.on(SocketEvents.error, (error) => {
 				this.socketReady = false
 				this.emit(KNXClientEvents.error, error)
@@ -760,12 +773,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							this._options.isSecureKNXEnabled &&
 							_knxPacket instanceof KNXRoutingIndication
 						) {
-							const kri = _knxPacket as KNXRoutingIndication & { header: any; length: number }
+							const kri = _knxPacket as KNXRoutingIndication & {
+								header: any
+								length: number
+							}
 							this.maybeApplyDataSecure(kri.cEMIMessage as any)
 							// Update KNX/IP header length to include updated cEMI length
 							try {
-								kri.length = kri.cEMIMessage?.length ?? kri.length
-								kri.header.length = KNX_CONSTANTS.HEADER_SIZE_10 + kri.length
+								kri.length =
+									kri.cEMIMessage?.length ?? kri.length
+								kri.header.length =
+									KNX_CONSTANTS.HEADER_SIZE_10 + kri.length
 							} catch {}
 						}
 					} catch {}
@@ -974,7 +992,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._options.isSecureKNXEnabled &&
 				(this._options.secureRoutingWaitForTimer ?? true) &&
 				!this._secureRoutingTimerAuthenticated &&
-				(item.knxPacket instanceof KNXRoutingIndication)
+				item.knxPacket instanceof KNXRoutingIndication
 			) {
 				try {
 					this.sysLogger.debug(
@@ -1627,7 +1645,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						if (!this._secureBackboneKey) {
 							this.emit(
 								KNXClientEvents.error,
-								new Error('No Backbone key found in keyring for secure multicast'),
+								new Error(
+									'No Backbone key found in keyring for secure multicast',
+								),
 							)
 						}
 					})
@@ -2248,7 +2268,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				'sha256',
 			)
 
-
 			// Load group keys (optional for Data Secure). Secure routing does not require them
 			this._secureGroupKeys = new Map()
 			for (const [gaStr, g] of kr.getGroupAddresses()) {
@@ -2278,7 +2297,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				if (backbones && backbones.length > 0) {
 					const bb = backbones[0]
 					if (bb?.decryptedKey && bb.decryptedKey.length >= 16) {
-						this._secureBackboneKey = bb.decryptedKey.subarray(0, 16)
+						this._secureBackboneKey = bb.decryptedKey.subarray(
+							0,
+							16,
+						)
 					}
 					if (typeof bb?.latency === 'number') {
 						this._secureRoutingLatencyMs = Math.max(100, bb.latency)
