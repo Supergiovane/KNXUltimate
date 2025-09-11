@@ -82,12 +82,13 @@ import {
 
 // Secure config moved here to avoid dependency on separate class file
 export interface SecureConfig {
-    gatewayIp: string
-    gatewayPort: number
+    /** Deprecated: use KNXClientOptions.ipAddr */
+    gatewayIp?: string
+    /** Deprecated: use KNXClientOptions.ipPort */
+    gatewayPort?: number
     tunnelInterfaceIndividualAddress: string
     knxkeys_file_path?: string
     knxkeys_password?: string
-    debug?: boolean
     // Temporary/testing: disable Data Secure wrapping of GA even if present in keyring
     disableDataSecure?: boolean
 }
@@ -1232,8 +1233,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
                 dstAddress,
                 data,
             )
-            // For secure tunneling, do not request bus ack (match SecureTunnelTCP and ETS)
-            cEMIMessage.control.ack = 0
+            // ACK handling:
+            // - TunnelTCP (secure): do not request bus ACK (align ETS/sample)
+            // - TunnelUDP (plain): keep legacy behavior controlled by suppress_ack_ldatareq
+            if (this._options.hostProtocol === 'TunnelTCP') {
+                cEMIMessage.control.ack = 0
+            } else {
+                cEMIMessage.control.ack = this._options.suppress_ack_ldatareq ? 0 : 1
+            }
             cEMIMessage.control.broadcast = 1
             cEMIMessage.control.priority = 3
             cEMIMessage.control.addressType = 1
@@ -1242,11 +1249,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._options.hostProtocol === 'TunnelTCP'
 					? this.secureIncTunnelSeq()
 					: this.incSeqNumber()
-			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
-				this._channelID,
-				seqNum,
-				cEMIMessage,
-			)
+            const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+                this._channelID,
+                seqNum,
+                cEMIMessage,
+            )
             if (!this._options.suppress_ack_ldatareq) {
                 this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
             } else {
@@ -2054,12 +2061,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
     private async secureEnsureKeyring(): Promise<void> {
         if (!this._options?.secureTunnelConfig) return
         const cfg = this._options.secureTunnelConfig
-        // Only override peer host/port for TCP secure sessions
-        if (this._options.hostProtocol === 'TunnelTCP') {
-            if (cfg.gatewayIp) this._peerHost = cfg.gatewayIp
-            if (cfg.gatewayPort) this._peerPort = cfg.gatewayPort
+        // Peer host/port now come from KNXClientOptions.ipAddr/ipPort (not from secure config)
+        // Drive deep secure debug from KNXClientOptions.loglevel (debug only)
+        try {
+            this._secureDebug = (this.sysLogger as any)?.level === 'debug'
+        } catch {
+            this._secureDebug = false
         }
-        this._secureDebug = !!cfg.debug
 
         // Load ETS keyring and extract credentials only once
         if (!this._secureUserPasswordKey || this._secureGroupKeys.size === 0) {
