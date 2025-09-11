@@ -19,10 +19,10 @@ interface MockServerEventCallbacks {
 }
 
 export type ServerOptions = {
-	port?: number
-	host?: string
-	protocol?: 'udp' | 'tcp'
-	useFakeTimers?: boolean
+    port?: number
+    host?: string
+    protocol?: 'udp' | 'tcp'
+    useFakeTimers?: boolean
 }
 
 export default class MockKNXServer extends TypedEventEmitter<MockServerEventCallbacks> {
@@ -42,7 +42,7 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 
 	private isPaused: boolean = false
 
-	private useFakeTimers: boolean = false
+  private useFakeTimers: boolean = false
 
 	get rInfo(): RemoteInfo {
 		return {
@@ -61,19 +61,19 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 		super()
 		this.expectedTelegrams = capturedTelegrams
 		this.client = client
-		this.useFakeTimers = options.useFakeTimers || false
+    this.useFakeTimers = options.useFakeTimers || false
 	}
 
-	private log(message: string) {
-		this.client['sysLogger'].info(`[MockKNXServer] ${message}`)
-	}
+  private log(message: string) {
+    this.client['sysLogger'].info(`[MockKNXServer] ${message}`)
+  }
 
-	private error(message: string) {
-		this.client['sysLogger'].error(`[MockKNXServer] ${message}`)
-		this.emit(MockServerEvents.error, new Error(message))
-	}
+  private error(message: string) {
+    this.client['sysLogger'].error(`[MockKNXServer] ${message}`)
+    this.emit(MockServerEvents.error, new Error(message))
+  }
 
-	public createFakeSocket() {
+  public createFakeSocket() {
 		// TODO: create the correct socket based on client hostProtocol
 		this.client['_clientSocket'] = createSocket({
 			type: 'udp4',
@@ -120,10 +120,10 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 			this.socket.on(SocketEvents.close, () => this.client.emit('close'))
 		}
 
-		this.client['socketReady'] = true
+    this.client['socketReady'] = true
 
-		this.log('MockKNXServer initialized')
-	}
+    this.log('MockKNXServer initialized')
+  }
 
 	public setPaused(paused: boolean) {
 		this.isPaused = paused
@@ -153,8 +153,8 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 			return
 		}
 
-		if (res?.response) {
-			this.log(`Found matching response, waiting ${res.deltaRes}ms`)
+        if (res?.response) {
+            this.log(`Found matching response, waiting ${res.deltaRes}ms`)
 			// Skip waiting when using fake timers
 			if (!this.useFakeTimers) {
 				await wait(res.deltaRes || 0)
@@ -175,8 +175,8 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 				this.socket.emit('message', nextResponseBuffer, this.rInfo)
 				this.lastIndex++
 			}
-		} else {
-			this.error('No matching response found for this request.')
-		}
+        } else {
+            this.error('No matching response found for this request.')
+        }
 	}
 }

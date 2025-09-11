@@ -1,6 +1,7 @@
 /**
  * Utility functions for KNX Secure implementation
  */
+import * as crypto from 'crypto'
 
 /**
  * Pad a buffer to a multiple of the specified block size
@@ -22,11 +23,8 @@ export function bytePad(buffer: Buffer, blockSize = 16): Buffer {
 /**
  * Calculate SHA256 hash of data
  * @param data - Data to hash
-	// Import crypto module at the top of the file
-	import * as crypto from 'crypto';
  */
 export function sha256Hash(data: Buffer): Buffer {
-	const crypto = require('crypto')
 	return crypto.createHash('sha256').update(data).digest()
 }
 
@@ -84,7 +82,6 @@ export function decryptAes128Cbc(
 	key: Buffer,
 	iv: Buffer,
 ): Buffer {
-	const crypto = require('crypto')
 	// Ensure key and IV are exactly 16 bytes for AES-128
 	const aesKey = key.slice(0, 16)
 	const aesIv = iv.slice(0, 16)

@@ -1146,8 +1146,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				dstAddress,
 				knxBuffer,
 			)
-			// cEMIMessage.control.ack = this._options.suppress_ack_ldatareq ? 0 : 1; // No ack like telegram sent from ETS (0 means don't care)
-			cEMIMessage.control.ack = 0 // No ack like telegram sent from ETS (0 means don't care)
+			// Tunnelling UDP: request bus ACK unless suppressed; TunnelTCP: no bus ACK
+			cEMIMessage.control.ack =
+				this._options.hostProtocol === 'TunnelTCP'
+					? 0
+					: this._options.suppress_ack_ldatareq
+						? 0
+						: 1
 			cEMIMessage.control.broadcast = 1
 			cEMIMessage.control.priority = 3
 			cEMIMessage.control.addressType = 1
@@ -1226,8 +1231,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				dstAddress,
 				knxBuffer,
 			)
-			// cEMIMessage.control.ack = this._options.suppress_ack_ldatareq ? 0 : 1;
-			cEMIMessage.control.ack = 0 // No ack like telegram sent from ETS (0 means don't care)
+			// No ACK request on bus
+			cEMIMessage.control.ack = 0
 			cEMIMessage.control.broadcast = 1
 			cEMIMessage.control.priority = 3
 			cEMIMessage.control.addressType = 1
@@ -1294,9 +1299,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				dstAddress,
 				null,
 			)
-			// Align with SecureTunnelTCP defaults for group traffic over secure tunnel
-			// Use no-ack to match ETS behavior and what MAC calculation expects
-			cEMIMessage.control.ack = 0
+			// Tunnelling UDP: request bus ACK unless suppressed; TunnelTCP: no bus ACK
+			cEMIMessage.control.ack =
+				this._options.hostProtocol === 'TunnelTCP'
+					? 0
+					: this._options.suppress_ack_ldatareq
+						? 0
+						: 1
 			cEMIMessage.control.broadcast = 1
 			cEMIMessage.control.priority = 3
 			cEMIMessage.control.addressType = 1
@@ -1988,7 +1997,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 			if (knxHeader.service_type === KNX_CONSTANTS.SEARCH_RESPONSE) {
 				if (!this.isDiscoveryRunning()) return
-
+				// no-op
 				this.emit(
 					KNXClientEvents.discover,
 					`${rinfo.address}:${rinfo.port}`,
@@ -2039,8 +2048,29 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this._connectionState = ConncetionState.CONNECTED
 					this._numFailedTelegramACK = 0 // 16/03/2022 Reset the failed ACK counter
 					this.clearToSend = true // 16/03/2022 allow to send
+					// Use the tunnel-assigned IA as source for tunnelling (UDP/TCP)
+					try {
+						if (
+							this._options.hostProtocol === 'TunnelTCP' ||
+							this._options.hostProtocol === 'TunnelUDP'
+						) {
+							const assignedIa =
+								knxConnectResponse?.crd?.knxAddress?.get?.()
+							if (typeof assignedIa === 'number' && assignedIa > 0) {
+								this.physAddr = new KNXAddress(
+									assignedIa,
+									KNXAddress.TYPE_INDIVIDUAL,
+								)
+								this.sysLogger.debug(
+									`[${getTimestamp()}] Tunnelling assigned IA set to ${this.physAddr.toString()}`,
+								)
+							}
+						}
+					} catch {}
 					this.emit(KNXClientEvents.connected, this._options)
-					this.startHeartBeat()
+					if (!this._options.sniffingMode) {
+						this.startHeartBeat()
+					}
 				}
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.DISCONNECT_RESPONSE
