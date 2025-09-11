@@ -296,7 +296,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
     private _secureSendSeq48: bigint = 0n
     private _secureSerial: Buffer = Buffer.from('000000000000', 'hex')
     private _secureAssignedIa: number = 0
-    private _secureDebug: boolean = false
+    // Logging helpers use KNXClient loglevel; no separate boolean
     private _secureHandshakeSessionTimer?: NodeJS.Timeout
     private _secureHandshakeAuthTimer?: NodeJS.Timeout
     private _secureHandshakeConnectTimer?: NodeJS.Timeout
@@ -765,10 +765,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
                                     } seq48=${seq48Hex ?? 'n/a'} dsDisabled=${this._options.secureTunnelConfig?.disableDataSecure ? 'true' : 'false'}`,
                             )
                             try {
-                                const innerHex = ktr.toBuffer().toString('hex')
-                                this.sysLogger.debug(
-                                    `[${getTimestamp()}] TX inner (KNX/IP TunnelReq): ${innerHex}`,
-                                )
+                                if (this.isLevelEnabled('debug')) {
+                                    const innerHex = ktr.toBuffer().toString('hex')
+                                    this.sysLogger.debug(
+                                        `[${getTimestamp()}] TX inner (KNX/IP TunnelReq): ${innerHex}`,
+                                    )
+                                }
                             } catch {}
                         }
                     } catch {}
@@ -2062,12 +2064,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
         if (!this._options?.secureTunnelConfig) return
         const cfg = this._options.secureTunnelConfig
         // Peer host/port now come from KNXClientOptions.ipAddr/ipPort (not from secure config)
-        // Drive deep secure debug from KNXClientOptions.loglevel (debug only)
-        try {
-            this._secureDebug = (this.sysLogger as any)?.level === 'debug'
-        } catch {
-            this._secureDebug = false
-        }
+        // Drive secure logs from KNXClientOptions.loglevel; no separate boolean
 
         // Load ETS keyring and extract credentials only once
         if (!this._secureUserPasswordKey || this._secureGroupKeys.size === 0) {
@@ -2406,6 +2403,28 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
         ])
     }
 
+    // ===== Logging level helpers =====
+    private getLoggerLevel(): LogLevel {
+        try {
+            const lvl = (this.sysLogger as any)?.level || 'info'
+            return String(lvl).toLowerCase() as LogLevel
+        } catch {
+            return 'info'
+        }
+    }
+    private isLevelEnabled(level: LogLevel): boolean {
+        const order: Record<LogLevel, number> = {
+            disable: 0,
+            error: 1,
+            warn: 2,
+            info: 3,
+            debug: 4,
+            trace: 5,
+        }
+        const cur = this.getLoggerLevel()
+        return order[cur] >= order[level]
+    }
+
     private secureDecrypt(frame: Buffer): Buffer {
         if (!this._secureSessionKey)
             throw new Error('Secure session not established')
@@ -2551,7 +2570,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
         )
         // Optional deep debug for Data Secure, helpful to compare with reference implementation
         try {
-            if (this._secureDebug) {
+            if (this.isLevelEnabled('debug')) {
                 const iaStr = `${(srcIa >> 12) & 0x0f}.${(srcIa >> 8) & 0x0f}.${srcIa & 0xff}`
                 this.sysLogger.debug(
                     `[${getTimestamp()}] DS build: dst=${this.secureFormatGroupAddress(groupAddr)} src=${iaStr} flags=0x${(cemiFlags & 0xffff).toString(16)} plain=${plainApdu.toString('hex')} seq48=${seq.toString('hex')} block0=${block0.toString('hex')} ctr0=${counter0.toString('hex')}`,

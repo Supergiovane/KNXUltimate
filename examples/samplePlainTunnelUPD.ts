@@ -44,7 +44,7 @@ async function main() {
     physAddr:"15.15.250",
     // Keep legacy ACK behavior on UDP; adjust if needed
     suppress_ack_ldatareq: false,
-    loglevel: 'debug',
+    loglevel: 'info',
     localEchoInTunneling: true,
   })
 
