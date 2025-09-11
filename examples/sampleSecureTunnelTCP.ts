@@ -43,8 +43,7 @@ async function main() {
     ipPort: 3671,
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,
-    loglevel: 'info',
-    localEchoInTunneling: true,
+    loglevel: 'info'
   })
 
   client.on('connected', () => console.log('✓ KNXClient connected (secure)'))

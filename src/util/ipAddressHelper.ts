@@ -5,25 +5,34 @@ import os, { NetworkInterfaceInfo } from 'os'
 const logger = module('ipAddressHelper')
 
 export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
-	const candidateInterfaces: { [key: string]: NetworkInterfaceInfo } = {}
-	let interfaces: Record<string, NetworkInterfaceInfo[]> =
-		os.networkInterfaces()
+    const candidateInterfaces: { [key: string]: NetworkInterfaceInfo } = {}
+    let interfaces: Record<string, NetworkInterfaceInfo[]>
 
-	if (process.env.CI) {
-		// create a fake interface for CI
-		interfaces = {
-			eth0: [
-				{
-					address: '192.168.1.58',
-					netmask: '255.255.255.0',
-					family: 'IPv4',
-					mac: '00:00:00:00:00:00',
-					internal: false,
-					cidr: '192.168.1.58/24',
-				},
-			],
-		}
-	}
+    // In CI, avoid touching real OS network and provide a deterministic interface
+    if (process.env.CI) {
+        interfaces = {
+            eth0: [
+                {
+                    address: '192.168.1.58',
+                    netmask: '255.255.255.0',
+                    family: 'IPv4',
+                    mac: '00:00:00:00:00:00',
+                    internal: false,
+                    cidr: '192.168.1.58/24',
+                },
+            ],
+        }
+    } else {
+        try {
+            interfaces = os.networkInterfaces()
+        } catch (e) {
+            logger.error(
+                'getIPv4Interfaces: os.networkInterfaces failed: %s',
+                (e as Error)?.message || e,
+            )
+            throw e
+        }
+    }
 	for (const iface in interfaces) {
 		for (let index = 0; index < interfaces[iface].length; index++) {
 			let intf

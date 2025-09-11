@@ -37,7 +37,6 @@ async function main() {
 
   // KNX Secure routing (multicast) config - uses Backbone key from ETS keyring
   const secureCfg: SecureConfig = {
-    tunnelInterfaceIndividualAddress: '1.1.254',
     knxkeys_file_path:
       '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
     knxkeys_password: 'passwordprogetto'
@@ -49,8 +48,6 @@ async function main() {
     ipPort: 3671,
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,
-    // For multicast, local echo helps see own telegrams
-    localEchoInTunneling: true,
     loglevel: 'debug',
     physAddr:"1.1.250"
   })

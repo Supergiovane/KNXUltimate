@@ -83,15 +83,9 @@ import {
 
 // Secure config moved here to avoid dependency on separate class file
 export interface SecureConfig {
-	/** Deprecated: use KNXClientOptions.ipAddr */
-	gatewayIp?: string
-	/** Deprecated: use KNXClientOptions.ipPort */
-	gatewayPort?: number
-	tunnelInterfaceIndividualAddress: string
+	tunnelInterfaceIndividualAddress?: string
 	knxkeys_file_path?: string
 	knxkeys_password?: string
-	// Temporary/testing: disable Data Secure wrapping of GA even if present in keyring
-	disableDataSecure?: boolean
 }
 
 export enum ConncetionState {
@@ -164,8 +158,6 @@ export type KNXClientOptions = {
 	isSecureKNXEnabled?: boolean
 	/** Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true */
 	suppress_ack_ldatareq?: boolean
-	/** Leave true forever. This is used only in Node-Red KNX-Ultimate node */
-	localEchoInTunneling?: boolean
 	/** The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate */
 	localIPAddress?: string
 	/** Specifies the local eth interface to be used to connect to the KNX Bus. */
@@ -185,7 +177,7 @@ export type KNXClientOptions = {
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
-	physAddr: '15.15.200',
+	physAddr: '',
 	connectionKeepAliveTimeout: KNX_CONSTANTS.CONNECTION_ALIVE_TIME,
 	ipAddr: '224.0.23.12',
 	ipPort: 3671,
@@ -193,7 +185,6 @@ const optionsDefaults: KNXClientOptions = {
 	isSecureKNXEnabled: false,
 	suppress_ack_ldatareq: false,
 	loglevel: 'info',
-	localEchoInTunneling: true,
 	localIPAddress: '',
 	interface: '',
 	KNXQueueSendIntervalMilliseconds: 25,
@@ -407,7 +398,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.sysLogger.error(error.stack)
 		})
 
-		if (typeof this._options.physAddr === 'string') {
+		if (this._options.physAddr !== '') {
 			this.physAddr = KNXAddress.createFromString(this._options.physAddr)
 		}
 
@@ -900,7 +891,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 										16,
 									)} dataSecure=${isSecApdu} scf=${
 										typeof scf === 'number' ? scf : 'n/a'
-									} seq48=${seq48Hex ?? 'n/a'} dsDisabled=${this._options.secureTunnelConfig?.disableDataSecure ? 'true' : 'false'}`,
+									} seq48=${seq48Hex ?? 'n/a'}`,
 							)
 							try {
 								if (this.isLevelEnabled('debug')) {
@@ -1175,8 +1166,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.send(knxPacketRequest, undefined, false, seqNum)
 			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			if (this._options.localEchoInTunneling)
-				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
+			this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
 
@@ -1254,8 +1244,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.send(knxPacketRequest, undefined, false, seqNum)
 			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			if (this._options.localEchoInTunneling)
-				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
+			this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
 
@@ -1327,9 +1316,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.send(knxPacketRequest, undefined, false, seqNum)
 			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			if (this._options.localEchoInTunneling) {
-				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
-			}
+			this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
 
@@ -1437,8 +1424,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.send(knxPacketRequest, undefined, false, seqNum)
 			}
 			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			if (this._options.localEchoInTunneling)
-				this.emit(KNXClientEvents.indication, knxPacketRequest, true)
+			this.emit(KNXClientEvents.indication, knxPacketRequest, true)
 		}
 	}
 
@@ -2050,11 +2036,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this._connectionState = ConncetionState.CONNECTED
 					this._numFailedTelegramACK = 0 // 16/03/2022 Reset the failed ACK counter
 					this.clearToSend = true // 16/03/2022 allow to send
-					// Use the tunnel-assigned IA as source for tunnelling (UDP/TCP)
+					// Use the tunnel-assigned IA as source only for TCP secure
 					try {
 						if (
-							this._options.hostProtocol === 'TunnelTCP' ||
-							this._options.hostProtocol === 'TunnelUDP'
+							(this._options.hostProtocol === 'TunnelTCP' ||
+								this._options.hostProtocol === 'TunnelUDP') &&
+							this.physAddr === undefined
 						) {
 							const assignedIa =
 								knxConnectResponse?.crd?.knxAddress?.get?.()
@@ -3123,7 +3110,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private maybeApplyDataSecure(cemi: any) {
 		try {
 			if (!this._options.isSecureKNXEnabled) return
-			if (this._options.secureTunnelConfig?.disableDataSecure) return
 			if (!this._secureGroupKeys || this._secureGroupKeys.size === 0)
 				return
 			// Already secure? don't re-apply (avoid consuming a new seq48)

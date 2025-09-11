@@ -48,13 +48,12 @@ These are the properties you can pass to `KNXClient` (see examples for full usag
 | `hostProtocol` (string)          | all                                | One of: `"TunnelUDP"` (plain tunnelling via UDP), `"Multicast"` (plain routing via multicast 224.0.23.12), `"TunnelTCP"` (KNX/IP Secure tunnelling over TCP). |
 | `ipAddr` (string)                | all                                | KNX/IP peer address. Use `"224.0.23.12"` for routing (multicast), or the interface/router IP for tunnelling. |
 | `ipPort` (number/string)         | all                                | KNX/IP port. Default `3671`. |
-| `physAddr` (string)              | all                                | Individual address used as source on the bus (for example `"1.1.200"`). |
+| `physAddr` (string) Optional             | all                                | Individual address used as source on the bus (for example `"1.1.200"`). Only mandatory in Multicast protocol. If set in TunnelTCP or TunnelUDP, forces the selection of the tunnel, that couldn't be allowed by the gateway. |
 | `loglevel` (string)              | all                                | One of: `disable`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `localIPAddress` (string)        | all                                | Optional. Binds the local UDP/TCP socket to a specific local interface IP. Useful with multiple NICs. |
 | `interface` (string)             | all                                | Optional. Local interface name to select the NIC (alternative to `localIPAddress`). |
 | `KNXQueueSendIntervalMilliseconds` (number) | all              | Optional. Inter‑telegram delay in ms. Default ~25ms. Don’t go below 20ms. |
 | `suppress_ack_ldatareq` (bool)   | tunnelling (UDP/TCP)               | Optional. Avoid requesting/handling L_DATA_REQ bus ACK in tunnelling. Leave `false` unless your interface needs it. |
-| `localEchoInTunneling` (bool)    | tunnelling (UDP/TCP)               | Optional. Echo back outgoing telegrams via the `indication` event. Default `true`. |
 | `theGatewayIsKNXVirtual` (bool)  | tunnelling                         | Optional. Special handling for ETS KNX Virtual (adds `localIPAddress` to tunnel endpoint). Default `false`. |
 | `isSecureKNXEnabled` (bool)      | secure tunnelling & secure routing | Enable KNX/IP Secure. With `TunnelTCP`: session handshake + Secure Wrapper. With `Multicast`: secure routing (Secure Wrapper, timer sync). |
 | `secureTunnelConfig` (object)    | secure tunnelling & secure routing | KNX Secure configuration. See below. |
@@ -64,10 +63,10 @@ Secure configuration object (`secureTunnelConfig`):
 
 | Field                                   | Description |
 | --------------------------------------- | ----------- |
-| `tunnelInterfaceIndividualAddress` (string) | Individual address of the KNX/IP Secure interface as in ETS (for session auth and Data Secure). |
+| `tunnelInterfaceIndividualAddress` (string) Optional| Individual address of the KNX/IP Secure interface as in ETS (for session auth and Data Secure). Leave this undefined for Multicast protocol (Multicast won't use tunnels) |
 | `knxkeys_file_path` (string)            | Path to ETS keyring `.knxkeys` file. |
 | `knxkeys_password` (string)             | ETS project password to decrypt the keyring. |
-| `disableDataSecure` (bool)              | Optional. Force disabling Data Secure for GA even if present in the keyring (debug only). |
+
 
 Note on KNX Secure: `KNXClient` supports KNX/IP Secure for both tunnelling (TCP) and routing (multicast). Group Addresses found in the ETS keyring are protected with Data Secure; GA not in the keyring remain plain.
 ## SUPPORTED DATAPOINTS
@@ -195,6 +194,14 @@ Examples overview:
   - Requires: set `.knxkeys` path + password in the example file.
   - Run: `npm run example:secure:multicast` or `node -r esbuild-register -e "require('./examples/sampleSecureMulticast.ts')"`
 
+### Source Individual Address (IA): UDP vs TCP
+
+- TunnelUDP: uses `physAddr` as the source IA on the bus. It does not replace it with the tunnel-assigned IA returned in `CONNECT_RESPONSE`.
+- TunnelTCP (secure): after a successful connect, uses the tunnel-assigned IA as the source IA for bus frames.
+- Tips for UDP tunnelling:
+  - If your interface times out on L_DATA_REQ ACK, try `suppress_ack_ldatareq: true`.
+  - With multiple NICs, set `localIPAddress` (or `interface`) to bind the correct local interface.
+
 ### KNX IP Secure (tunnelling & routing) and Data Secure
 
 `KNXClient` supports KNX/IP Secure and Data Secure.
@@ -205,39 +212,7 @@ Examples overview:
   - `TunnelTCP` + `isSecureKNXEnabled: true` → secure session (Secure Wrapper) + Data Secure per GA.
   - `Multicast` + `isSecureKNXEnabled: true` → secure routing (Secure Wrapper over multicast with timer synchronization via 0x0955) + Data Secure per GA.
 
-Quick example (secure tunnelling TCP):
 
-```ts
-import KNXClient, { SecureConfig } from './src/KNXClient'
-
-const secureCfg: SecureConfig = {
-  gatewayIp: '192.168.1.4',
-  gatewayPort: 3671,
-  tunnelInterfaceIndividualAddress: '1.1.254',
-  // knxkeys_file_path: '/path/to/project.knxkeys',
-  // knxkeys_password: 'projectPassword',
-  debug: true,
-}
-
-const client = new KNXClient({
-  hostProtocol: 'TunnelTCP',
-  isSecureKNXEnabled: true,
-  secureTunnelConfig: secureCfg,
-  physAddr: '1.1.200',
-})
-
-client.on('connected', () => console.log('Connected (secure)'))
-client.on('error', (e) => console.error('Error:', e))
-
-client.Connect()
-
-// Writes ON to 1/1/1; if 1/1/1 is in the keyring → Data Secure
-client.write('1/1/1', true, '1.001')
-```
-
-Quick example (secure routing multicast): see `examples/sampleSecureMulticast.ts`.
-
-<br/>
 
 ## HOW TO COLLABORATE
 

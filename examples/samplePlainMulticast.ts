@@ -42,8 +42,6 @@ async function main() {
     ipPort: 3671,
     physAddr:"15.15.250",
     isSecureKNXEnabled: false,
-    // For multicast, local echo helps see own telegrams
-    localEchoInTunneling: true,
     loglevel: 'info'
   })
 

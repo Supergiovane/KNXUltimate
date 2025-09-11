@@ -1,4 +1,8 @@
-import { test, describe } from 'node:test'
+// Ensure deterministic behavior in CI-like environments and lower log verbosity
+process.env.CI = process.env.CI || '1'
+process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'warn'
+
+import { test, describe, after } from 'node:test'
 import assert from 'node:assert'
 import sinon from 'sinon'
 import { dptlib, KNXClient, KNXClientEvents, SnifferPacket } from '../../src'
@@ -213,7 +217,21 @@ describe('KNXClient Tests', () => {
 					c.startDiscovery()
 				},
 			)
-
+			/* ...dopo aver creato client/server... */
+			after(async () => {
+				try {
+					await (client as any)?.Disconnect?.()
+				} catch {}
+				try {
+					;(client as any)?.tcpSocket?.removeAllListeners?.()
+					;(client as any)?.tcpSocket?.destroy?.()
+					;(client as any)?.udpSocket?.removeAllListeners?.()
+					;(client as any)?.udpSocket?.close?.()
+				} catch {}
+				try {
+					;(server as any)?.close?.()
+				} catch {}
+			})
 			const discovered: string[] = []
 
 			// Handle client errors
@@ -279,6 +297,7 @@ describe('KNXClient Tests', () => {
 				{
 					loglevel: 'trace',
 					hostProtocol: 'TunnelUDP',
+					suppress_ack_ldatareq: true,
 					sniffingMode: true,
 				},
 				(c: KNXClient) => {

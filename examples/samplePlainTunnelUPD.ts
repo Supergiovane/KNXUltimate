@@ -41,11 +41,8 @@ async function main() {
     ipAddr: '192.168.1.117',
     ipPort: 3671,
     isSecureKNXEnabled: false,
-    physAddr:"15.15.250",
-    // Disable bus ACKs for UDP tunnelling to improve compatibility
     suppress_ack_ldatareq: false,
-    loglevel: 'debug',
-    localEchoInTunneling: true
+    loglevel: 'info'
   })
 
   client.on('connected', () => console.log('✓ KNXClient connected (plain UDP)'))
