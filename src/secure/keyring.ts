@@ -125,15 +125,36 @@ export class Keyring {
 	private iv?: Buffer
 
 	/**
-	 * Load a .knxkeys file with the given password
+	 * Load keyring content using either a file path to a .knxkeys file
+	 * or a string containing the keyring (raw XML or base64 of the .knxkeys binary).
 	 */
-	async load(filePath: string, password: string): Promise<void> {
-		if (process.env.KNX_DEBUG === '1')
-			console.log('🔐 Loading keyring file:', filePath)
+	async load(source: string, password: string): Promise<void> {
+		let xmlContent: string
 
-		// Read and unzip the .knxkeys file
-		const zipContent = fs.readFileSync(filePath)
-		const xmlContent = await this.unzipKnxKeys(zipContent)
+		if (fs.existsSync(source)) {
+			// Load from file path (.knxkeys)
+			if (process.env.KNX_DEBUG === '1')
+				console.log('🔐 Loading keyring file:', source)
+			const zipContent = fs.readFileSync(source)
+			xmlContent = await this.unzipKnxKeys(zipContent)
+		} else {
+			// Load from provided string: try XML first, then base64-encoded .knxkeys
+			const trimmed = (source || '').trim()
+			if (trimmed.startsWith('<')) {
+				// Raw XML string
+				xmlContent = trimmed
+			} else {
+				// Try base64-encoded .knxkeys content
+				try {
+					const buf = Buffer.from(trimmed, 'base64')
+					// If base64 was invalid, the buffer will be small or garbage; unzip will throw
+					xmlContent = await this.unzipKnxKeys(buf)
+				} catch (e) {
+					// Fallback: treat the string as XML even if not starting with '<'
+					xmlContent = trimmed
+				}
+			}
+		}
 
 		// Parse XML
 		const parser = new xml2js.Parser()
@@ -146,6 +167,13 @@ export class Keyring {
 
 		// Extract keyring data
 		await this.parseKeyring(result)
+	}
+
+	/**
+	 * Explicit helper to load from string (raw XML or base64 .knxkeys).
+	 */
+	async loadFromString(content: string, password: string): Promise<void> {
+		return this.load(content, password)
 	}
 
 	getCreatedBy(): string | undefined {
