@@ -1,4 +1,5 @@
 import KNXClient from '../src/KNXClient'
+import { dptlib } from '../src'
 import CEMIConstants from '../src/protocol/cEMI/CEMIConstants'
 
 async function waitForStatus(
@@ -49,6 +50,37 @@ async function main() {
   client.on('error', (e) => console.error('Error:', e.message))
   client.on('disconnected', (reason) => console.log('Disconnected:', reason))
 
+  // Example: decode incoming telegrams by datapoint, similar to simpleSample.ts
+  client.on('indication', (packet: any) => {
+    try {
+      const cemi = packet?.cEMIMessage
+      if (!cemi || !cemi.npdu) return
+      const dst = cemi.dstAddress?.toString?.()
+      const raw: Buffer | undefined = cemi.npdu?.dataValue
+      if (!dst || !raw) return
+
+      let jsValue: any
+      if (dst === '0/1/1') {
+        // We know 0/1/1 is a boolean DPT 1.001
+        const config = dptlib.resolve('1.001')
+        jsValue = dptlib.fromBuffer(raw, config)
+      } else if (dst === '0/1/2') {
+        // We know 0/1/2 is a DPT 232.600 Color RGB
+        const config = dptlib.resolve('232.600')
+        jsValue = dptlib.fromBuffer(raw, config)
+      } else {
+        // All others... assume they are boolean
+        const config = dptlib.resolve('1.001')
+        jsValue = dptlib.fromBuffer(raw, config)
+        if (jsValue === null) {
+          // Opppsss, it's null. It means that the datapoint isn't 1.001
+          // Raise whatever error you want.
+        }
+      }
+      console.log(`Indication dst=${dst} -> value=`, jsValue)
+    } catch {}
+  })
+
   try {
     client.Connect()
     await new Promise<void>((resolve) => client.once('connected', () => resolve()))
@@ -80,4 +112,3 @@ async function main() {
 }
 
 main().catch(console.error)
-
