@@ -2142,8 +2142,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.setTimer(
 			KNXTimer.CONNECTION_STATE,
 			() => {
-				this.sysLogger.error(
-					`KNXClient: getConnectionStatus Timeout ${this._heartbeatFailures} out of ${this.max_HeartbeatFailures}`,
+				// First misses can happen transiently; warn until final attempt
+				const attempt = this._heartbeatFailures + 1
+				const level =
+					attempt >= this.max_HeartbeatFailures ? 'error' : 'warn'
+				;(this.sysLogger as any)[level](
+					`KNXClient: getConnectionStatus timeout attempt ${attempt}/${this.max_HeartbeatFailures} to ${this._peerHost}:${this._peerPort} ch:${this._channelID}`,
 				)
 				// this.emit(KNXClientEvents.error, timeoutError)
 
@@ -3723,8 +3727,26 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendConnectionStateRequestMessage(channelID: number) {
+		// For UDP tunnelling, include our control endpoint HPAI to improve
+		// compatibility with interfaces that require a valid return address.
+		let hpai: HPAI | undefined
+		try {
+			if (this._options.hostProtocol === 'TunnelUDP') {
+				const addr: any = this.udpSocket?.address?.()
+				const localPort =
+					addr && typeof addr.port === 'number'
+						? addr.port
+						: KNX_CONSTANTS.KNX_PORT
+				hpai = new HPAI(this._options.localIPAddress, localPort)
+			}
+		} catch {}
+
 		this.send(
-			KNXProtocol.newKNXConnectionStateRequest(channelID),
+			KNXProtocol.newKNXConnectionStateRequest(
+				channelID,
+				// Use explicit HPAI for UDP, NULLHPAI otherwise (TCP/mcast path)
+				(hpai as any) || (HPAI as any).NULLHPAI,
+			),
 			undefined,
 			true,
 			this.getSeqNumber(),
