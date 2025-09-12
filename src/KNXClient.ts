@@ -7,7 +7,7 @@ import CEMIFactory from './protocol/cEMI/CEMIFactory'
 import CEMIMessage from './protocol/cEMI/CEMIMessage'
 import KNXProtocol, { KnxMessage, KnxResponse } from './protocol/KNXProtocol'
 import KNXConnectResponse from './protocol/KNXConnectResponse'
-import HPAI from './protocol/HPAI'
+import HPAI, { KnxProtocol } from './protocol/HPAI'
 import TunnelCRI, { TunnelTypes } from './protocol/TunnelCRI'
 import KNXConnectionStateResponse from './protocol/KNXConnectionStateResponse'
 import * as errors from './errors'
@@ -462,6 +462,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.udpSocket.on(SocketEvents.close, () => {
 				this.socketReady = false
 				this.exitProcessingKNXQueueLoop = true
+				// For unexpected closes, emit a disconnected event
+				if (
+					this._connectionState !== ConncetionState.DISCONNECTING &&
+					this._connectionState !== ConncetionState.DISCONNECTED
+				) {
+					try {
+						void this.setDisconnected('Socket closed by peer')
+					} catch {}
+				}
 				this.emit(KNXClientEvents.close)
 			})
 
@@ -533,6 +542,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						`[${getTimestamp()}] TCP close: set exitProcessingKNXQueueLoop=true`,
 					)
 				} catch {}
+				// If the socket closed unexpectedly, propagate a disconnected event
+				if (
+					this._connectionState !== ConncetionState.DISCONNECTING &&
+					this._connectionState !== ConncetionState.DISCONNECTED
+				) {
+					try {
+						void this.setDisconnected('Socket closed by peer')
+					} catch {}
+				}
 				this.emit(KNXClientEvents.close)
 			})
 		} else if (this._options.hostProtocol === 'Multicast') {
@@ -582,6 +600,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.udpSocket.on(SocketEvents.close, () => {
 				this.socketReady = false
 				this.exitProcessingKNXQueueLoop = true
+				if (
+					this._connectionState !== ConncetionState.DISCONNECTING &&
+					this._connectionState !== ConncetionState.DISCONNECTED
+				) {
+					try {
+						void this.setDisconnected('Socket closed by peer')
+					} catch {}
+				}
 				this.emit(KNXClientEvents.close)
 			})
 
@@ -2281,6 +2307,23 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		try {
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(msg)
 
+			// If we're waiting on a heartbeat reply but receive any frame from the
+			// same peer, consider the connection alive and reset the heartbeat timer.
+			try {
+				if (
+					this.timers.has(KNXTimer.CONNECTION_STATE) &&
+					this._connectionState === ConncetionState.CONNECTED &&
+					rinfo?.address === this._peerHost &&
+					rinfo?.port === this._peerPort
+				) {
+					this.clearTimer(KNXTimer.CONNECTION_STATE)
+					this._heartbeatFailures = 0
+					this.sysLogger.debug(
+						`[${getTimestamp()}] Heartbeat satisfied by inbound traffic from ${rinfo.address}:${rinfo.port}`,
+					)
+				}
+			} catch {}
+
 			// Composing debug string
 			sProcessInboundLog = `peerHost:${this._peerHost}:${this._peerPort}`
 			sProcessInboundLog += ` srcAddress:${rinfo?.address}:${rinfo?.port}`
@@ -2896,12 +2939,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this._numFailedTelegramACK = 0
 						this.clearToSend = true
 						this.emit(KNXClientEvents.connected, this._options)
-						// For TunnelTCP, delay first heartbeat to avoid premature CONNSTATE right after connect
+						// For TunnelTCP, start the first heartbeat quickly to keep
+						// the tunnel alive on gateways with short idle timeouts.
 						try {
-							const delayMs =
-								1000 *
-								(this._options.connectionKeepAliveTimeout ||
-									KNX_CONSTANTS.CONNECTION_ALIVE_TIME)
+							const keep =
+								this._options.connectionKeepAliveTimeout ||
+								KNX_CONSTANTS.CONNECTION_ALIVE_TIME
+							// Schedule first heartbeat at ~keep/10 (min 2s, max 5s)
+							const delayMs = Math.max(
+								2000,
+								Math.min(5000, Math.floor((keep * 1000) / 10)),
+							)
 							this.setTimer(
 								KNXTimer.HEARTBEAT,
 								() => this.startHeartBeat(),
@@ -3718,8 +3766,26 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendConnectRequestMessage(cri: TunnelCRI) {
+		// For UDP tunnelling, explicitly advertise our control/data endpoint
+		// to improve compatibility with gateways that require a concrete HPAI.
+		let hpai: HPAI | undefined
+		try {
+			if (this._options.hostProtocol === 'TunnelUDP') {
+				const addr: any = this.udpSocket?.address?.()
+				const localPort =
+					addr && typeof addr.port === 'number'
+						? addr.port
+						: KNX_CONSTANTS.KNX_PORT
+				hpai = new HPAI(this._options.localIPAddress, localPort)
+			}
+		} catch {}
+
 		this.send(
-			KNXProtocol.newKNXConnectRequest(cri),
+			KNXProtocol.newKNXConnectRequest(
+				cri,
+				(hpai as any) || (HPAI as any).NULLHPAI,
+				(hpai as any) || (HPAI as any).NULLHPAI,
+			),
 			undefined,
 			true,
 			this.getSeqNumber(),
@@ -3737,7 +3803,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					addr && typeof addr.port === 'number'
 						? addr.port
 						: KNX_CONSTANTS.KNX_PORT
-				hpai = new HPAI(this._options.localIPAddress, localPort)
+				hpai = new HPAI(this._options.localIPAddress, localPort, KnxProtocol.IPV4_UDP)
+			} else if (this._options.hostProtocol === 'TunnelTCP') {
+				// For TCP, advertise protocol TCP with 0.0.0.0:0 as per spec
+				hpai = new HPAI('0.0.0.0', 0, KnxProtocol.IPV4_TCP)
 			}
 		} catch {}
 
