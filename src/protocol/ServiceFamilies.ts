@@ -35,17 +35,17 @@ export default class ServiceFamilies {
 			)
 		}
 		offset++
-        const type: number = buffer.readUInt8(offset++)
-        // Accept both standard and secured service families (0x02 and 0x06)
-        if (
-            type !== KNX_CONSTANTS.SUPP_SVC_FAMILIES &&
-            type !== KNX_CONSTANTS.SECURED_SERVICE_FAMILIES
-        ) {
-            throw new Error(`Invalid Service Family type ${type}`)
-        }
-        const serviceFamily: ServiceFamilies = new ServiceFamilies()
-        // preserve actual DIB type (02 = SUPP_SVC_FAMILIES, 06 = SECURED_SERVICE_FAMILIES)
-        ;(serviceFamily as any)._type = type
+		const type: number = buffer.readUInt8(offset++)
+		// Accept both standard and secured service families (0x02 and 0x06)
+		if (
+			type !== KNX_CONSTANTS.SUPP_SVC_FAMILIES &&
+			type !== KNX_CONSTANTS.SECURED_SERVICE_FAMILIES
+		) {
+			throw new Error(`Invalid Service Family type ${type}`)
+		}
+		const serviceFamily: ServiceFamilies = new ServiceFamilies()
+		// preserve actual DIB type (02 = SUPP_SVC_FAMILIES, 06 = SECURED_SERVICE_FAMILIES)
+		;(serviceFamily as any)._type = type
 		for (let i = 2; i < structureLength; i += 2) {
 			serviceFamily.set(
 				buffer.readUInt8(offset),

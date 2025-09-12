@@ -1511,7 +1511,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			eth = undefined
 		}
 
-
 		const baseKey = (host: string, sr: KNXSearchResponse) =>
 			`${host}:${sr.deviceInfo?.name.replace(/:/g, ' ') ?? ''}:${
 				sr.deviceInfo?.formattedAddress ?? ''
@@ -1525,7 +1524,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		) => {
 			// Base entry (tunnelling-capable device appears here as well)
 			const base = baseKey(hostKey, sr)
-			collector.set(base, (collector.get(base) || false) || isSecure)
+			collector.set(base, collector.get(base) || false || isSecure)
 			// If routing is supported, add a synthetic routing entry pointing to KNX multicast
 			try {
 				const families = sr?.serviceFamilies?.services
@@ -1533,7 +1532,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					// Ensure routing entries include the default KNX port (3671)
 					const routingHost = `${KNX_CONSTANTS.KNX_IP}:${KNX_CONSTANTS.KNX_PORT}`
 					const baseR = baseKey(routingHost, sr)
-					collector.set(baseR, (collector.get(baseR) || false) || isSecure)
+					collector.set(
+						baseR,
+						collector.get(baseR) || false || isSecure,
+					)
 				}
 			} catch {}
 		}
@@ -1551,18 +1553,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					hostProtocol: proto,
 				})
 				try {
-            client.on(
-                KNXClientEvents.discover,
-                (host, header, searchResponse) => {
-                    addResultsFromSearch(
-                        host,
-                        searchResponse,
-                        results,
-                        header?.service_type === KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED &&
-                            !!(searchResponse as any)?.securedServiceFamilies,
-                    )
-                },
-            )
+					client.on(
+						KNXClientEvents.discover,
+						(host, header, searchResponse) => {
+							addResultsFromSearch(
+								host,
+								searchResponse,
+								results,
+								header?.service_type ===
+									KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED &&
+									!!(searchResponse as any)
+										?.securedServiceFamilies,
+							)
+						},
+					)
 					client.startDiscovery()
 					await wait(timeout)
 				} finally {
@@ -1590,15 +1594,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						interface: name,
 						hostProtocol: proto,
 					})
-                    c.on(KNXClientEvents.discover, (host, header, sr) => {
-                        addResultsFromSearch(
-                            host,
-                            sr,
-                            results,
-                            header?.service_type === KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED &&
-                                !!(sr as any)?.securedServiceFamilies,
-                        )
-                    })
+					c.on(KNXClientEvents.discover, (host, header, sr) => {
+						addResultsFromSearch(
+							host,
+							sr,
+							results,
+							header?.service_type ===
+								KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED &&
+								!!(sr as any)?.securedServiceFamilies,
+						)
+					})
 					clients.push(c)
 				}
 			}
@@ -2320,17 +2325,26 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 			if (
 				knxHeader.service_type === KNX_CONSTANTS.SEARCH_RESPONSE ||
-				knxHeader.service_type === KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED
+				knxHeader.service_type ===
+					KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED
 			) {
 				if (!this.isDiscoveryRunning()) return
 				// After receiving a plain SEARCH_RESPONSE, also try a unicast SECURE_SEARCH_REQUEST
 				// to the responding host to increase chances of detecting Secure KNX capability.
 				try {
-					if (knxHeader.service_type === KNX_CONSTANTS.SEARCH_RESPONSE) {
+					if (
+						knxHeader.service_type === KNX_CONSTANTS.SEARCH_RESPONSE
+					) {
 						const key = `${rinfo.address}:${KNX_CONSTANTS.KNX_PORT}`
-						if (!this._secureSearchProbed.has(key) && this.udpSocket) {
+						if (
+							!this._secureSearchProbed.has(key) &&
+							this.udpSocket
+						) {
 							this._secureSearchProbed.add(key)
-							this.sendSecureSearchRequestTo(rinfo.address, KNX_CONSTANTS.KNX_PORT)
+							this.sendSecureSearchRequestTo(
+								rinfo.address,
+								KNX_CONSTANTS.KNX_PORT,
+							)
 						}
 					}
 				} catch {}
@@ -3678,10 +3692,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private sendSecureSearchRequestTo(host: string, port: number) {
 		try {
 			const addr: any = this.udpSocket?.address?.()
-			const localPort = addr && typeof addr.port === 'number' ? addr.port : KNX_CONSTANTS.KNX_PORT
-			const frame = KNXProtocol
-				.newKNXSecureSearchRequest(new HPAI(this._options.localIPAddress, localPort))
-				.toBuffer()
+			const localPort =
+				addr && typeof addr.port === 'number'
+					? addr.port
+					: KNX_CONSTANTS.KNX_PORT
+			const frame = KNXProtocol.newKNXSecureSearchRequest(
+				new HPAI(this._options.localIPAddress, localPort),
+			).toBuffer()
 			this.udpSocket?.send(frame, port, host, (error) => {
 				if (error) {
 					this.sysLogger.error(

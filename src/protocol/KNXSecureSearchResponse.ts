@@ -8,8 +8,11 @@ import ServiceFamilies from './ServiceFamilies'
 // but map it to the extended search response semantics.
 export default class KNXSecureSearchResponse extends KNXPacket {
 	hpai: HPAI
+
 	deviceInfo?: DeviceInfo
+
 	serviceFamilies?: ServiceFamilies
+
 	securedServiceFamilies?: ServiceFamilies
 
 	constructor(
@@ -55,7 +58,10 @@ export default class KNXSecureSearchResponse extends KNXPacket {
 					offset += families.length
 					break
 				case KNX_CONSTANTS.SECURED_SERVICE_FAMILIES:
-					secFamilies = ServiceFamilies.createFromBuffer(buffer, offset)
+					secFamilies = ServiceFamilies.createFromBuffer(
+						buffer,
+						offset,
+					)
 					offset += secFamilies.length
 					break
 				default:
@@ -63,7 +69,12 @@ export default class KNXSecureSearchResponse extends KNXPacket {
 			}
 		}
 
-		return new KNXSecureSearchResponse(hpai, deviceInfo, families, secFamilies)
+		return new KNXSecureSearchResponse(
+			hpai,
+			deviceInfo,
+			families,
+			secFamilies,
+		)
 	}
 
 	toBuffer(): Buffer {

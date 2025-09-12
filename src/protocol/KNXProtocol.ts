@@ -51,9 +51,9 @@ export default class KNXProtocol {
 			case KNX_CONSTANTS.SEARCH_RESPONSE:
 				knxMessage = KNXSearchResponse.createFromBuffer(knxData)
 				break
-            case KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED:
-                knxMessage = KNXSecureSearchResponse.createFromBuffer(knxData)
-                break
+			case KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED:
+				knxMessage = KNXSecureSearchResponse.createFromBuffer(knxData)
+				break
 			case KNX_CONSTANTS.DESCRIPTION_REQUEST:
 				knxMessage = KNXDescriptionRequest.createFromBuffer(knxData)
 				break
@@ -98,10 +98,10 @@ export default class KNXProtocol {
 		return new KNXSearchRequest(hpai)
 	}
 
-    static newKNXSecureSearchRequest(hpai: HPAI) {
-        // This is actually Search Request Extended (0x020B)
-        return new KNXSecureSearchRequest(hpai)
-    }
+	static newKNXSecureSearchRequest(hpai: HPAI) {
+		// This is actually Search Request Extended (0x020B)
+		return new KNXSecureSearchRequest(hpai)
+	}
 
 	static newKNXDescriptionRequest(hpai: HPAI) {
 		return new KNXDescriptionRequest(hpai)
