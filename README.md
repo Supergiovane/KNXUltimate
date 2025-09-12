@@ -196,6 +196,15 @@ Examples overview:
   - Requires: set `.knxkeys` path + password in the example file.
   - Run: `npm run example:secure:multicast` or `node -r esbuild-register -e "require('./examples/sampleSecureMulticast.ts')"`
 
+### Discovery details
+
+- Functions: `KNXClient.discover()`, `KNXClient.discoverDetailed()`, `KNXClient.discoverInterfaces()`.
+- Default port: if a KNX interface does not advertise a port in the `SEARCH_RESPONSE` HPAI (missing or zero), discovery uses `3671` as the port.
+- Return formats:
+- `discover()` → strings formatted as `ip:port:name:ia:Security`, where `Security` is `Secure KNX` if the device replies to Secure Search, otherwise `Plain KNX`.
+  - `discoverDetailed()` → strings formatted as `ip:port:name:ia:services:type`.
+  - `discoverInterfaces()` → array of objects `{ ip, port, name, ia, services, type }`.
+
 ### Source Individual Address (IA): UDP vs TCP
 
 - TunnelUDP: uses `physAddr` as the source IA on the bus. It does not replace it with the tunnel-assigned IA returned in `CONNECT_RESPONSE`.

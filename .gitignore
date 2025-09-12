@@ -346,3 +346,5 @@ build
 
 /.nyc_output/
 
+# Ignore all PDF files
+*.[Pp][Dd][Ff]
