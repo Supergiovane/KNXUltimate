@@ -8,6 +8,7 @@ import MockKNXServer from 'test/utils/MockKNXServer'
 import { networkInterfaces } from 'node:os'
 
 process.env.CI = process.env.CI || '1'
+process.env.KNX_USE_FAKE_IFACE = process.env.KNX_USE_FAKE_IFACE || '1'
 process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'warn'
 
 const ciIP = '192.168.1.58'
