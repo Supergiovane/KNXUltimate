@@ -8,8 +8,8 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 	const candidateInterfaces: { [key: string]: NetworkInterfaceInfo } = {}
 	let interfaces: Record<string, NetworkInterfaceInfo[]>
 
-	// In CI, avoid touching real OS network and provide a deterministic interface
-	if (process.env.CI) {
+	// In CI (only when explicitly enabled), avoid touching real OS network and provide a deterministic interface
+	if (process.env.CI && process.env.KNX_USE_FAKE_IFACE) {
 		interfaces = {
 			eth0: [
 				{

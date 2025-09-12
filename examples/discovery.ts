@@ -1,10 +1,15 @@
-import { KNXClient, KNXClientEvents } from "../src";
+import { KNXClient } from '../src'
 
 async function main() {
-    const discovered = await KNXClient.discover();
+  // Optional args: iface and timeout
+  const ifaceArg = process.argv[2]
+  const timeout = Number(process.argv[3] || 5000)
 
-    console.log(discovered);
-
+  const list = await KNXClient.discover(
+    ifaceArg ? (ifaceArg as any) : undefined,
+    timeout,
+  )
+  console.log(list)
 }
 
-main().catch(console.error);
+main().catch(console.error)

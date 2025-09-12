@@ -81,6 +81,15 @@ import {
 	DEFAULT_KNXKEYS_PASSWORD,
 } from './secure/secure_knx_constants'
 
+export type DiscoveryInterface = {
+	ip: string
+	port: number
+	name: string
+	ia: string
+	services: string[]
+	type: 'tunnelling' | 'routing'
+}
+
 // Secure config moved here to avoid dependency on separate class file
 export interface SecureConfig {
 	tunnelInterfaceIndividualAddress?: string
@@ -465,6 +474,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 				() => {
 					try {
+						// For multicast SEARCH_REQUEST sending, ensure correct iface and TTL
+						try {
+							this.udpSocket.setMulticastInterface(
+								this._options.localIPAddress,
+							)
+							this.udpSocket.setMulticastTTL(5)
+						} catch {}
 						this.udpSocket.setTTL(5)
 						if (this._options.localSocketAddress === undefined) {
 							this._options.localSocketAddress =
@@ -1462,7 +1478,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			() => {},
 			1000 * KNX_CONSTANTS.SEARCH_TIMEOUT,
 		)
+		// Send bursts to increase chances across stacks/NICs
 		this.sendSearchRequestMessage()
+		setTimeout(() => {
+			try {
+				this.sendSearchRequestMessage()
+			} catch {}
+		}, 300)
+		setTimeout(() => {
+			try {
+				this.sendSearchRequestMessage()
+			} catch {}
+		}, 900)
 	}
 
 	/**
@@ -1481,25 +1508,312 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			eth = undefined
 		}
 
-		const client = new KNXClient({
-			interface: eth as string,
-			hostProtocol: 'Multicast',
-		})
+		const toEntry = (host: string, sr: KNXSearchResponse) =>
+			`${host}:${sr.deviceInfo?.name.replace(/:/g, ' ') ?? ''}:${
+				sr.deviceInfo?.formattedAddress ?? ''
+			}`
 
-		const discovered: string[] = []
+		const addResultsFromSearch = (
+			hostKey: string,
+			sr: KNXSearchResponse,
+			collector: Set<string>,
+		) => {
+			// Base entry (tunnelling-capable device appears here as well)
+			collector.add(toEntry(hostKey, sr))
+			// If routing is supported, add a synthetic routing entry pointing to KNX multicast
+			try {
+				const families = sr?.serviceFamilies?.services
+				if (families && families.has(0x05)) {
+					const routingKey = `${KNX_CONSTANTS.KNX_IP}:${
+						sr.deviceInfo?.name.replace(/:/g, ' ') ?? ''
+					}:${sr.deviceInfo?.formattedAddress ?? ''}`
 
-		client.on(KNXClientEvents.discover, (host, header, searchResponse) => {
-			discovered.push(
-				`${host}:${searchResponse.deviceInfo?.name.replace(/:/g, ' ') ?? ''}:${searchResponse.deviceInfo?.formattedAddress ?? ''}`,
-			)
-		})
+					collector.add(routingKey)
+				}
+			} catch {}
+		}
 
-		client.startDiscovery()
+		const results = new Set<string>()
 
-		await wait(timeout)
-		await client.Disconnect()
+		// If a specific interface is provided, use a single client
+		if (eth && typeof eth === 'string') {
+			for (const proto of [
+				'Multicast',
+				'TunnelUDP',
+			] as KNXClientProtocol[]) {
+				const client = new KNXClient({
+					interface: eth,
+					hostProtocol: proto,
+				})
+				try {
+					client.on(
+						KNXClientEvents.discover,
+						(host, _header, searchResponse) => {
+							addResultsFromSearch(host, searchResponse, results)
+						},
+					)
+					client.startDiscovery()
+					await wait(timeout)
+				} finally {
+					await client.Disconnect()
+				}
+				if (results.size > 0) break
+			}
+			return Array.from(results)
+		}
 
-		return discovered
+		// Otherwise, try all IPv4 interfaces in parallel to maximize coverage
+		const candidates = Object.keys(ipAddressHelper.getIPv4Interfaces())
+		if (candidates.length === 0) return []
+
+		const clients: KNXClient[] = []
+		try {
+			for (const name of candidates) {
+				for (const proto of [
+					'Multicast',
+					'TunnelUDP',
+				] as KNXClientProtocol[]) {
+					const c = new KNXClient({
+						interface: name,
+						hostProtocol: proto,
+					})
+					c.on(KNXClientEvents.discover, (host, _header, sr) => {
+						addResultsFromSearch(host, sr, results)
+					})
+					clients.push(c)
+				}
+			}
+			// Start discovery on all
+			clients.forEach((c) => {
+				try {
+					c.startDiscovery()
+				} catch {}
+			})
+			await wait(timeout)
+		} finally {
+			await Promise.allSettled(clients.map((c) => c.Disconnect()))
+		}
+
+		return Array.from(results)
+	}
+
+	// New: detailed discovery returning enriched strings
+	// Format: ip:port:name:ia:services:type
+	public static async discoverDetailed(
+		eth?: string | number,
+		timeout = 5000,
+	): Promise<string[]> {
+		if (typeof eth === 'number') {
+			timeout = eth
+			eth = undefined
+		}
+
+		const servicesToString = (sr: KNXSearchResponse) => {
+			const fam = sr?.serviceFamilies?.services
+			if (!fam) return ''
+			const names: string[] = []
+			for (const id of fam.keys()) {
+				switch (id) {
+					case 0x05:
+						names.push('routing')
+						break
+					case 0x04:
+						names.push('tunnelling')
+						break
+					case 0x03:
+						names.push('device_mgmt')
+						break
+					case 0x06:
+						names.push('remlog')
+						break
+					case 0x07:
+						names.push('remconf')
+						break
+					case 0x08:
+						names.push('objsvr')
+						break
+					default:
+						names.push(`0x${id.toString(16)}`)
+				}
+			}
+			return names.join(',')
+		}
+
+		const detailed: Set<string> = new Set()
+
+		const pushDetailed = (
+			ip: string,
+			port: number,
+			sr: KNXSearchResponse,
+			type: 'tunnelling' | 'routing',
+		) => {
+			const name = sr.deviceInfo?.name?.replace(/:/g, ' ') || ''
+			const ia = sr.deviceInfo?.formattedAddress || ''
+			const svc = servicesToString(sr)
+			detailed.add(`${ip}:${port}:${name}:${ia}:${svc}:${type}`)
+		}
+
+		const handleSearch = (hostKey: string, sr: KNXSearchResponse) => {
+			try {
+				const [ip, p] = hostKey.split(':')
+				const port = parseInt(p || '3671', 10)
+				pushDetailed(ip, port, sr, 'tunnelling')
+				const fam = sr?.serviceFamilies?.services
+				if (fam && fam.has(0x05)) {
+					pushDetailed(
+						KNX_CONSTANTS.KNX_IP,
+						KNX_CONSTANTS.KNX_PORT,
+						sr,
+						'routing',
+					)
+				}
+			} catch {}
+		}
+
+		const runOnInterface = async (iface: string) => {
+			for (const proto of [
+				'Multicast',
+				'TunnelUDP',
+			] as KNXClientProtocol[]) {
+				const c = new KNXClient({
+					interface: iface,
+					hostProtocol: proto,
+				})
+				try {
+					c.on(KNXClientEvents.discover, (host, _h, sr) =>
+						handleSearch(host, sr),
+					)
+					c.startDiscovery()
+					await wait(timeout)
+				} finally {
+					await c.Disconnect()
+				}
+				if (detailed.size > 0) break
+			}
+		}
+
+		if (eth && typeof eth === 'string') {
+			await runOnInterface(eth)
+			return Array.from(detailed)
+		}
+
+		const candidates = Object.keys(ipAddressHelper.getIPv4Interfaces())
+		for (const name of candidates) {
+			await runOnInterface(name)
+		}
+		return Array.from(detailed)
+	}
+
+	public static async discoverInterfaces(
+		eth?: string | number,
+		timeout = 5000,
+	): Promise<DiscoveryInterface[]> {
+		if (typeof eth === 'number') {
+			timeout = eth
+			eth = undefined
+		}
+
+		const toList = (sr: KNXSearchResponse): string[] => {
+			const fam = sr?.serviceFamilies?.services
+			const names: string[] = []
+			if (fam) {
+				for (const id of fam.keys()) {
+					switch (id) {
+						case 0x05:
+							names.push('routing')
+							break
+						case 0x04:
+							names.push('tunnelling')
+							break
+						case 0x03:
+							names.push('device_mgmt')
+							break
+						case 0x06:
+							names.push('remlog')
+							break
+						case 0x07:
+							names.push('remconf')
+							break
+						case 0x08:
+							names.push('objsvr')
+							break
+						default:
+							names.push(`0x${id.toString(16)}`)
+					}
+				}
+			}
+			return names
+		}
+
+		const out = new Map<string, DiscoveryInterface>()
+
+		const push = (
+			ip: string,
+			port: number,
+			sr: KNXSearchResponse,
+			type: 'tunnelling' | 'routing',
+		) => {
+			const key = `${ip}:${port}:${type}`
+			if (out.has(key)) return
+			out.set(key, {
+				ip,
+				port,
+				name: sr.deviceInfo?.name?.replace(/:/g, ' ') || '',
+				ia: sr.deviceInfo?.formattedAddress || '',
+				services: toList(sr),
+				type,
+			})
+		}
+
+		const handleSearch = (hostKey: string, sr: KNXSearchResponse) => {
+			try {
+				const [ip, p] = hostKey.split(':')
+				const port = parseInt(p || '3671', 10)
+				push(ip, port, sr, 'tunnelling')
+				const fam = sr?.serviceFamilies?.services
+				if (fam && fam.has(0x05)) {
+					push(
+						KNX_CONSTANTS.KNX_IP,
+						KNX_CONSTANTS.KNX_PORT,
+						sr,
+						'routing',
+					)
+				}
+			} catch {}
+		}
+
+		const runOnInterface = async (iface: string) => {
+			for (const proto of [
+				'Multicast',
+				'TunnelUDP',
+			] as KNXClientProtocol[]) {
+				const c = new KNXClient({
+					interface: iface,
+					hostProtocol: proto,
+				})
+				try {
+					c.on(KNXClientEvents.discover, (host, _h, sr) =>
+						handleSearch(host, sr),
+					)
+					c.startDiscovery()
+					await wait(timeout)
+				} finally {
+					await c.Disconnect()
+				}
+				if (out.size > 0) break
+			}
+		}
+
+		if (eth && typeof eth === 'string') {
+			await runOnInterface(eth)
+			return Array.from(out.values())
+		}
+
+		const candidates = Object.keys(ipAddressHelper.getIPv4Interfaces())
+		for (const name of candidates) {
+			await runOnInterface(name)
+		}
+		return Array.from(out.values())
 	}
 
 	/**
@@ -3274,15 +3588,23 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendSearchRequestMessage() {
+		// For discovery, the HPAI in SEARCH_REQUEST must contain the local
+		// control endpoint (IP + local UDP port) to receive unicast responses.
+		let localPort = 0
+		try {
+			const addr: any = this.udpSocket?.address?.()
+			if (addr && typeof addr.port === 'number') localPort = addr.port
+		} catch {}
 		this.send(
 			KNXProtocol.newKNXSearchRequest(
-				new HPAI(this._options.localIPAddress, this._peerPort),
+				new HPAI(
+					this._options.localIPAddress,
+					localPort || KNX_CONSTANTS.KNX_PORT,
+				),
 			),
 			undefined,
 			false,
 			this.getSeqNumber(),
-			// KNX_CONSTANTS.KNX_PORT,
-			// KNX_CONSTANTS.KNX_IP,
 		)
 	}
 
