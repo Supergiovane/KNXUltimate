@@ -27,7 +27,7 @@
     "release:major": "npm run release -- major",
     "newbetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it major --preRelease=beta",
     "consecutivebetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it --preRelease",
-    "clean": "node -e \"const fs=require('fs'); if(fs.existsSync('build')) fs.rmSync('build',{recursive:true,force:true});\""
+    "clean": "node -e \"const fs=require('fs'), path=require('path'), dir='build'; if(!fs.existsSync(dir)){ fs.mkdirSync(dir,{recursive:true}); } else { for (const e of fs.readdirSync(dir)) fs.rmSync(path.join(dir,e),{recursive:true,force:true}); }\""
   },
   "release-it": {
     "github": {
