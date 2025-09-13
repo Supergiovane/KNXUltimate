@@ -12,22 +12,22 @@
     "url": "git+https://github.com/Supergiovane/KNXUltimate.git"
   },
   "scripts": {
-    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "build": "npm run clean && node -e \"setTimeout(()=>{},5000)\" && tsc -p tsconfig.build.json",
     "example:secure:multicast": "node -r esbuild-register -e \"require('./examples/sampleSecureMulticast.ts')\"",
     "example:secure:tunnel": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCP.ts')\"",
+    "realsamples": "node scripts/realsamples.js",
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",
-    "test": "node -r esbuild-register --test --test-reporter tap test/**/*.test.ts | sed -e '/failing tests/d' -e '/^# fail /d' || true",
-    "test:coverage": "nyc npm run test || true",
+    "test": "node -r esbuild-register --test --test-reporter tap test/unit/*.test.ts",
+    "test:integration": "node -r esbuild-register --test --test-reporter tap test/integration/**/*.test.ts",
+    "test:coverage": "nyc npm run test",
     "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it",
     "release:patch": "npm run release -- patch",
     "release:minor": "npm run release -- minor",
     "release:major": "npm run release -- major",
     "newbetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it major --preRelease=beta",
     "consecutivebetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it --preRelease",
-    "clean": "node -e \"const fs=require('fs'); if(fs.existsSync('build')) fs.rmSync('build',{recursive:true,force:true});\"",
-    "secure:data": "npm --prefix Codex/nodejs run secure:data",
-    "secure:data:e2e": "npm --prefix Codex/nodejs run secure:data:e2e"
+    "clean": "node -e \"const fs=require('fs'); if(fs.existsSync('build')) fs.rmSync('build',{recursive:true,force:true});\""
   },
   "release-it": {
     "github": {

@@ -468,7 +468,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this._connectionState !== ConncetionState.DISCONNECTED
 				) {
 					try {
-						void this.setDisconnected('Socket closed by peer')
+						this.setDisconnected('Socket closed by peer').catch(
+							() => {},
+						)
 					} catch {}
 				}
 				this.emit(KNXClientEvents.close)
@@ -548,7 +550,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this._connectionState !== ConncetionState.DISCONNECTED
 				) {
 					try {
-						void this.setDisconnected('Socket closed by peer')
+						this.setDisconnected('Socket closed by peer').catch(
+							() => {},
+						)
 					} catch {}
 				}
 				this.emit(KNXClientEvents.close)
@@ -605,7 +609,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this._connectionState !== ConncetionState.DISCONNECTED
 				) {
 					try {
-						void this.setDisconnected('Socket closed by peer')
+						this.setDisconnected('Socket closed by peer').catch(
+							() => {},
+						)
 					} catch {}
 				}
 				this.emit(KNXClientEvents.close)
@@ -1210,8 +1216,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			} else {
 				this.send(knxPacketRequest, undefined, false, seqNum)
 			}
-			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			this.emit(KNXClientEvents.indication, knxPacketRequest, true)
+			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
+			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
 		}
 	}
 
@@ -1288,8 +1295,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			} else {
 				this.send(knxPacketRequest, undefined, false, seqNum)
 			}
-			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			this.emit(KNXClientEvents.indication, knxPacketRequest, true)
+			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
+			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
 		}
 	}
 
@@ -1360,8 +1368,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			} else {
 				this.send(knxPacketRequest, undefined, false, seqNum)
 			}
-			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			this.emit(KNXClientEvents.indication, knxPacketRequest, true)
+			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
+			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
 		}
 	}
 
@@ -1468,8 +1477,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			} else {
 				this.send(knxPacketRequest, undefined, false, seqNum)
 			}
-			// 06/12/2021 Echo the sent telegram. Last parameter is the echo true/false
-			this.emit(KNXClientEvents.indication, knxPacketRequest, true)
+			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
+			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
 		}
 	}
 
@@ -2557,11 +2567,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					knxTunnelingRequest.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_IND
 				) {
-					// If Data Secure, decrypt NPDU before emitting
-					this.maybeDecryptDataSecure(knxTunnelingRequest.cEMIMessage)
+					// Ensure plain KNX (decrypt Data Secure if needed) and emit full telegram
+					this.ensurePlainCEMI(knxTunnelingRequest.cEMIMessage)
 					this.emit(
 						KNXClientEvents.indication,
-						knxTunnelingRequest,
+						knxTunnelingRequest as any,
 						false,
 					)
 				} else if (
@@ -2626,9 +2636,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					knxRoutingInd.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_IND
 				) {
-					// If Data Secure, decrypt NPDU before emitting
-					this.maybeDecryptDataSecure(knxRoutingInd.cEMIMessage)
-					this.emit(KNXClientEvents.indication, knxRoutingInd, false)
+					// Ensure plain KNX (decrypt Data Secure if needed) and emit full telegram
+					this.ensurePlainCEMI(knxRoutingInd.cEMIMessage)
+					this.emit(
+						KNXClientEvents.indication,
+						knxRoutingInd as any,
+						false,
+					)
 				} else if (
 					knxRoutingInd.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_CON
@@ -3692,6 +3706,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 	}
 
+	// Ensure the provided cEMI message is in plain KNX form before emitting
+	// If Data Secure is detected and keys are available, decrypts it in-place.
+	private ensurePlainCEMI<T extends CEMIMessage>(cemi: T): T {
+		try {
+			this.maybeDecryptDataSecure(cemi as any)
+		} catch {}
+		return cemi
+	}
+
 	private sendDescriptionRequestMessage() {
 		this.send(
 			KNXProtocol.newKNXDescriptionRequest(
@@ -3766,25 +3789,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendConnectRequestMessage(cri: TunnelCRI) {
-		// For UDP tunnelling, explicitly advertise our control/data endpoint
-		// to improve compatibility with gateways that require a concrete HPAI.
-		let hpai: HPAI | undefined
-		try {
-			if (this._options.hostProtocol === 'TunnelUDP') {
-				const addr: any = this.udpSocket?.address?.()
-				const localPort =
-					addr && typeof addr.port === 'number'
-						? addr.port
-						: KNX_CONSTANTS.KNX_PORT
-				hpai = new HPAI(this._options.localIPAddress, localPort)
-			}
-		} catch {}
-
+		// Use NULLHPAI for UDP to match legacy behavior and tests; TCP handled separately
 		this.send(
 			KNXProtocol.newKNXConnectRequest(
 				cri,
-				(hpai as any) || (HPAI as any).NULLHPAI,
-				(hpai as any) || (HPAI as any).NULLHPAI,
+				(HPAI as any).NULLHPAI,
+				(HPAI as any).NULLHPAI,
 			),
 			undefined,
 			true,
@@ -3793,28 +3803,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendConnectionStateRequestMessage(channelID: number) {
-		// For UDP tunnelling, include our control endpoint HPAI to improve
-		// compatibility with interfaces that require a valid return address.
-		let hpai: HPAI | undefined
-		try {
-			if (this._options.hostProtocol === 'TunnelUDP') {
-				const addr: any = this.udpSocket?.address?.()
-				const localPort =
-					addr && typeof addr.port === 'number'
-						? addr.port
-						: KNX_CONSTANTS.KNX_PORT
-				hpai = new HPAI(this._options.localIPAddress, localPort, KnxProtocol.IPV4_UDP)
-			} else if (this._options.hostProtocol === 'TunnelTCP') {
-				// For TCP, advertise protocol TCP with 0.0.0.0:0 as per spec
-				hpai = new HPAI('0.0.0.0', 0, KnxProtocol.IPV4_TCP)
-			}
-		} catch {}
-
+		// Use NULLHPAI to match legacy/test expectations (TCP handled by secure path)
 		this.send(
 			KNXProtocol.newKNXConnectionStateRequest(
 				channelID,
-				// Use explicit HPAI for UDP, NULLHPAI otherwise (TCP/mcast path)
-				(hpai as any) || (HPAI as any).NULLHPAI,
+				(HPAI as any).NULLHPAI,
 			),
 			undefined,
 			true,

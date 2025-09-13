@@ -13,6 +13,8 @@ async function waitForStatus(
       reject(new Error('Timeout waiting for status'))
     }, timeoutMs)
 
+    // Note: packet.cEMIMessage is ensured to be plain (decrypted)
+    // if the telegram was Data Secure and keys are available.
     const onInd = (packet: any) => {
       try {
         const cemi = packet?.cEMIMessage
@@ -51,6 +53,8 @@ async function main() {
   client.on('disconnected', (reason) => console.log('Disconnected:', reason))
 
   // Example: decode incoming telegrams by datapoint, similar to simpleSample.ts
+  // Note: packet.cEMIMessage is ensured to be plain (decrypted)
+  // if the telegram was Data Secure and keys are available.
   client.on('indication', (packet: any) => {
     try {
       const cemi = packet?.cEMIMessage

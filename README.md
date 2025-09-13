@@ -36,10 +36,16 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 | --------------------- | -------------------------------------------------------------------- |
 | KNX Tunnelling (UDP)  | ![](https://placehold.co/200x20/green/white?text=YES)                |
 | KNX Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES)              |
-| KNX Secure Tunnelling (TCP) | ![](https://placehold.co/200x20/orange/white?text=YES+IN+THE+BETA+BELOW)         |
-| KNX Secure Routing (Multicast) | ![](https://placehold.co/200x20/orange/white?text=YES+IN+THE+BETA+BELOW)      |
+| KNX Secure Tunnelling (TCP) | ![](https://placehold.co/200x20/green/white?text=YES+IN+THE+BETA+BELOW)         |
+| KNX Secure Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES+IN+THE+BETA+BELOW)      |
 
-  Try the new 5.0.0-beta to test KNX SECURE https://www.npmjs.com/package/knxultimate/v/5.0.0-beta.1
+  Try the new 5.0.0-beta to test KNX SECURE
+
+  [![Install latest beta](https://img.shields.io/badge/%F0%9F%9B%A1%EF%B8%8F%20Install%20latest%20beta-knxultimate%405.0.0--beta-brightgreen)](https://www.npmjs.com/package/knxultimate?activeTab=versions)
+
+  ```bash
+  npm i knxultimate@5.0.0-beta
+  ```
 
 ## CONNECTION SETUP
 
@@ -138,6 +144,195 @@ logStream.on('data', (log) => {
 | timestamp                      | ISO formatted date (YYYY-MM-DD HH:mm:ss.SSS)                  |
 | level                          | Log level in uppercase (ERROR, WARN, INFO, DEBUG)             |
 | label                          | Module name in uppercase (specified when creating logger)      |
+
+## KNX/IP Secure: Quick Examples
+
+Below are progressively richer examples to connect to a KNX/IP Secure gateway and listen for telegrams with decrypted payloads. These are meant to be copy‑pasted inline (no files are added under `examples/`). All snippets assume TypeScript/Node 18+.
+
+Important notes
+- The client emits the full datagram on `indication`, and its `cEMIMessage` is already plain (decrypted) when keys are available in your ETS keyring.
+- Never commit your `.knxkeys` file. Keep its path/password in environment variables or local config.
+
+### 1) Minimal secure tunnelling (TCP) listener
+
+```ts
+import KNXClient, { SecureConfig } from 'knxultimate'
+
+// 1) Configure ETS keyring + the interface IA used in your project
+const secureCfg: SecureConfig = {
+  tunnelInterfaceIndividualAddress: '1.1.254',   // KNX/IP Secure interface IA
+  knxkeys_file_path: process.env.KNX_KEYS_PATH || '/path/to/Project.knxkeys',
+  knxkeys_password: process.env.KNX_KEYS_PASSWORD || 'your-ets-password',
+}
+
+// 2) Create a KNX/IP Secure TCP client
+const client = new KNXClient({
+  hostProtocol: 'TunnelTCP',
+  ipAddr: '192.168.1.4',
+  ipPort: 3671,
+  isSecureKNXEnabled: true,
+  secureTunnelConfig: secureCfg,
+  loglevel: 'info',
+})
+
+client.on('connected', () => console.log('✓ Secure tunnel connected'))
+client.on('error', (e) => console.error('Error:', e.message))
+client.on('disconnected', (reason) => console.log('Disconnected:', reason))
+
+// 3) Listen: cEMI payload is already decrypted when Data Secure is used
+client.on('indication', (packet) => {
+  const cemi = packet?.cEMIMessage
+  if (!cemi) return
+  const dst = cemi.dstAddress?.toString?.()
+  const src = cemi.srcAddress?.toString?.()
+  const isWrite = cemi.npdu?.isGroupWrite
+  const isResp = cemi.npdu?.isGroupResponse
+  const raw: Buffer | undefined = cemi.npdu?.dataValue
+  console.log('indication', { src, dst, isWrite, isResp, raw: raw?.toString('hex') })
+})
+
+async function main() {
+  client.Connect()
+  await new Promise<void>((res) => client.once('connected', () => res()))
+  console.log('Listening… Press Ctrl+C to exit')
+}
+
+main().catch(console.error)
+```
+
+### 2) Decode datapoints (boolean 1.001) from decrypted payloads
+
+```ts
+import KNXClient, { SecureConfig } from 'knxultimate'
+import { dptlib } from 'knxultimate'
+
+const secureCfg: SecureConfig = {
+  tunnelInterfaceIndividualAddress: '1.1.254',
+  knxkeys_file_path: process.env.KNX_KEYS_PATH || '/path/to/Project.knxkeys',
+  knxkeys_password: process.env.KNX_KEYS_PASSWORD || 'your-ets-password',
+}
+
+const client = new KNXClient({
+  hostProtocol: 'TunnelTCP',
+  ipAddr: '192.168.1.4',
+  ipPort: 3671,
+  isSecureKNXEnabled: true,
+  secureTunnelConfig: secureCfg,
+  loglevel: 'info',
+})
+
+client.on('indication', (packet) => {
+  const cemi = packet?.cEMIMessage
+  if (!cemi?.npdu) return
+  const dst = cemi.dstAddress?.toString?.()
+  const raw: Buffer | undefined = cemi.npdu?.dataValue
+  if (!dst || !raw) return
+
+  // Example: decode boolean status for GA 1/1/2 as DPT 1.001
+  if (dst === '1/1/2') {
+    const cfg = dptlib.resolve('1.001')
+    const value = dptlib.fromBuffer(raw, cfg)
+    console.log(`dst=${dst} ->`, value)
+  }
+})
+
+client.Connect()
+```
+
+### 3) Secure routing (multicast) listener
+
+For routers supporting KNX Secure routing (multicast 224.0.23.12). The ETS keyring must include the Backbone key; the client will automatically use it to decrypt SecureWrapper frames and present decrypted cEMI payloads.
+
+```ts
+import KNXClient, { SecureConfig } from 'knxultimate'
+
+const secureCfg: SecureConfig = {
+  knxkeys_file_path: process.env.KNX_KEYS_PATH || '/path/to/Project.knxkeys',
+  knxkeys_password: process.env.KNX_KEYS_PASSWORD || 'your-ets-password',
+}
+
+const client = new KNXClient({
+  hostProtocol: 'Multicast',
+  ipAddr: '224.0.23.12',
+  ipPort: 3671,
+  physAddr: '1.1.250',   // your device IA used as source on bus
+  isSecureKNXEnabled: true,
+  secureTunnelConfig: secureCfg,
+  loglevel: 'info',
+})
+
+client.on('connected', () => console.log('✓ Secure multicast ready'))
+client.on('error', (e) => console.error('Error:', e.message))
+client.on('indication', (packet) => {
+  const cemi = packet?.cEMIMessage
+  if (!cemi?.npdu) return
+  const dst = cemi.dstAddress?.toString?.()
+  const raw: Buffer | undefined = cemi.npdu?.dataValue
+  console.log('routing ind', { dst, raw: raw?.toString('hex') })
+})
+
+client.Connect()
+```
+
+### 4) Send a READ and get a decrypted status
+
+```ts
+import KNXClient, { SecureConfig } from 'knxultimate'
+import { dptlib } from 'knxultimate'
+
+const secureCfg: SecureConfig = {
+  tunnelInterfaceIndividualAddress: '1.1.254',
+  knxkeys_file_path: process.env.KNX_KEYS_PATH || '/path/to/Project.knxkeys',
+  knxkeys_password: process.env.KNX_KEYS_PASSWORD || 'your-ets-password',
+}
+
+const client = new KNXClient({
+  hostProtocol: 'TunnelTCP',
+  ipAddr: '192.168.1.4',
+  ipPort: 3671,
+  isSecureKNXEnabled: true,
+  secureTunnelConfig: secureCfg,
+})
+
+function waitForStatus(ga: string, timeoutMs = 5000): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      client.off('indication', onInd)
+      reject(new Error('Timeout waiting for status'))
+    }, timeoutMs)
+    const onInd = (packet: any) => {
+      const cemi = packet?.cEMIMessage
+      if (!cemi || cemi.dstAddress?.toString?.() !== ga) return
+      const npdu = cemi.npdu
+      const isResp = npdu?.isGroupResponse
+      const isWrite = npdu?.isGroupWrite
+      if (!(isResp || isWrite)) return
+      const raw: Buffer = npdu?.dataValue ?? Buffer.alloc(1, 0)
+      const bit = (raw.readUInt8(0) ?? 0) & 0x01
+      clearTimeout(t)
+      client.off('indication', onInd)
+      resolve(bit)
+    }
+    client.on('indication', onInd)
+  })
+}
+
+async function main() {
+  client.Connect()
+  await new Promise<void>((res) => client.once('connected', () => res()))
+  // Example: query a status GA and decode as boolean 1.001
+  const statusGA = '1/1/2'
+  client.read(statusGA)
+  const val = await waitForStatus(statusGA, 5000)
+  console.log(`Status on ${statusGA}:`, val ? 'ON' : 'OFF')
+}
+
+main().catch(console.error)
+```
+
+Tips
+- For tunnelling (TCP), the source IA is assigned by the gateway. For routing (multicast), set `physAddr` in options.
+- If you see decrypted payloads as null, verify that the GA has a Data Secure key in your `.knxkeys` and that the ETS keyring and password are correct.
 | message                        | Log message content                                           |
 | stack                          | Error stack trace (only present for errors)                   |
 

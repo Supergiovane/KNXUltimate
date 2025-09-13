@@ -40,7 +40,7 @@ async function main() {
 
   // Start and keep the connection open
   client.Connect()
-  await new Promise<void>((resolve) => client.once('connected', resolve))
+  await new Promise<void>((resolve) => client.once('connected', () => resolve()))
 
   console.log(
     `\n[${now()}] Connection is open and heartbeat is running. Press Ctrl+C to exit.`,
@@ -74,4 +74,3 @@ main().catch((e) => {
   console.error(`[${now()}] Fatal:`, e)
   process.exit(1)
 })
-

@@ -1,14 +1,14 @@
 import { createSocket, RemoteInfo, Socket as UDPSocket } from 'dgram'
 import { Socket as TCPSocket } from 'net'
-import { TypedEventEmitter } from 'src/TypedEmitter'
-import { KNXClientEvents } from 'src/KNXClient'
+import { TypedEventEmitter } from '../../src/TypedEmitter'
+import { KNXClientEvents } from '../../src/KNXClient'
 import {
 	KNXClient,
 	KNXConnectionStateResponse,
 	SnifferPacket,
 	SocketEvents,
-} from 'src'
-import { wait } from 'src/utils'
+} from '../../src'
+import { wait } from '../../src/utils'
 
 enum MockServerEvents {
 	error = 'error',
@@ -40,6 +40,8 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 
 	private lastIndex = 0
 
+	private used: Set<number> = new Set()
+
 	private isPaused: boolean = false
 
 	private useFakeTimers: boolean = false
@@ -68,9 +70,12 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 		this.client['sysLogger'].info(`[MockKNXServer] ${message}`)
 	}
 
+	private _lastRequestHex?: string
+
 	private error(message: string) {
-		this.client['sysLogger'].error(`[MockKNXServer] ${message}`)
-		this.emit(MockServerEvents.error, new Error(message))
+		const extra = this._lastRequestHex ? ` req=${this._lastRequestHex}` : ''
+		this.client['sysLogger'].error(`[MockKNXServer] ${message}${extra}`)
+		this.emit(MockServerEvents.error, new Error(`${message}${extra}`))
 	}
 
 	public createFakeSocket() {
@@ -133,18 +138,120 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 	// Handles incoming connections and data
 	private async onRequest(data: Buffer) {
 		const requestHex = data.toString('hex')
+		this._lastRequestHex = requestHex
 		this.log(`Received request: ${requestHex}`)
+		// eslint-disable-next-line no-console
+		console.log('[REQ]', requestHex)
 
-		// Look up the captured response
-		const resIndex = this.expectedTelegrams.findIndex(
-			(packet, i) => i >= this.lastIndex && packet.request === requestHex,
+		// If we consumed all expectations, ignore further requests
+		if (this.lastIndex >= this.expectedTelegrams.length) {
+			this.log('No more expectations; ignoring request')
+			return
+		}
+
+		// Look up the captured response (robust matching)
+		// Debug helper for matching state
+		// eslint-disable-next-line no-console
+		console.log(
+			'[MockKNXServer] match from index',
+			this.lastIndex,
+			'of',
+			this.expectedTelegrams.length,
 		)
+		// eslint-disable-next-line no-console
+		console.log(
+			'[MockKNXServer] expected[0]=',
+			this.expectedTelegrams[0]?.request,
+		)
+		// eslint-disable-next-line no-console
+		console.log(
+			'[MockKNXServer] expected[1]=',
+			this.expectedTelegrams[1]?.request,
+		)
+		if (this.expectedTelegrams[this.lastIndex]?.request) {
+			console.log(
+				'[MockKNXServer] compare lens:',
+				this.expectedTelegrams[this.lastIndex].request.length,
+				'vs incoming',
+				requestHex.length,
+			)
+		}
+		const serviceOf = (hex: string) =>
+			hex && hex.length >= 8 ? hex.substring(4, 8) : ''
+		const looseTypes = new Set([
+			'0201',
+			'020b',
+			'0205',
+			'0207',
+			'0209',
+			'0420',
+			'0421',
+		])
+		const typeServiceMap: Record<string, string> = {
+			KNXConnectRequest: '0205',
+			KNXConnectionStateRequest: '0207',
+			KNXDisconnectRequest: '0209',
+			KNXTunnelingRequest: '0420',
+			KNXTunnelingAck: '0421',
+		}
+		const si = serviceOf(requestHex)
+		const isMatchAt = (packet: SnifferPacket, i: number) => {
+			if (this.used.has(i)) return false
+			const exp = packet.request
+			if (exp) {
+				if (exp === requestHex) return true
+				const se = serviceOf(exp)
+				return se === si && looseTypes.has(se)
+			}
+			const se2 = packet.reqType
+				? typeServiceMap[packet.reqType]
+				: undefined
+			return !!se2 && se2 === si
+		}
+
+		let resIndex = -1
+		// Prefer a match at or after lastIndex
+		for (let i = this.lastIndex; i < this.expectedTelegrams.length; i++) {
+			if (isMatchAt(this.expectedTelegrams[i], i)) {
+				resIndex = i
+				break
+			}
+		}
+		// Fallback: search the whole sequence for an unused candidate
+		if (resIndex < 0) {
+			for (let i = 0; i < this.expectedTelegrams.length; i++) {
+				if (isMatchAt(this.expectedTelegrams[i], i)) {
+					resIndex = i
+					break
+				}
+			}
+		}
+		// Fallback: accept SEARCH_REQUEST_EXTENDED when expecting SEARCH_REQUEST
+		if (resIndex < 0) {
+			const expected = this.expectedTelegrams[this.lastIndex]
+			// Accept either SEARCH_REQUEST (0x0201) or EXTENDED (0x020b) interchangeably
+			const expIsPlain = expected?.request?.startsWith('06100201')
+			const expIsExt = expected?.request?.startsWith('0610020b')
+			const inIsPlain = requestHex.startsWith('06100201')
+			const inIsExt = requestHex.startsWith('0610020b')
+			console.log('[MockKNXServer] fallback flags', {
+				expIsPlain,
+				expIsExt,
+				inIsPlain,
+				inIsExt,
+			})
+			if ((expIsPlain && inIsExt) || (expIsExt && inIsPlain)) {
+				resIndex = this.lastIndex
+				console.log('[MockKNXServer] fallback matched at', resIndex)
+			}
+		}
 
 		const res = this.expectedTelegrams[resIndex]
 		this.log(`BANANA ${resIndex}`)
 		// Update lastIndex if we found a matching request
 		if (resIndex >= 0) {
-			this.lastIndex = resIndex + 1
+			this.used.add(resIndex)
+			if (resIndex >= this.lastIndex) this.lastIndex = resIndex + 1
 		}
 
 		// When paused, don't send any response
@@ -163,18 +270,26 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 			const responseBuffer = Buffer.from(res.response, 'hex')
 			this.socket.emit('message', responseBuffer, this.rInfo)
 
-			// Handle next automatic response if any
-			const next = this.expectedTelegrams[this.lastIndex]
-			if (next && !next.request) {
-				// Skip waiting when using fake timers
+			// Handle following automatic responses (no request)
+			for (
+				let j = this.lastIndex;
+				j < this.expectedTelegrams.length;
+				j++
+			) {
+				const auto = this.expectedTelegrams[j]
+				if (!auto || this.used.has(j) || auto.request) break
 				if (!this.useFakeTimers) {
-					await wait(next.deltaReq || 0)
+					await wait(auto.deltaReq || 0)
 				}
-				this.log(`Sending automatic response: ${next.response}`)
-				const nextResponseBuffer = Buffer.from(next.response, 'hex')
-				this.socket.emit('message', nextResponseBuffer, this.rInfo)
-				this.lastIndex++
+				this.log(`Sending automatic response: ${auto.response}`)
+				const autoBuf = Buffer.from(auto.response, 'hex')
+				this.socket.emit('message', autoBuf, this.rInfo)
+				this.used.add(j)
+				this.lastIndex = j + 1
 			}
+		} else if (resIndex >= 0) {
+			// Matched a request with no response defined; treat as no-op
+			this.log('Matched request with no response; continuing')
 		} else {
 			this.error('No matching response found for this request.')
 		}

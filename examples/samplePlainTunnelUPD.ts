@@ -12,6 +12,8 @@ async function waitForStatus(
       reject(new Error('Timeout waiting for status'))
     }, timeoutMs)
 
+    // Note: packet.cEMIMessage is ensured to be plain (decrypted)
+    // if the telegram was Data Secure and keys are available.
     const onInd = (packet: any) => {
       try {
         const cemi = packet?.cEMIMessage

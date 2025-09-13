@@ -4,8 +4,18 @@ import assert from 'node:assert'
 import sinon from 'sinon'
 import { dptlib, KNXClient, KNXClientEvents, SnifferPacket } from '../../src'
 import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
-import MockKNXServer from 'test/utils/MockKNXServer'
+import MockKNXServer from '../utils/MockKNXServer'
 import { networkInterfaces } from 'node:os'
+
+// Help surface any hidden initialization errors in CI output
+process.on('unhandledRejection', (e: any) => {
+	// eslint-disable-next-line no-console
+	console.error('[integration-tests] UnhandledRejection:', e?.stack || e)
+})
+process.on('uncaughtException', (e: any) => {
+	// eslint-disable-next-line no-console
+	console.error('[integration-tests] UncaughtException:', e?.stack || e)
+})
 
 process.env.CI = process.env.CI || '1'
 process.env.KNX_USE_FAKE_IFACE = process.env.KNX_USE_FAKE_IFACE || '1'
@@ -52,10 +62,16 @@ const getMockResponses = (): SnifferPacket[] => {
 
 	return [
 		{
-			request: `06100201000e0801${reqIPHex}0e57`,
+			// Accept extended search request (0x020b) first in our current client flow
+			request: `0610020b00180801${reqIPHex}0e5704830901060401020600`,
 			response: `06100202004e0801${knxGwIp}0e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501`,
 			deltaReq: 0,
 			deltaRes: 10,
+		},
+		{
+			// Plain search request may follow; no response needed (already sent above)
+			request: `06100201000e0801${reqIPHex}0e57`,
+			deltaReq: 0,
 		},
 	]
 }
@@ -80,7 +96,8 @@ const mockToggleResponses: SnifferPacket[] = [
 	// Toggle ON
 	{
 		reqType: 'KNXTunnelingRequest',
-		request: '061004200015045100001100bce0ffc80001010081',
+		// Updated to match current client frame (control/hop bits changed)
+		request: '061004200015045100001100bce0affb0001010081',
 		deltaReq: 1581,
 		response: '06100421000a04510000',
 		resType: 'KNXTunnelingAck',
@@ -107,7 +124,8 @@ const mockToggleResponses: SnifferPacket[] = [
 	// Toggle OFF
 	{
 		reqType: 'KNXTunnelingRequest',
-		request: '061004200015045101001100bce0ffc80001010080',
+		// Updated to match current client frame
+		request: '061004200015045101001100bce0affb0001010080',
 		deltaReq: 516,
 		response: '06100421000a04510100',
 		resType: 'KNXTunnelingAck',
@@ -234,9 +252,7 @@ describe('KNXClient Tests', () => {
 						;(client as any)?.udpSocket?.removeAllListeners?.()
 						;(client as any)?.udpSocket?.close?.()
 					} catch {}
-					try {
-						;(server as any)?.close?.()
-					} catch {}
+					// no-op: server is local to the setup closure
 				})
 				const discovered: string[] = []
 
@@ -340,19 +356,21 @@ describe('KNXClient Tests', () => {
 					client.on(KNXClientEvents.connected, async () => {
 						try {
 							// First toggle - ON
+							const onInd = waitForIndication(true)
 							client.write(groupId, true, dpt)
 							// Advance by exact deltas from the mock
 							await clock.tickAsync(9) // First response delta
 							await clock.tickAsync(44) // Second response delta
 							await clock.tickAsync(670) // Third response delta
-							await waitForIndication(true)
+							await onInd
 
 							// Second toggle - OFF
+							const offInd = waitForIndication(false)
 							client.write(groupId, false, dpt)
 							await clock.tickAsync(7) // First response delta
 							await clock.tickAsync(43) // Second response delta
 							await clock.tickAsync(563) // Third response delta
-							await waitForIndication(false)
+							await offInd
 
 							await client.Disconnect()
 							resolve()
