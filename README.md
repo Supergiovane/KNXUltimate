@@ -18,6 +18,11 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 
 <br/>
 
+```bash
+  npm i knxultimate
+```
+
+
 ![Logo](img/readmemain.png)
 
 
@@ -41,11 +46,10 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 
   Try the new 5.0.0-beta to test KNX SECURE
 
-  [![Install latest beta](https://img.shields.io/badge/%F0%9F%9B%A1%EF%B8%8F%20Install%20latest%20beta-knxultimate%405.0.0--beta-brightgreen)](https://www.npmjs.com/package/knxultimate?activeTab=versions)
-
   ```bash
   npm i knxultimate@5.0.0-beta
   ```
+
 Please subscribe to my channel, to learn how to use it [![Youtube][youtube-image]][youtube-url]  
 
  [![Donate via PayPal](https://raw.githubusercontent.com/Supergiovane/node-red-contrib-knx-ultimate/master/img/CodiceQR.png)](https://www.paypal.com/donate/?hosted_button_id=S8SKPUBSPK758)

@@ -19,7 +19,7 @@ async function main() {
     ipPort: 3671,
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,
-    loglevel: 'info',
+    loglevel: 'debug',
   })
 
   client.on('connecting', () =>

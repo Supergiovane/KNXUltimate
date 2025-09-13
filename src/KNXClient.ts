@@ -3803,12 +3803,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendConnectionStateRequestMessage(channelID: number) {
-		// Use NULLHPAI to match legacy/test expectations (TCP handled by secure path)
+		// For TunnelTCP, some gateways expect the control HPAI to indicate TCP (0x02).
+		// For UDP/Multicast keep legacy NULLHPAI (UDP 0x01).
+		const hpai =
+			this._options.hostProtocol === 'TunnelTCP'
+				? new HPAI('0.0.0.0', 0, KnxProtocol.IPV4_TCP)
+				: (HPAI as any).NULLHPAI
 		this.send(
-			KNXProtocol.newKNXConnectionStateRequest(
-				channelID,
-				(HPAI as any).NULLHPAI,
-			),
+			KNXProtocol.newKNXConnectionStateRequest(channelID, hpai),
 			undefined,
 			true,
 			this.getSeqNumber(),
@@ -3816,8 +3818,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendDisconnectRequestMessage(channelID: number) {
+		// Align HPAI with connection type: use TCP HPAI on TunnelTCP to avoid
+		// gateways rejecting the message; keep NULLHPAI for UDP.
+		const hpai =
+			this._options.hostProtocol === 'TunnelTCP'
+				? new HPAI('0.0.0.0', 0, KnxProtocol.IPV4_TCP)
+				: (HPAI as any).NULLHPAI
 		this.send(
-			KNXProtocol.newKNXDisconnectRequest(channelID),
+			KNXProtocol.newKNXDisconnectRequest(channelID, hpai),
 			undefined,
 			true,
 			this.getSeqNumber(),
