@@ -1,5 +1,12 @@
 
 
+# [5.0.0-beta.4](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.3...v5.0.0-beta.4) (2025-09-13)
+
+
+### Bug Fixes
+
+* regression in secure connection keep alive. ([c6da3aa](https://github.com/Supergiovane/KNXUltimate/commit/c6da3aa6d97c6872709d8e4d74302dabb90432b3))
+
 # [5.0.0-beta.3](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.2...v5.0.0-beta.3) (2025-09-13)
 
 
