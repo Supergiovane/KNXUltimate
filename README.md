@@ -22,7 +22,7 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 
 
 <p align='center'>
-<img width="110px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/KNX_CERTI_MARK_RGB.jpg" ></br>
+<img width="110px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/KNX_CERTI_MARK_RGB.jpg" ></br></br>
 <img width="100px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/knxsecure.png" ></br>
 <span style="font-size:0.5em;color:grey;">Authorized KNX logo by KNX Association*</span>
 </p>
