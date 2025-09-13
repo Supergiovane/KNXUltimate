@@ -33,10 +33,10 @@ async function runOne(file) {
   })
 }
 
-;(async () => {
+; (async () => {
   for (let i = 0; i < samples.length; i++) {
     const f = samples[i]
-    console.log(`\n=== Running sample ${i + 1}/${samples.length}: ${f} ===`)
+    console.log(`\n\n\n\n\n\n\n=== Running sample ${i + 1}/${samples.length}: ${f} ===`)
     await runOne(f)
     if (i < samples.length - 1) {
       console.log('Waiting 5s before next sample...')
