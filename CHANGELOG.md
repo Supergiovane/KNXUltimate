@@ -1,5 +1,14 @@
 
 
+# [5.0.0-beta.3](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.2...v5.0.0-beta.3) (2025-09-13)
+
+
+### Bug Fixes
+
+* fided heartbeat in TunnelTCP secure ([06f24af](https://github.com/Supergiovane/KNXUltimate/commit/06f24af6618c822eeb16a91b3fcb5f7ec734066b))
+* fixed tests and update README ([87c9b01](https://github.com/Supergiovane/KNXUltimate/commit/87c9b0136ad45e907a0d08b98286e4fa2d097a67))
+* fixed wrong heartbeat log ([b46d5de](https://github.com/Supergiovane/KNXUltimate/commit/b46d5ded0ea73d1ce66738d84e6e3a91bd2026a0))
+
 # [5.0.0-beta.2](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.1...v5.0.0-beta.2) (2025-09-12)
 
 # [5.0.0-beta.1](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.0...v5.0.0-beta.1) (2025-09-11)
