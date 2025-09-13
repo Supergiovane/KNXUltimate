@@ -24,7 +24,7 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 <p align='center'>
 <img width="110px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/KNX_CERTI_MARK_RGB.jpg" ></br>
 <img width="100px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/knxsecure.png" ></br>
-<span style="font-size:0.7em;color:grey;">Authorized KNX logo by KNX Association*</span>
+<span style="font-size:0.5em;color:grey;">Authorized KNX logo by KNX Association*</span>
 </p>
 
 
@@ -46,6 +46,9 @@ If you enjoy my work developing this package, do today a kind thing for someone 
   ```bash
   npm i knxultimate@5.0.0-beta
   ```
+Please subscribe to my channel, to learn how to use it [![Youtube][youtube-image]][youtube-url]  
+
+ [![Donate via PayPal](https://raw.githubusercontent.com/Supergiovane/node-red-contrib-knx-ultimate/master/img/CodiceQR.png)](https://www.paypal.com/donate/?hosted_button_id=S8SKPUBSPK758)
 
 ## CONNECTION SETUP
 
@@ -144,6 +147,130 @@ logStream.on('data', (log) => {
 | timestamp                      | ISO formatted date (YYYY-MM-DD HH:mm:ss.SSS)                  |
 | level                          | Log level in uppercase (ERROR, WARN, INFO, DEBUG)             |
 | label                          | Module name in uppercase (specified when creating logger)      |
+
+## Plain KNX: Quick Examples
+
+Below are short, progressively richer examples to connect in plain (non‑secure) KNX and listen or interact with the bus. Copy/paste inline; no extra files are created.
+
+### 1) Minimal tunnelling (UDP) listener
+
+```ts
+import KNXClient from 'knxultimate'
+
+const client = new KNXClient({
+  hostProtocol: 'TunnelUDP',
+  ipAddr: '192.168.1.117',  // your KNX/IP interface IP
+  ipPort: 3671,
+  loglevel: 'info',
+})
+
+client.on('connected', () => console.log('✓ Plain tunnelling connected'))
+client.on('error', (e) => console.error('Error:', e.message))
+client.on('disconnected', (reason) => console.log('Disconnected:', reason))
+
+client.on('indication', (packet) => {
+  const cemi = packet?.cEMIMessage
+  if (!cemi) return
+  const src = cemi.srcAddress?.toString?.()
+  const dst = cemi.dstAddress?.toString?.()
+  const isWrite = cemi.npdu?.isGroupWrite
+  const isResp = cemi.npdu?.isGroupResponse
+  const raw: Buffer | undefined = cemi.npdu?.dataValue
+  console.log('indication', { src, dst, isWrite, isResp, raw: raw?.toString('hex') })
+})
+
+client.Connect()
+```
+
+### 2) Decode a boolean datapoint (1.001)
+
+```ts
+import KNXClient, { KNXClientEvents } from 'knxultimate'
+import { dptlib } from 'knxultimate'
+
+const client = new KNXClient({ hostProtocol: 'TunnelUDP', ipAddr: '192.168.1.117', ipPort: 3671 })
+
+client.on(KNXClientEvents.indication, (packet) => {
+  const cemi = packet?.cEMIMessage
+  if (!cemi?.npdu) return
+  const dst = cemi.dstAddress?.toString?.()
+  const raw: Buffer | undefined = cemi.npdu?.dataValue
+  if (!dst || !raw) return
+  if (dst === '0/1/25') { // for example: a status GA known to be 1.001
+    const cfg = dptlib.resolve('1.001')
+    const value = dptlib.fromBuffer(raw, cfg)
+    console.log(`dst=${dst} ->`, value)
+  }
+})
+
+client.Connect()
+```
+
+### 3) Plain routing (Multicast) listener
+
+```ts
+import KNXClient from 'knxultimate'
+
+const client = new KNXClient({
+  hostProtocol: 'Multicast',
+  ipAddr: '224.0.23.12',
+  ipPort: 3671,
+  physAddr: '1.1.200',   // set your device IA for routing
+  loglevel: 'info',
+})
+
+client.on('connected', () => console.log('✓ Plain multicast ready'))
+client.on('error', (e) => console.error('Error:', e.message))
+client.on('indication', (packet) => {
+  const cemi = packet?.cEMIMessage
+  if (!cemi?.npdu) return
+  const dst = cemi.dstAddress?.toString?.()
+  const raw: Buffer | undefined = cemi.npdu?.dataValue
+  console.log('routing ind', { dst, raw: raw?.toString('hex') })
+})
+
+client.Connect()
+```
+
+### 4) Write and then READ a status (plain)
+
+```ts
+import KNXClient from 'knxultimate'
+import { dptlib } from 'knxultimate'
+
+const client = new KNXClient({ hostProtocol: 'TunnelUDP', ipAddr: '192.168.1.117', ipPort: 3671 })
+
+function waitForStatus(ga: string, timeoutMs = 3000): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => { client.off('indication', onInd); reject(new Error('Timeout')) }, timeoutMs)
+    const onInd = (packet: any) => {
+      const cemi = packet?.cEMIMessage
+      if (!cemi || cemi.dstAddress?.toString?.() !== ga) return
+      const npdu = cemi.npdu
+      if (!(npdu?.isGroupResponse || npdu?.isGroupWrite)) return
+      const raw: Buffer = npdu?.dataValue ?? Buffer.alloc(1, 0)
+      const bit = (raw.readUInt8(0) ?? 0) & 0x01
+      clearTimeout(t)
+      client.off('indication', onInd)
+      resolve(bit)
+    }
+    client.on('indication', onInd)
+  })
+}
+
+async function main() {
+  client.Connect()
+  await new Promise<void>((res) => client.once('connected', () => res()))
+  // Write ON	n
+  client.write('0/1/1', true, '1.001')
+  // Read status
+  client.read('0/1/25')
+  const val = await waitForStatus('0/1/25', 3000)
+  console.log('Status:', val ? 'ON' : 'OFF')
+}
+
+main().catch(console.error)
+```
 
 ## KNX/IP Secure: Quick Examples
 
