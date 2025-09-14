@@ -578,6 +578,13 @@ Behavior when fields are unset
   - TunnelUDP: optional; used as cEMI source if set.
   - TunnelTCP: optional and ignored for the bus source (gateway provides the tunnel IA); Data Secure signs as the interface IA from the keyring.
 
+Secure TCP auto‑selection details
+- IA selection: the client runs discovery for `ipAddr:ipPort`, reads the gateway “Host” IA, and selects keyring interfaces whose `Host` matches it. Candidates are sorted descending (e.g. …255, …254, …253). If no match by `Host`, it falls back to all keyring interfaces of type `Tunneling`.
+- Single‑NIC discovery: when `options.interface` is empty/undefined, discovery is executed only on the local NIC that shares the same subnet of `ipAddr` (no scan across all OS interfaces).
+- Timeouts: detailed discovery runs ~3s on the chosen NIC; if nothing is found, a lightweight simple discovery runs ~5s on the same NIC and is adapted to the detailed format.
+- Logging: look for lines starting with “Secure TCP:” to follow selection steps (discovered Host IA, candidates, chosen IA).
+- Override: set `secureTunnelConfig.tunnelInterfaceIndividualAddress` and/or `interface` explicitly to skip the auto‑selection.
+
 
 
 ## HOW TO COLLABORATE

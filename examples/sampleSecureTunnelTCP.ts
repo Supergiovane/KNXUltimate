@@ -34,7 +34,7 @@ async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): P
 async function main() {
   // KNX Secure + Data Secure configuration
   const secureCfg: SecureConfig = {
-    tunnelInterfaceIndividualAddress: '1.1.254',
+    // tunnelInterfaceIndividualAddress: '1.1.254', // Optional. If not specified, will be auto discovered. Must be in the keyring
     knxkeys_file_path: '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
     knxkeys_password: 'passwordprogetto',
   }

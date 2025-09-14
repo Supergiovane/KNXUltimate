@@ -314,6 +314,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _secureAssignedIa: number = 0
 
+	// Track candidate secure interface IAs for fallback selection
+	private _secureCandidateIAs: string[] = []
+	private _secureCandidateIndex: number = 0
+
 	// Track hosts we have already probed with SECURE_SEARCH_REQUEST (unicast)
 	private _secureSearchProbed: Set<string> = new Set()
 
@@ -510,54 +514,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
 			// KNX/IP Secure over TCP handled inline
-			this._clientSocket = new net.Socket()
-			// Buffer incoming TCP to complete frames
-			this._tcpRxBuffer = Buffer.alloc(0)
-
-			this.tcpSocket.on('connect', () => {
-				// TCP connected, start secure session handshake
-				this.socketReady = true
-				// Reset queue exit flag on fresh TCP connect
-				this.exitProcessingKNXQueueLoop = false
-				this.secureStartSession().catch((err) => {
-					this.emit(KNXClientEvents.error, err)
-				})
-			})
-			this.tcpSocket.on('data', (data: Buffer) => {
-				try {
-					this.secureOnTcpData(data)
-				} catch (e) {
-					this.emit(
-						KNXClientEvents.error,
-						e instanceof Error ? e : new Error('TCP data error'),
-					)
-				}
-			})
-			this.tcpSocket.on('error', (error) => {
-				this.socketReady = false
-				this.emit(KNXClientEvents.error, error)
-			})
-			this.tcpSocket.on('close', () => {
-				this.socketReady = false
-				this.exitProcessingKNXQueueLoop = true
-				try {
-					this.sysLogger.debug(
-						`[${getTimestamp()}] TCP close: set exitProcessingKNXQueueLoop=true`,
-					)
-				} catch {}
-				// If the socket closed unexpectedly, propagate a disconnected event
-				if (
-					this._connectionState !== ConncetionState.DISCONNECTING &&
-					this._connectionState !== ConncetionState.DISCONNECTED
-				) {
-					try {
-						this.setDisconnected('Socket closed by peer').catch(
-							() => {},
-						)
-					} catch {}
-				}
-				this.emit(KNXClientEvents.close)
-			})
+			this.initTcpSocket()
 		} else if (this._options.hostProtocol === 'Multicast') {
 			this._clientSocket = dgram.createSocket({
 				type: 'udp4',
@@ -662,6 +619,56 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				},
 			)
 		}
+	}
+
+	// Initialize/Reinitialize TCP socket and its listeners for KNX/IP Secure over TCP
+	private initTcpSocket() {
+		this._clientSocket = new net.Socket()
+		// Buffer incoming TCP to complete frames
+		this._tcpRxBuffer = Buffer.alloc(0)
+
+		this.tcpSocket.on('connect', () => {
+			// TCP connected, start secure session handshake
+			this.socketReady = true
+			// Reset queue exit flag on fresh TCP connect
+			this.exitProcessingKNXQueueLoop = false
+			this.secureStartSession().catch((err) => {
+				this.emit(KNXClientEvents.error, err)
+			})
+		})
+		this.tcpSocket.on('data', (data: Buffer) => {
+			try {
+				this.secureOnTcpData(data)
+			} catch (e) {
+				this.emit(
+					KNXClientEvents.error,
+					e instanceof Error ? e : new Error('TCP data error'),
+				)
+			}
+		})
+		this.tcpSocket.on('error', (error) => {
+			this.socketReady = false
+			this.emit(KNXClientEvents.error, error)
+		})
+		this.tcpSocket.on('close', () => {
+			this.socketReady = false
+			this.exitProcessingKNXQueueLoop = true
+			try {
+				this.sysLogger.debug(
+					`[${getTimestamp()}] TCP close: set exitProcessingKNXQueueLoop=true`,
+				)
+			} catch {}
+			// If the socket closed unexpectedly, propagate a disconnected event
+			if (
+				this._connectionState !== ConncetionState.DISCONNECTING &&
+				this._connectionState !== ConncetionState.DISCONNECTED
+			) {
+				try {
+					this.setDisconnected('Socket closed by peer').catch(() => {})
+				} catch {}
+			}
+			this.emit(KNXClientEvents.close)
+		})
 	}
 
 	/**
@@ -1975,6 +1982,297 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return descriptions
 	}
 
+	// Resolve candidate secure interface IAs by discovering the gateway and matching keyring entries by Host IA
+	private async secureGetIaCandidatesByDiscovery(): Promise<string[]> {
+		const cfg = this._options.secureTunnelConfig
+		if (!cfg) throw new Error('Secure config not provided')
+		// Load keyring once to access interfaces
+		const kr = new Keyring()
+		const path = cfg.knxkeys_file_path || DEFAULT_KNXKEYS_PATH
+		const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
+		await kr.load(path, pwd)
+
+		// Discover gateways and find the one matching ipAddr/ipPort
+		const timeout = 3000
+		let discovered: string[] = []
+		// Prefer a single OS interface to speed up discovery and only use same-subnet interface if none specified
+		let preferredIface = (this._options.interface as string) || ''
+		if (!preferredIface) {
+			try {
+				const all = ipAddressHelper.getIPv4Interfaces()
+				const ipToInt = (ip: string) =>
+					ip
+						.split('.')
+						.map((x) => parseInt(x, 10))
+						.reduce((a, b) => (a << 8) | (b & 0xff), 0) >>> 0
+				const peer = ipToInt(this._peerHost)
+				let matchBySubnet = ''
+				for (const name of Object.keys(all)) {
+					const addr = all[name]?.address
+					const mask = all[name]?.netmask
+					if (!addr || !mask) continue
+					const a = ipToInt(addr)
+					const m = ipToInt(mask)
+					if ((a & m) === (peer & m)) {
+						matchBySubnet = name
+						break
+					}
+				}
+				preferredIface = matchBySubnet
+				// Fallback to localIPAddress matching name, else first iface — but still only one iface
+				if (!preferredIface) {
+					const local = this._options.localIPAddress
+					for (const name of Object.keys(all)) {
+						if (all[name]?.address === local) {
+							preferredIface = name
+							break
+						}
+					}
+				}
+				if (!preferredIface) preferredIface = Object.keys(all)[0] || ''
+				if (this.isLevelEnabled('debug')) {
+					this.sysLogger.debug(
+						`[${getTimestamp()}] Secure TCP: discovery preferred iface=${preferredIface || 'none'}`,
+					)
+				}
+			} catch {}
+		}
+		try {
+			discovered = await KNXClient.discoverDetailed(
+				preferredIface,
+				timeout,
+			)
+		} catch {}
+		// If nothing found quickly on preferred iface, try simple discover() on the SAME iface only (no broad scan)
+		if (!discovered || discovered.length === 0) {
+			try {
+				const simple = await KNXClient.discover(preferredIface || undefined, 5000)
+				// Map simple format to detailed-like for reuse of parsing logic
+				discovered = (simple || []).map((s) => {
+					// simple: ip:port:name:ia:Secure/Plain:transport
+					// Convert to: ip:port:name:ia:services:type (type=tunnelling)
+					const parts = s.split(':')
+					if (parts.length < 6) return s
+					return `${parts[0]}:${parts[1]}:${parts[2]}:${parts[3]}:${parts[4]}:${'tunnelling'}`
+				})
+			} catch {}
+		}
+		try {
+			if (this.isLevelEnabled('debug')) {
+				this.sysLogger.debug(
+					`[${getTimestamp()}] Secure TCP: discovery returned ${discovered.length} entries`,
+				)
+			}
+		} catch {}
+		const peerIp = this._peerHost
+		const peerPort = this._peerPort || 3671
+		let hostIa = ''
+		for (const entry of discovered) {
+			// Format: ip:port:name:ia:services:type
+			const parts = entry.split(':')
+			if (parts.length < 6) continue
+			const [ip, p, _name, ia, _svc, type] = [
+				parts[0],
+				parseInt(parts[1] || '3671', 10),
+				parts[2],
+				parts[3],
+				parts[4],
+				parts[5],
+			]
+			if (ip === peerIp && p === peerPort && type === 'tunnelling') {
+				hostIa = ia
+				break
+			}
+		}
+		// Fallback: match by IP only
+		if (!hostIa) {
+			try {
+				this.sysLogger.debug(
+					`[${getTimestamp()}] Secure TCP: no exact match ip:port; trying IP-only match for ${peerIp}`,
+				)
+			} catch {}
+			for (const entry of discovered) {
+				const parts = entry.split(':')
+				if (parts.length < 6) continue
+				const [ip, , , ia] = [parts[0], parts[1], parts[2], parts[3]]
+				if (ip === peerIp) {
+					hostIa = ia
+					break
+				}
+			}
+		}
+		if (!hostIa) {
+			throw new Error(
+				`Discovery could not find gateway ${peerIp}:${peerPort} (tunnelling)`,
+			)
+		}
+		try {
+			if (this.isLevelEnabled('debug')) {
+				this.sysLogger.debug(
+					`[${getTimestamp()}] Secure TCP: discovered gateway IA ${hostIa} for ${peerIp}:${peerPort}`,
+				)
+			}
+		} catch {}
+
+		// Candidates: interfaces in keyring with Host == discovered IA
+		let candidates: string[] = []
+		for (const iface of kr.getInterfaces().values()) {
+			if (iface?.host?.toString?.() === hostIa) {
+				candidates.push(iface.individualAddress.toString())
+			}
+		}
+		if (candidates.length === 0) {
+			// Fallback: try all keyring interfaces of type "Tunneling"
+			try {
+				if (this.isLevelEnabled('warn')) {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Secure TCP: no interfaces matched Host ${hostIa}. Falling back to all keyring Tunneling interfaces.`,
+					)
+				}
+			} catch {}
+			for (const iface of kr.getInterfaces().values()) {
+				if ((iface?.type || '').toLowerCase() === 'tunneling') {
+					candidates.push(iface.individualAddress.toString())
+				}
+			}
+			if (candidates.length === 0) {
+				throw new Error(
+					`No keyring interfaces available to try (Host ${hostIa}).`,
+				)
+			}
+		}
+		// Sort candidates by IA numeric value descending (typical tunnelling IAs near .254/.255)
+		try {
+			candidates = candidates.sort((a, b) =>
+				this.secureParseIndividualAddress(b) -
+				this.secureParseIndividualAddress(a),
+			)
+		} catch {}
+		try {
+			this.sysLogger.info(
+				`[${getTimestamp()}] Secure TCP: IA candidates from keyring (Host ${hostIa}) sorted: ${candidates.join(', ')}`,
+			)
+		} catch {}
+		return candidates
+	}
+
+	// When IA is not specified, discover the gateway and try each keyring Interface (by Host) until connected
+	private async secureConnectWithIaDiscovery(): Promise<void> {
+		const cfg = this._options.secureTunnelConfig
+		if (!cfg) throw new Error('Secure config missing')
+
+		try {
+			this.sysLogger.info(
+				`[${getTimestamp()}] Secure TCP: IA discovery/selection started for ${this._peerHost}:${this._peerPort}`,
+			)
+		} catch {}
+
+		// Build candidate list (IA strings)
+		this._secureCandidateIAs = await this.secureGetIaCandidatesByDiscovery()
+		this._secureCandidateIndex = 0
+		try {
+			this.sysLogger.info(
+				`[${getTimestamp()}] Secure TCP: IA candidates: ${this._secureCandidateIAs.join(', ')}`,
+			)
+		} catch {}
+
+		// Try candidates sequentially
+		let lastErr: Error = null
+		for (let i = 0; i < this._secureCandidateIAs.length; i++) {
+			const ia = this._secureCandidateIAs[i]
+			this._secureCandidateIndex = i
+			// Reset per-attempt secure state so keyring derivation uses the new IA
+			this._secureUserPasswordKey = undefined
+			this._secureUserId = 2
+			this._secureSerial = Buffer.from('000000000000', 'hex')
+			this._secureAssignedIa = 0
+			this._secureWrapperSeq = 0
+			this._secureSearchProbed.clear()
+
+			cfg.tunnelInterfaceIndividualAddress = ia
+			try {
+				this.sysLogger.info(
+					`[${getTimestamp()}] Secure TCP: attempting IA ${ia}`,
+				)
+			} catch {}
+
+			try {
+				await this.secureEnsureKeyring()
+			} catch (e) {
+				lastErr = e as Error
+				continue
+			}
+
+			// Ensure a clean TCP socket for each attempt
+			try {
+				await this.closeSocket()
+			} catch {}
+			this.initTcpSocket()
+			this._connectionState = ConncetionState.CONNECTING
+
+			const attempt = new Promise<void>((resolve, reject) => {
+				let settled = false
+				const onConn = () => {
+					if (settled) return
+					settled = true
+					cleanup()
+					resolve()
+				}
+				const onErr = (e: Error) => {
+					if (settled) return
+					settled = true
+					cleanup()
+					reject(e)
+				}
+				const onDisc = () => {
+					if (settled) return
+					settled = true
+					cleanup()
+					reject(new Error('Socket closed during connect'))
+				}
+				const timer = setTimeout(() => {
+					if (settled) return
+					settled = true
+					cleanup()
+					reject(new Error('Secure TCP connect timeout'))
+				}, 6000)
+				const cleanup = () => {
+					clearTimeout(timer)
+					this.off(KNXClientEvents.connected, onConn)
+					this.off(KNXClientEvents.error, onErr)
+					this.off(KNXClientEvents.disconnected, onDisc)
+				}
+				this.once(KNXClientEvents.connected, onConn)
+				this.once(KNXClientEvents.error, onErr)
+				this.once(KNXClientEvents.disconnected, onDisc)
+				try {
+					this.tcpSocket.connect(this._peerPort, this._peerHost)
+				} catch (e) {
+					cleanup()
+					reject(e as Error)
+				}
+			})
+
+			try {
+				await attempt
+				// Success, stop trying
+				return
+			} catch (e) {
+				lastErr = e as Error
+				try {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Secure TCP: IA ${ia} failed: ${lastErr?.message || lastErr}`,
+					)
+				} catch {}
+				// Continue to next candidate
+			}
+		}
+
+		throw (
+			lastErr || new Error('No secure interface IA could connect successfully')
+		)
+	}
+
 	/**
 	 * Connect to the KNX bus
 	 */
@@ -2025,7 +2323,49 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				2000,
 			)
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
-			// KNX/IP Secure over TCP: initialize keyring and connect socket
+			// KNX/IP Secure over TCP: if IA not provided, discover and try candidates
+			const cfg = this._options.secureTunnelConfig
+			const iaEmpty = !cfg?.tunnelInterfaceIndividualAddress ||
+				cfg.tunnelInterfaceIndividualAddress.trim() === ''
+			if (this._options.isSecureKNXEnabled && iaEmpty) {
+				try {
+					this.sysLogger.info(
+						`[${getTimestamp()}] Secure TCP: no tunnel IA provided. Starting discovery-based selection for ${this._peerHost}:${this._peerPort}`,
+					)
+				} catch {}
+				// Defer to next tick: select IA only, then proceed with normal connect
+				setImmediate(() => {
+					this.secureGetIaCandidatesByDiscovery()
+						.then((cands) => {
+							if (!cands || cands.length === 0)
+								throw new Error('No secure IA candidates found')
+							const chosen = cands[0]
+							try {
+								this.sysLogger.info(
+									`[${getTimestamp()}] Secure TCP: selected IA ${chosen}`,
+								)
+							} catch {}
+							this._options.secureTunnelConfig.tunnelInterfaceIndividualAddress =
+								chosen
+							return this.secureEnsureKeyring()
+						})
+						.then(() => {
+							try {
+								this.tcpSocket.connect(this._peerPort, this._peerHost)
+							} catch (err) {
+								this.emit(
+									KNXClientEvents.error,
+									err instanceof Error
+										? err
+										: new Error('TCP connect error'),
+								)
+							}
+						})
+						.catch((err) => this.emit(KNXClientEvents.error, err))
+				})
+				return
+			}
+			// Otherwise, proceed with direct connect using provided IA
 			this.secureEnsureKeyring()
 				.then(() => {
 					try {
@@ -2740,69 +3080,64 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// Peer host/port now come from KNXClientOptions.ipAddr/ipPort (not from secure config)
 		// Drive secure logs from KNXClientOptions.loglevel; no separate boolean
 
-		// Load ETS keyring and extract credentials only once
-		if (!this._secureUserPasswordKey || this._secureGroupKeys.size === 0) {
-			const kr = new Keyring()
-			const path = cfg.knxkeys_file_path || DEFAULT_KNXKEYS_PATH
-			const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
-			await kr.load(path, pwd)
+		// Always load ETS keyring and extract credentials based on current IA
+		const kr = new Keyring()
+		const path = cfg.knxkeys_file_path || DEFAULT_KNXKEYS_PATH
+		const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
+		await kr.load(path, pwd)
 
-			const iface = kr.getInterface(cfg.tunnelInterfaceIndividualAddress)
-			if (iface?.userId) this._secureUserId = iface.userId
-			const password = iface?.decryptedPassword || 'passwordtunnel1'
+		const iface = kr.getInterface(cfg.tunnelInterfaceIndividualAddress)
+		if (iface?.userId) this._secureUserId = iface.userId
+		const password = iface?.decryptedPassword || 'passwordtunnel1'
 
-			// Derive user password key
-			this._secureUserPasswordKey = crypto.pbkdf2Sync(
-				Buffer.from(password, 'latin1'),
-				Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
-				65536,
-				16,
-				'sha256',
-			)
+		// Derive user password key
+		this._secureUserPasswordKey = crypto.pbkdf2Sync(
+			Buffer.from(password, 'latin1'),
+			Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
+			65536,
+			16,
+			'sha256',
+		)
 
-			// Load group keys (optional for Data Secure). Secure routing does not require them
-			this._secureGroupKeys = new Map()
-			for (const [gaStr, g] of kr.getGroupAddresses()) {
-				if (!g.decryptedKey) continue
-				const ga = this.secureParseGroupAddress(gaStr)
-				this._secureGroupKeys.set(ga, g.decryptedKey.slice(0, 16))
-			}
+		// Load group keys (optional for Data Secure). Secure routing does not require them
+		this._secureGroupKeys = new Map()
+		for (const [gaStr, g] of kr.getGroupAddresses()) {
+			if (!g.decryptedKey) continue
+			const ga = this.secureParseGroupAddress(gaStr)
+			this._secureGroupKeys.set(ga, g.decryptedKey.slice(0, 16))
+		}
 
-			// Initialize Data Secure sender sequence (48-bit)
-			const base = Date.parse('2018-01-05T00:00:00Z')
-			this._secureSendSeq48 = BigInt(Date.now() - base)
+		// Initialize Data Secure sender sequence (48-bit)
+		const base = Date.parse('2018-01-05T00:00:00Z')
+		this._secureSendSeq48 = BigInt(Date.now() - base)
 
-			// Pick KNX Serial from gateway device if available
-			const gatewayIaStr =
-				iface?.host?.toString() || iface?.individualAddress?.toString()
-			const dev = gatewayIaStr ? kr.getDevice(gatewayIaStr) : undefined
-			if (dev?.serialNumber) {
-				try {
-					const ser = Buffer.from(dev.serialNumber, 'hex')
-					if (ser.length === 6) this._secureSerial = ser
-				} catch {}
-			}
-
-			// Load Backbone key for secure multicast routing (if present)
+		// Pick KNX Serial from gateway device if available
+		const gatewayIaStr =
+			iface?.host?.toString() || iface?.individualAddress?.toString()
+		const dev = gatewayIaStr ? kr.getDevice(gatewayIaStr) : undefined
+		if (dev?.serialNumber) {
 			try {
-				const backbones = kr.getBackbones()
-				if (backbones && backbones.length > 0) {
-					const bb = backbones[0]
-					if (bb?.decryptedKey && bb.decryptedKey.length >= 16) {
-						this._secureBackboneKey = bb.decryptedKey.subarray(
-							0,
-							16,
-						)
-					}
-					if (typeof bb?.latency === 'number') {
-						this._secureRoutingLatencyMs = Math.max(100, bb.latency)
-					}
+				const ser = Buffer.from(dev.serialNumber, 'hex')
+				if (ser.length === 6) this._secureSerial = ser
+			} catch {}
+		}
+
+		// Load Backbone key for secure multicast routing (if present)
+		try {
+			const backbones = kr.getBackbones()
+			if (backbones && backbones.length > 0) {
+				const bb = backbones[0]
+				if (bb?.decryptedKey && bb.decryptedKey.length >= 16) {
+					this._secureBackboneKey = bb.decryptedKey.subarray(0, 16)
 				}
-			} catch (e) {
-				this.sysLogger.warn(
-					`Secure multicast: cannot read backbone key/latency: ${(e as Error).message}`,
-				)
+				if (typeof bb?.latency === 'number') {
+					this._secureRoutingLatencyMs = Math.max(100, bb.latency)
+				}
 			}
+		} catch (e) {
+			this.sysLogger.warn(
+				`Secure multicast: cannot read backbone key/latency: ${(e as Error).message}`,
+			)
 		}
 	}
 
