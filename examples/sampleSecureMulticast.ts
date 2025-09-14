@@ -51,7 +51,7 @@ async function main() {
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,
     loglevel: 'debug',
-    physAddr:"1.1.250"
+    physAddr:"1.1.254"
   })
 
   client.on('connected', () => console.log('✓ KNXClient connected (secure multicast)'))
