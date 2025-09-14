@@ -88,6 +88,7 @@ export type DiscoveryInterface = {
 	ia: string
 	services: string[]
 	type: 'tunnelling' | 'routing'
+	transport?: 'UDP' | 'TCP' | 'Multicast'
 }
 
 // Secure config moved here to avoid dependency on separate class file
@@ -1555,28 +1556,46 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const addResultsFromSearch = (
 			hostKey: string,
 			sr: KNXSearchResponse,
-			collector: Map<string, boolean>,
+			collector: Map<
+				string,
+				{ secure: boolean; transport: 'UDP' | 'TCP' | 'Multicast' }
+			>,
 			isSecure: boolean,
 		) => {
-			// Base entry (tunnelling-capable device appears here as well)
+			const secFam: Map<number, number> | undefined = (sr as any)
+				?.securedServiceFamilies?.services
+			const hasSecTunnelling = !!secFam && secFam.has(0x04)
+			const hasSecRouting = !!secFam && secFam.has(0x05)
+			// Base entry (tunnelling)
 			const base = baseKey(hostKey, sr)
-			collector.set(base, collector.get(base) || false || isSecure)
+			const existing = collector.get(base)
+			let transport: 'UDP' | 'TCP' = existing?.transport === 'TCP' ? 'TCP' : 'UDP'
+			// Prefer TCP if secure tunnelling is advertised
+			if (hasSecTunnelling) transport = 'TCP'
+			collector.set(base, {
+				secure: existing?.secure || isSecure || hasSecTunnelling || hasSecRouting,
+				transport,
+			})
 			// If routing is supported, add a synthetic routing entry pointing to KNX multicast
 			try {
 				const families = sr?.serviceFamilies?.services
 				if (families && families.has(0x05)) {
-					// Ensure routing entries include the default KNX port (3671)
 					const routingHost = `${KNX_CONSTANTS.KNX_IP}:${KNX_CONSTANTS.KNX_PORT}`
 					const baseR = baseKey(routingHost, sr)
-					collector.set(
-						baseR,
-						collector.get(baseR) || false || isSecure,
-					)
+					const existingR = collector.get(baseR)
+					collector.set(baseR, {
+						secure:
+							existingR?.secure || isSecure || hasSecTunnelling || hasSecRouting,
+						transport: existingR?.transport || 'Multicast',
+					})
 				}
 			} catch {}
 		}
 
-		const results = new Map<string, boolean>()
+		const results = new Map<
+			string,
+			{ secure: boolean; transport: 'UDP' | 'TCP' | 'Multicast' }
+		>()
 
 		// If a specific interface is provided, use a single client
 		if (eth && typeof eth === 'string') {
@@ -1610,8 +1629,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 				if (results.size > 0) break
 			}
-			return Array.from(results.entries()).map(
-				([k, sec]) => `${k}:${sec ? 'Secure KNX' : 'Plain KNX'}`,
+			return Array.from(results.entries()).map(([k, meta]) =>
+				`${k}:${meta.secure ? 'Secure KNX' : 'Plain KNX'}:${meta.transport}`,
 			)
 		}
 
@@ -1654,8 +1673,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			await Promise.allSettled(clients.map((c) => c.Disconnect()))
 		}
 
-		return Array.from(results.entries()).map(
-			([k, sec]) => `${k}:${sec ? 'Secure KNX' : 'Plain KNX'}`,
+		return Array.from(results.entries()).map(([k, meta]) =>
+			`${k}:${meta.secure ? 'Secure KNX' : 'Plain KNX'}:${meta.transport}`,
 		)
 	}
 
@@ -1817,6 +1836,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		) => {
 			const key = `${ip}:${port}:${type}`
 			if (out.has(key)) return
+			// Infer transport: routing => Multicast; tunnelling => UDP by default, TCP if secured tunnelling present
+			let transport: 'UDP' | 'TCP' | 'Multicast' = 'UDP'
+			if (type === 'routing') {
+				transport = 'Multicast'
+			} else {
+				try {
+					const secFam: Map<number, number> | undefined = (sr as any)
+						?.securedServiceFamilies?.services
+					if (secFam && secFam.has(0x04)) transport = 'TCP'
+				} catch {}
+			}
 			out.set(key, {
 				ip,
 				port,
@@ -1824,6 +1854,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				ia: sr.deviceInfo?.formattedAddress || '',
 				services: toList(sr),
 				type,
+				transport,
 			})
 		}
 

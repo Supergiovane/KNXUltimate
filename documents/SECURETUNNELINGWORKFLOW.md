@@ -1,6 +1,6 @@
 # KNX Secure Tunneling Workflow
 
-This document summarizes the end‑to‑end flow used by `SecureTunnelTCP` for KNX IP Secure session setup, tunneling, and KNX Data Secure payload protection. It also explains how sequence numbers are managed at each layer.
+This document summarizes the end‑to‑end flow used by KNX/IP Secure over TCP (TunnelTCP) for: session setup, tunneling, and KNX Data Secure payload protection. It also explains how sequence numbers are managed at each layer.
 
 ## Overview
 
@@ -9,6 +9,10 @@ This document summarizes the end‑to‑end flow used by `SecureTunnelTCP` for K
   - KNX IP Secure Session (Secure Wrapper, 0x0950)
   - KNX Data Secure (SecureAPDU with APCI_SEC 0x03F1 + SCF 0x10)
   - KNX/IP Tunneling for bus frames (0x0420/0x0421)
+
+Note on interface selection and sender identity
+- If `secureTunnelConfig.tunnelInterfaceIndividualAddress` is unset/empty, the client auto‑selects a usable interface from the ETS keyring and retries candidates until authentication/connect succeed. The chosen IA is applied at runtime.
+- In TunnelTCP, the gateway assigns a tunnel IA in CONNECT_RESPONSE; bus frames use that IA as cEMI source. Data Secure, however, authenticates as the interface IA from the ETS keyring (not the dynamic tunnel IA).
 
 ## Session Establishment (KNX IP Secure)
 
@@ -26,11 +30,11 @@ This document summarizes the end‑to‑end flow used by `SecureTunnelTCP` for K
    - `sessionKey = SHA256(secret)[0..15]` (128-bit AES key)
 
 5) Session Authenticate (0x0953) [wrapped]
-   - User key derivation: `userPasswordKey = PBKDF2(password, "user-password.1.secure.ip.knx.org", 65536, 16, sha256)`
-   - AdditionalData: header(0953) + `00` + `userId` + XOR(client_pubkey, server_pubkey)
-   - CBC‑MAC over `[block0=16 zeroes] + TL(additionalData) + additionalData` (no padding bytes in MAC; tail of CBC)
-   - Transform MAC via AES‑CTR with IV `000..0ff00`
-   - Send 0x0953 inside Secure Wrapper using `sessionKey`
+  - User key derivation: `userPasswordKey = PBKDF2(password, "user-password.1.secure.ip.knx.org", 65536, 16, sha256)`
+  - AdditionalData: header(0953) + `00` + `userId` + XOR(client_pubkey, server_pubkey)
+  - CBC‑MAC over `[block0=16 zeroes] + TL(additionalData) + additionalData` (no padding bytes in MAC; tail of CBC)
+  - Transform MAC via AES‑CTR with a fixed IV (see `AUTH_CTR_IV`)
+  - Send 0x0953 inside Secure Wrapper using `sessionKey`
 
 6) Session Status (0x0954) [wrapped]
    - Expect status `0` (OK). If OK, proceed to tunneling
@@ -41,7 +45,7 @@ This document summarizes the end‑to‑end flow used by `SecureTunnelTCP` for K
    - Body: HPAI control + HPAI data + CRD (link‑layer)
 
 8) CONNECT_RESPONSE (0x0206) [wrapped]
-   - Returns `channelId` and (often) assigned Individual Address (IA) in CRD
+   - Returns `channelId` and (often) the tunnel‑assigned Individual Address (IA) in CRD
 
 ## Data Phase (KNX Data Secure over Tunneling)
 
@@ -58,6 +62,10 @@ Send path:
   - SecureAPDU = `[0x03, 0xF1] + [0x10] + seq48 + encPayload + encMac4`
 - Pack into cEMI L_DATA_REQ and KNX/IP TUNNELING_REQUEST (with connection header)
 - Send inside Secure Wrapper (0x0950)
+
+Implementation notes:
+- In TunnelTCP, cEMI `ack=0` (no KNX bus ACK requested). The KNX/IP Tunneling ACK (0x0421) still flows at the IP layer.
+- The Data Secure sender IA (`srcIA`) is the interface IA from the keyring; `cEMI.srcAddress` is updated accordingly for consistency.
 
 Receive path:
 - On inbound TUNNELING_REQUEST: send TUNNELING_ACK
@@ -110,6 +118,6 @@ Client                                            Gateway
 
 ## Notes and Code Anchors
 
-- Session and tunneling in: `src/secure/SecureTunnelTCP.ts`
- - Constants: `src/secure/secure_knx_constants.ts`
- - Keyring parsing: `src/secure/keyring.ts`
+- Implementation lives inline in the client: `src/KNXClient.ts` (search for "KNX/IP Secure")
+- Crypto/constants: `src/secure/secure_knx_constants.ts`, `src/secure/security_primitives.ts`
+- Keyring parsing: `src/secure/keyring.ts`

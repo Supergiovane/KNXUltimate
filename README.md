@@ -63,7 +63,7 @@ These are the properties you can pass to `KNXClient` (see examples for full usag
 | `hostProtocol` (string)          | all                                | One of: `"TunnelUDP"` (plain tunnelling via UDP), `"Multicast"` (plain routing via multicast 224.0.23.12), `"TunnelTCP"` (KNX/IP Secure tunnelling over TCP). |
 | `ipAddr` (string)                | all                                | KNX/IP peer address. Use `"224.0.23.12"` for routing (multicast), or the interface/router IP for tunnelling. |
 | `ipPort` (number/string)         | all                                | KNX/IP port. Default `3671`. |
-| `physAddr` (string) Optional             | all                                | Individual address used as source on the bus (for example `"1.1.200"`). Only mandatory in Multicast protocol. If set in TunnelTCP or TunnelUDP, forces the selection of the tunnel, that couldn't be allowed by the gateway. |
+| `physAddr` (string) Optional             | all                                | Source IA on bus (e.g. `"1.1.200"`). Multicast: required. TunnelUDP: used as cEMI source. TunnelTCP (secure): ignored as bus source — the gateway assigns the tunnel IA; Data Secure uses the interface IA from ETS for authentication. |
 | `loglevel` (string)              | all                                | One of: `disable`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `localIPAddress` (string)        | all                                | Optional. Binds the local UDP/TCP socket to a specific local interface IP. Useful with multiple NICs. |
 | `interface` (string)             | all                                | Optional. Local interface name to select the NIC (alternative to `localIPAddress`). |
@@ -78,7 +78,7 @@ Secure configuration object (`secureTunnelConfig`):
 
 | Field                                   | Description |
 | --------------------------------------- | ----------- |
-| `tunnelInterfaceIndividualAddress` (string) Optional| Individual address of the KNX/IP Secure interface as in ETS (for session auth and Data Secure). Leave this unset (undefined) when using Multicast protocol (Multicast won't use tunnels) |
+| `tunnelInterfaceIndividualAddress` (string) Optional| Interface IA as in ETS. TunnelTCP: if unset/empty the client auto‑selects a usable tunnel from the ETS keyring (tries in sequence until auth/connect succeed) and uses it. Multicast: not used. |
 | `knxkeys_file_path` (string)            | Path to ETS keyring `.knxkeys` file. |
 | `knxkeys_password` (string)             | ETS project password to decrypt the keyring. |
 
@@ -283,6 +283,7 @@ Below are progressively richer examples to connect to a KNX/IP Secure gateway an
 Important notes
 - The client emits the full datagram on `indication`, and its `cEMIMessage` is already plain (decrypted) when keys are available in your ETS keyring.
 - Never commit your `.knxkeys` file. Keep its path/password in environment variables or local config.
+- Secure TCP tunnel auto‑select: if `secureTunnelConfig.tunnelInterfaceIndividualAddress` is omitted or empty, the client tries all interfaces found in the ETS keyring until authentication and connect succeed, then proceeds and keeps the tunnel open. The chosen IA is exposed on `client._options.secureTunnelConfig.tunnelInterfaceIndividualAddress` after connect.
 
 ### 1) Minimal secure tunnelling (TCP) listener
 
@@ -291,7 +292,7 @@ import KNXClient, { SecureConfig } from 'knxultimate'
 
 // 1) Configure ETS keyring + the interface IA used in your project
 const secureCfg: SecureConfig = {
-  tunnelInterfaceIndividualAddress: '1.1.254',   // KNX/IP Secure interface IA
+  // tunnelInterfaceIndividualAddress: '1.1.254',   // Optional: omit to auto‑select a free tunnel
   knxkeys_file_path: process.env.KNX_KEYS_PATH || '/path/to/Project.knxkeys',
   knxkeys_password: process.env.KNX_KEYS_PASSWORD || 'your-ets-password',
 }
@@ -338,7 +339,7 @@ import KNXClient, { SecureConfig } from 'knxultimate'
 import { dptlib } from 'knxultimate'
 
 const secureCfg: SecureConfig = {
-  tunnelInterfaceIndividualAddress: '1.1.254',
+  // tunnelInterfaceIndividualAddress: '1.1.254',   // Optional (auto‑select if omitted)
   knxkeys_file_path: process.env.KNX_KEYS_PATH || '/path/to/Project.knxkeys',
   knxkeys_password: process.env.KNX_KEYS_PASSWORD || 'your-ets-password',
 }
@@ -516,7 +517,7 @@ Examples overview:
 - [samplePlainMulticast](./examples/samplePlainMulticast.ts): Plain KNX routing over multicast (`hostProtocol: 'Multicast'`). Uses RoutingIndication with cEMI L_DATA_REQ. ON/OFF + status read via a KNX router (no secure).
   - Run: `node -r esbuild-register -e "require('./examples/samplePlainMulticast.ts')"`
 - [sampleSecureTunnelTCP](./examples/sampleSecureTunnelTCP.ts): KNX/IP Secure tunnelling over TCP (`hostProtocol: 'TunnelTCP'` + `isSecureKNXEnabled: true`). Performs session handshake + Secure Wrapper. Applies Data Secure for GA present in the ETS keyring. ON/OFF + status read.
-  - Requires: set `.knxkeys` path + password in the example file.
+  - Requires: set `.knxkeys` path + password in the example file. Optionally omit `tunnelInterfaceIndividualAddress` to auto‑select a free tunnel from the keyring.
   - Run: `npm run example:secure:tunnel` or `node -r esbuild-register -e "require('./examples/sampleSecureTunnelTCP.ts')"`
 - [sampleSecureMulticast](./examples/sampleSecureMulticast.ts): KNX/IP Secure routing over multicast (`hostProtocol: 'Multicast'` + `isSecureKNXEnabled: true`). Synchronizes timer via 0x0955, wraps frames in Secure Wrapper, and applies Data Secure per GA. ON/OFF + status read.
   - Requires: set `.knxkeys` path + password in the example file.
@@ -527,14 +528,35 @@ Examples overview:
 - Functions: `KNXClient.discover()`, `KNXClient.discoverDetailed()`, `KNXClient.discoverInterfaces()`.
 - Default port: if a KNX interface does not advertise a port in the `SEARCH_RESPONSE` HPAI (missing or zero), discovery uses `3671` as the port.
 - Return formats:
-- `discover()` → strings formatted as `ip:port:name:ia:Security`, where `Security` is `Secure KNX` if the device replies to Secure Search, otherwise `Plain KNX`.
-  - `discoverDetailed()` → strings formatted as `ip:port:name:ia:services:type`.
-  - `discoverInterfaces()` → array of objects `{ ip, port, name, ia, services, type }`.
+- `discover()` → strings formatted as `ip:port:name:ia:Security:Transport`.
+  - Example: `192.168.1.4:3671:MyGW:1.1.1:Secure KNX:TCP`, `224.0.23.12:3671:MyRouter:1.1.0:Plain KNX:Multicast`.
+  - `discoverDetailed()` → strings formatted as `ip:port:name:ia:services:type:transport`.
+  - `discoverInterfaces()` → array of objects `{ ip, port, name, ia, services, type, transport }`.
+
+Example usage
+```ts
+import KNXClient from 'knxultimate'
+
+// Simple list with security + transport
+const list = await KNXClient.discover(5000)
+for (const entry of list) {
+  const [ip, port, name, ia, security, transport] = entry.split(':')
+  console.log({ ip, port, name, ia, security, transport })
+}
+
+// Detailed strings
+const detailed = await KNXClient.discoverDetailed(5000)
+// ip:port:name:ia:services:type:transport
+
+// Structured objects
+const objects = await KNXClient.discoverInterfaces(5000)
+// [{ ip, port, name, ia, services, type, transport }, ...]
+```
 
 ### Source Individual Address (IA): UDP vs TCP
 
-- TunnelUDP: uses `physAddr` as the source IA on the bus. It does not replace it with the tunnel-assigned IA returned in `CONNECT_RESPONSE`.
-- TunnelTCP (secure): after a successful connect, uses the tunnel-assigned IA as the source IA for bus frames.
+- TunnelUDP: uses `physAddr` as the source IA on the bus.
+- TunnelTCP (secure): after a successful connect, uses the tunnel-assigned IA as the cEMI source on the bus; the Data Secure authentication, however, uses the interface IA from the ETS keyring (not the dynamic tunnel IA).
 - Tips for UDP tunnelling:
   - If your interface times out on L_DATA_REQ ACK, try `suppress_ack_ldatareq: true`.
   - With multiple NICs, set `localIPAddress` (or `interface`) to bind the correct local interface.
@@ -543,11 +565,18 @@ Examples overview:
 
 `KNXClient` supports KNX/IP Secure and Data Secure.
 
-- Requirements: KNX Secure router/interface, ETS keyring (`.knxkeys`) and the interface individual address as configured in ETS.
+- Requirements: KNX Secure router/interface and ETS keyring (`.knxkeys`). For `TunnelTCP`, the interface IA is optional — if omitted, the client auto‑selects a usable tunnel from the keyring.
 - Data Secure: Group Addresses present in the keyring are encrypted end‑to‑end; GA not present remain plain.
 - Modes:
   - `TunnelTCP` + `isSecureKNXEnabled: true` → secure session (Secure Wrapper) + Data Secure per GA.
   - `Multicast` + `isSecureKNXEnabled: true` → secure routing (Secure Wrapper over multicast with timer synchronization via 0x0955) + Data Secure per GA.
+
+Behavior when fields are unset
+- secureTunnelConfig.tunnelInterfaceIndividualAddress (TunnelTCP): if omitted/empty, the client auto‑selects a tunnel from the ETS keyring and retries interfaces until authentication and connect succeed. The chosen IA is exposed runtime in `client._options.secureTunnelConfig.tunnelInterfaceIndividualAddress` after connect.
+- physAddr:
+  - Multicast: must be provided; it’s your node’s source IA on the bus.
+  - TunnelUDP: optional; used as cEMI source if set.
+  - TunnelTCP: optional and ignored for the bus source (gateway provides the tunnel IA); Data Secure signs as the interface IA from the keyring.
 
 
 
