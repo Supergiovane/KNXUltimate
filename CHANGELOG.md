@@ -1,5 +1,17 @@
 
 
+# [5.0.0-beta.5](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.4...v5.0.0-beta.5) (2025-09-15)
+
+
+### Bug Fixes
+
+* fixed multicast secure issue ([8289661](https://github.com/Supergiovane/KNXUltimate/commit/82896615e75b1d877061970545ff36498eddf4f1))
+
+
+### Features
+
+* auto tunnel selection in TCP Secure ([09d4c1c](https://github.com/Supergiovane/KNXUltimate/commit/09d4c1cd0f7be776b74c31c6f38dfef1e350cda3))
+
 # [5.0.0-beta.4](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.3...v5.0.0-beta.4) (2025-09-13)
 
 
