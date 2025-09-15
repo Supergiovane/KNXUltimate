@@ -314,8 +314,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _secureAssignedIa: number = 0
 
+	private _secureKeyring?: Keyring
+
 	// Track candidate secure interface IAs for fallback selection
 	private _secureCandidateIAs: string[] = []
+
 	private _secureCandidateIndex: number = 0
 
 	// Track hosts we have already probed with SECURE_SEARCH_REQUEST (unicast)
@@ -336,6 +339,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private _secureHandshakeAuthTimer?: NodeJS.Timeout
 
 	private _secureHandshakeConnectTimer?: NodeJS.Timeout
+
+	// Secure routing (multicast) initial timer sync helper
+	private _secureRoutingSyncTimer?: NodeJS.Timeout
 
 	private _secureHandshakeState?:
 		| 'connecting'
@@ -498,9 +504,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							this.udpSocket.setMulticastInterface(
 								this._options.localIPAddress,
 							)
-							this.udpSocket.setMulticastTTL(5)
+							this.udpSocket.setMulticastTTL(55)
 						} catch {}
-						this.udpSocket.setTTL(5)
+						this.udpSocket.setTTL(55)
 						if (this._options.localSocketAddress === undefined) {
 							this._options.localSocketAddress =
 								this.udpSocket.address().address
@@ -534,6 +540,24 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.clearToSend = true
 					this._clientTunnelSeqNumber = -1
 					this.emit(KNXClientEvents.connected, this._options)
+				}
+
+				// If secure routing, proactively send a TimerNotify once to authenticate timer
+				if (
+					this._options.hostProtocol === 'Multicast' &&
+					this._options.isSecureKNXEnabled
+				) {
+					// small delay to ensure keyring/backbone key are loaded
+					try {
+						clearTimeout(this._secureRoutingSyncTimer as any)
+					} catch {}
+					this._secureRoutingSyncTimer = setTimeout(() => {
+						try {
+							// Ensure backbone key available
+							if (!this._secureBackboneKey) this.secureEnsureKeyring()
+							this.secureSendTimerNotify()
+						} catch {}
+					}, 120)
 				}
 			})
 			this.udpSocket.on(
@@ -584,7 +608,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					: '0.0.0.0',
 				() => {
 					try {
-						this.udpSocket.setMulticastTTL(5)
+						this.udpSocket.setMulticastTTL(55)
 						this.udpSocket.setMulticastInterface(
 							this._options.localIPAddress,
 						)
@@ -664,7 +688,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._connectionState !== ConncetionState.DISCONNECTED
 			) {
 				try {
-					this.setDisconnected('Socket closed by peer').catch(() => {})
+					this.setDisconnected('Socket closed by peer').catch(
+						() => {},
+					)
 				} catch {}
 			}
 			this.emit(KNXClientEvents.close)
@@ -1171,8 +1197,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const srcAddress = this.physAddr
 
 		if (this._options.hostProtocol === 'Multicast') {
-			// Multicast: use L_DATA_REQ for outgoing injection onto the bus
-			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+			// Multicast: per KNX Routing spec, inject as L_DATA_IND
+			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'write',
 				srcAddress,
 				dstAddress,
@@ -1257,8 +1283,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const srcAddress = this.physAddr
 
 		if (this._options.hostProtocol === 'Multicast') {
-			// Multicast: use L_DATA_REQ for outgoing injection
-			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+			// Multicast: per KNX Routing spec, inject as L_DATA_IND
+			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'response',
 				srcAddress,
 				dstAddress,
@@ -1326,8 +1352,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const srcAddress = this.physAddr
 
 		if (this._options.hostProtocol === 'Multicast') {
-			// Multicast: use L_DATA_REQ for outgoing read request
-			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+			// Multicast: per KNX Routing spec, inject as L_DATA_IND
+			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'read',
 				srcAddress,
 				dstAddress,
@@ -1433,7 +1459,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		const srcAddress = this.physAddr
 		if (this._options.hostProtocol === 'Multicast') {
-			// Multicast
+			// Multicast: per KNX Routing spec, inject as L_DATA_IND
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'write',
 				srcAddress,
@@ -1576,11 +1602,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// Base entry (tunnelling)
 			const base = baseKey(hostKey, sr)
 			const existing = collector.get(base)
-			let transport: 'UDP' | 'TCP' = existing?.transport === 'TCP' ? 'TCP' : 'UDP'
+			let transport: 'UDP' | 'TCP' =
+				existing?.transport === 'TCP' ? 'TCP' : 'UDP'
 			// Prefer TCP if secure tunnelling is advertised
 			if (hasSecTunnelling) transport = 'TCP'
 			collector.set(base, {
-				secure: existing?.secure || isSecure || hasSecTunnelling || hasSecRouting,
+				secure:
+					existing?.secure ||
+					isSecure ||
+					hasSecTunnelling ||
+					hasSecRouting,
 				transport,
 			})
 			// If routing is supported, add a synthetic routing entry pointing to KNX multicast
@@ -1592,7 +1623,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					const existingR = collector.get(baseR)
 					collector.set(baseR, {
 						secure:
-							existingR?.secure || isSecure || hasSecTunnelling || hasSecRouting,
+							existingR?.secure ||
+							isSecure ||
+							hasSecTunnelling ||
+							hasSecRouting,
 						transport: existingR?.transport || 'Multicast',
 					})
 				}
@@ -1636,8 +1670,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 				if (results.size > 0) break
 			}
-			return Array.from(results.entries()).map(([k, meta]) =>
-				`${k}:${meta.secure ? 'Secure KNX' : 'Plain KNX'}:${meta.transport}`,
+			return Array.from(results.entries()).map(
+				([k, meta]) =>
+					`${k}:${meta.secure ? 'Secure KNX' : 'Plain KNX'}:${meta.transport}`,
 			)
 		}
 
@@ -1680,8 +1715,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			await Promise.allSettled(clients.map((c) => c.Disconnect()))
 		}
 
-		return Array.from(results.entries()).map(([k, meta]) =>
-			`${k}:${meta.secure ? 'Secure KNX' : 'Plain KNX'}:${meta.transport}`,
+		return Array.from(results.entries()).map(
+			([k, meta]) =>
+				`${k}:${meta.secure ? 'Secure KNX' : 'Plain KNX'}:${meta.transport}`,
 		)
 	}
 
@@ -2046,7 +2082,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// If nothing found quickly on preferred iface, try simple discover() on the SAME iface only (no broad scan)
 		if (!discovered || discovered.length === 0) {
 			try {
-				const simple = await KNXClient.discover(preferredIface || undefined, 5000)
+				const simple = await KNXClient.discover(
+					preferredIface || undefined,
+					5000,
+				)
 				// Map simple format to detailed-like for reuse of parsing logic
 				discovered = (simple || []).map((s) => {
 					// simple: ip:port:name:ia:Secure/Plain:transport
@@ -2143,9 +2182,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 		// Sort candidates by IA numeric value descending (typical tunnelling IAs near .254/.255)
 		try {
-			candidates = candidates.sort((a, b) =>
-				this.secureParseIndividualAddress(b) -
-				this.secureParseIndividualAddress(a),
+			candidates = candidates.sort(
+				(a, b) =>
+					this.secureParseIndividualAddress(b) -
+					this.secureParseIndividualAddress(a),
 			)
 		} catch {}
 		try {
@@ -2249,7 +2289,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.tcpSocket.connect(this._peerPort, this._peerHost)
 				} catch (e) {
 					cleanup()
-					reject(e as Error)
+					reject(e instanceof Error ? e : new Error(String(e)))
 				}
 			})
 
@@ -2269,7 +2309,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		throw (
-			lastErr || new Error('No secure interface IA could connect successfully')
+			lastErr ||
+			new Error('No secure interface IA could connect successfully')
 		)
 	}
 
@@ -2325,7 +2366,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		} else if (this._options.hostProtocol === 'TunnelTCP') {
 			// KNX/IP Secure over TCP: if IA not provided, discover and try candidates
 			const cfg = this._options.secureTunnelConfig
-			const iaEmpty = !cfg?.tunnelInterfaceIndividualAddress ||
+			const iaEmpty =
+				!cfg?.tunnelInterfaceIndividualAddress ||
 				cfg.tunnelInterfaceIndividualAddress.trim() === ''
 			if (this._options.isSecureKNXEnabled && iaEmpty) {
 				try {
@@ -2351,7 +2393,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						})
 						.then(() => {
 							try {
-								this.tcpSocket.connect(this._peerPort, this._peerHost)
+								this.tcpSocket.connect(
+									this._peerPort,
+									this._peerHost,
+								)
 							} catch (err) {
 								this.emit(
 									KNXClientEvents.error,
@@ -3085,6 +3130,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const path = cfg.knxkeys_file_path || DEFAULT_KNXKEYS_PATH
 		const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
 		await kr.load(path, pwd)
+		this._secureKeyring = kr
 
 		const iface = kr.getInterface(cfg.tunnelInterfaceIndividualAddress)
 		if (iface?.userId) this._secureUserId = iface.userId
@@ -3476,6 +3522,54 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		} catch {}
 	}
 
+	// Send a single TimerNotify (0x0955) to trigger timer authentication for secure routing.
+	private secureSendTimerNotify(messageTag?: Buffer) {
+		if (!this.udpSocket) return
+		if (!this._secureBackboneKey) return
+		try {
+			// Build TimerNotify
+			const timerValue = this.secureRoutingTimerValue()
+			const timerBytes = Buffer.alloc(SECURE_SEQ_LEN)
+			timerBytes.writeUIntBE(timerValue, 0, SECURE_SEQ_LEN)
+			const tag = messageTag && messageTag.length === 2 ? messageTag : crypto.randomBytes(2)
+			const serial = this._secureSerial
+			// Additional data = KNX/IP header of TimerNotify (06 10 09 55 00 24)
+			const additional = Buffer.from('061009550024', 'hex')
+			// Block0 = timer(6) + serial(6) + tag(2) + 00 00
+			const b0 = Buffer.concat([timerBytes, serial, tag, Buffer.from([0x00, 0x00])])
+			const macCbc = calculateMessageAuthenticationCodeCBC(
+				this._secureBackboneKey,
+				additional,
+				Buffer.alloc(0),
+				b0,
+			)
+			// CTR-enc mac with counter0 = timer + serial + tag + ff 00
+			const ctr0 = Buffer.concat([timerBytes, serial, tag, Buffer.from([0xff, 0x00])])
+			const [, mac] = encryptDataCtr(
+				this._secureBackboneKey,
+				ctr0,
+				macCbc,
+			)
+			// Assemble full 0x0955 frame
+			const body = Buffer.concat([timerBytes, serial, tag, mac])
+			const hdr = Buffer.from('061009550024', 'hex')
+			const frame = Buffer.concat([hdr, body])
+			this.udpSocket.send(
+				frame,
+				this._peerPort,
+				this._peerHost,
+				() => {},
+			)
+			try {
+				if (this.isLevelEnabled('debug')) {
+					this.sysLogger.debug(
+						`[${getTimestamp()}] TX 0955 TimerNotify timer=${timerValue} tag=${tag.toString('hex')}`,
+					)
+				}
+			} catch {}
+		} catch {}
+	}
+
 	private secureWrapRouting(inner: Buffer): Buffer {
 		if (!this._secureBackboneKey) throw new Error('Backbone key not set')
 		const seqNum = this.secureRoutingTimerValue()
@@ -3609,6 +3703,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					if (!this._secureRoutingTimerAuthenticated) {
 						this._secureRoutingTimerOffsetMs = delta
 						this._secureRoutingTimerAuthenticated = true
+						// Align Data Secure sender seq to routing timer (timer strategy)
+						try {
+							const tv = BigInt(timerValue)
+							if (this._secureSendSeq48 < tv)
+								this._secureSendSeq48 = tv
+						} catch {}
 						try {
 							this.sysLogger.debug(
 								`[${getTimestamp()}] Secure routing timer authenticated. remote=${timerValue} local=${localNow} offset=${delta}ms`,
@@ -3666,6 +3766,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						const localNow = Math.floor(performance.now())
 						this._secureRoutingTimerOffsetMs = t - localNow
 						this._secureRoutingTimerAuthenticated = true
+						// Align Data Secure sender seq to routing timer
+						try {
+							const tv = BigInt(t)
+							if (this._secureSendSeq48 < tv)
+								this._secureSendSeq48 = tv
+						} catch {}
 						try {
 							this.sysLogger.debug(
 								`[${getTimestamp()}] TimerNotify authenticated. remote=${t} local=${localNow} offset=${this._secureRoutingTimerOffsetMs}ms`,
@@ -3883,6 +3989,32 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		])
 	}
 
+	// For multicast+Data Secure: try to pick an allowed sender IA for the GA
+	private securePickSenderIaForGa(
+		gaRaw: number,
+		currIa?: number,
+	): number | undefined {
+		try {
+			const gaStr = this.secureFormatGroupAddress(gaRaw)
+			// If current IA è consentita, mantienila
+			const allowed = new Set<number>()
+			const ifaces = this._secureKeyring?.getInterfaces?.()
+			if (ifaces) {
+				for (const [, i] of ifaces) {
+					const senders = i.groupAddresses?.get?.(gaStr) || []
+					for (const s of senders) allowed.add(s.raw)
+				}
+			}
+			if (currIa && allowed.has(currIa)) return currIa
+
+			// Altrimenti scegli un mittente consentito (il più alto in modo deterministico)
+			if (allowed.size > 0) {
+				return Array.from(allowed).sort((a, b) => b - a)[0]
+			}
+		} catch {}
+		return currIa
+	}
+
 	private secureBuildLDataReq(
 		secureApdu: Buffer,
 		srcIa: number,
@@ -3932,9 +4064,22 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const dst = cemi?.dstAddress?.get?.() as number
 			if (typeof dst !== 'number') return
 			if (!this._secureGroupKeys.has(dst)) return
-			const src = (this._secureAssignedIa ||
+			let src = (this._secureAssignedIa ||
 				(cemi?.srcAddress?.get?.() as number)) as number
 			if (typeof src !== 'number') return
+			// For multicast routing: ensure source IA is allowed for the GA, otherwise pick one from keyring
+			if (this._options.hostProtocol === 'Multicast') {
+				const picked = this.securePickSenderIaForGa(dst, src)
+				if (picked && picked !== src) {
+					src = picked
+					this._secureAssignedIa = picked
+					try {
+						this.sysLogger.debug(
+							`[${getTimestamp()}] Secure multicast: override src IA to allowed ${(picked >> 12) & 0x0f}.${(picked >> 8) & 0x0f}.${picked & 0xff} for GA ${this.secureFormatGroupAddress(dst)}`,
+						)
+					} catch {}
+				}
+			}
 			const ctrlBuf: Buffer = cemi?.control?.toBuffer?.()
 			if (!Buffer.isBuffer(ctrlBuf) || ctrlBuf.length < 2) return
 			const flags16 = (ctrlBuf[0] << 8) | ctrlBuf[1]
@@ -3959,9 +4104,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			npdu.data = new KNXDataBuffer(secureApduFull.subarray(2))
 			// Ensure srcAddress reflects the assigned IA used on the bus (TunnelTCP) or current physAddr (Multicast)
 			try {
-				if (this._secureAssignedIa) {
+				if (src) {
 					cemi.srcAddress = new KNXAddress(
-						this._secureAssignedIa,
+						src,
 						KNXAddress.TYPE_INDIVIDUAL,
 					)
 				}

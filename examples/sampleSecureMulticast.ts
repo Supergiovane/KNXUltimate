@@ -4,6 +4,7 @@ import CEMIConstants from '../src/protocol/cEMI/CEMIConstants'
 async function waitForStatus(
   client: KNXClient,
   ga: string,
+  fallbackGa?: string,
   timeoutMs = 5000,
 ): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -18,7 +19,8 @@ async function waitForStatus(
       try {
         const cemi = packet?.cEMIMessage
         if (!cemi || cemi.msgCode !== CEMIConstants.L_DATA_IND) return
-        if (cemi.dstAddress?.toString?.() !== ga) return
+        const dst = cemi.dstAddress?.toString?.()
+        if (dst !== ga && dst !== (fallbackGa || '')) return
         const isResp = cemi.npdu?.isGroupResponse
         const isWrite = cemi.npdu?.isGroupWrite
         if (isResp || isWrite) {
@@ -50,8 +52,8 @@ async function main() {
     ipPort: 3671,
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,
-    loglevel: 'debug',
-    physAddr:"1.1.254"
+    loglevel: 'info',
+    physAddr: '1.1.0'
   })
 
   client.on('connected', () => console.log('✓ KNXClient connected (secure multicast)'))
@@ -65,26 +67,42 @@ async function main() {
     // Give the router a moment to emit TimerNotify (0955) and align our timer
     await new Promise((r) => setTimeout(r, 1000))
 
-    // Example GA - adjust to your installation
+    // Example GA - adjust to your installation (no env vars)
     const cmdGA = '1/1/1'
     const statusGA = '1/1/2'
+
+    // Log indications for the target groups
+    client.on('indication', (packet: any) => {
+      try {
+        const cemi = packet?.cEMIMessage
+        if (!cemi || cemi.msgCode !== CEMIConstants.L_DATA_IND) return
+        const dst = cemi.dstAddress?.toString?.()
+        if (dst !== cmdGA && dst !== statusGA) return
+        const isResp = cemi.npdu?.isGroupResponse
+        const isWrite = cemi.npdu?.isGroupWrite
+        const raw: Buffer | undefined = cemi.npdu?.dataValue
+        console.log(`IND dst=${dst} type=${isResp ? 'RESP' : isWrite ? 'WRITE' : 'OTHER'} data=${raw?.toString('hex')}`)
+      } catch {}
+    })
 
     console.log(`\nTEST (secure multicast): ON/OFF ${cmdGA} with status ${statusGA}`)
 
     // ON
     client.write(cmdGA, true, '1.001')
-    await new Promise((r) => setTimeout(r, 200))
+    await new Promise((r) => setTimeout(r, 300))
     client.read(statusGA)
-    const onVal = await waitForStatus(client, statusGA, 5000)
+    let onVal: number | undefined = undefined
+    onVal = await waitForStatus(client, statusGA, cmdGA, 4000)
     console.log(`Status after ON: ${onVal ? 'ON' : 'OFF'}`)
     if (onVal !== 1) throw new Error('Unexpected status after ON (expected ON)')
 
     // OFF
     client.write(cmdGA, false, '1.001')
-    await new Promise((r) => setTimeout(r, 200))
+    await new Promise((r) => setTimeout(r, 300))
     client.read(statusGA)
-    const offVal = await waitForStatus(client, statusGA, 5000)
-    console.log(`Status after OFF: ${offVal ? 'ON' : 'OFF'}`)
+    let offVal: number | undefined = undefined
+    offVal = await waitForStatus(client, statusGA, cmdGA, 4000)
+     console.log(`Status after OFF: ${offVal ? 'ON' : 'OFF'}`)
     if (offVal !== 0) throw new Error('Unexpected status after OFF (expected OFF)')
 
     console.log('\nCommands sent and status verified correctly (secure multicast).')

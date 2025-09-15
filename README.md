@@ -571,6 +571,15 @@ const objects = await KNXClient.discoverInterfaces(5000)
   - `TunnelTCP` + `isSecureKNXEnabled: true` → secure session (Secure Wrapper) + Data Secure per GA.
   - `Multicast` + `isSecureKNXEnabled: true` → secure routing (Secure Wrapper over multicast with timer synchronization via 0x0955) + Data Secure per GA.
 
+Routing (Multicast) specifics
+- Outgoing frames are injected as `L_DATA_IND` when using routing (both plain and secure). This mirrors ETS and xKNX behavior and ensures devices react correctly to injected telegrams. Do not use `L_DATA_REQ` for routing injection.
+- Secure routing needs a synchronized timer. By default the client waits until the timer is authenticated before sending. Additionally, on secure multicast startup the client proactively sends a `TimerNotify (0x0955)` once, so the timer can authenticate immediately even if the router doesn’t broadcast it right away. Plain multicast is unaffected.
+- Option: `secureRoutingWaitForTimer` (default `true`) controls gating of outgoing frames until the timer is authenticated.
+
+Troubleshooting (routing)
+- If an actuator doesn’t react to writes sent over routing, verify that your app injects `L_DATA_IND` (not `L_DATA_REQ`). From version 5.0.0‑beta the library automatically uses `L_DATA_IND` for multicast writes/reads/responses.
+- For secure routing, ensure your ETS keyring contains a Backbone key and that the target Group Addresses are present with keys (Data Secure). You can list them with the example `examples/listSecureGroups.ts`.
+
 Behavior when fields are unset
 - secureTunnelConfig.tunnelInterfaceIndividualAddress (TunnelTCP): if omitted/empty, the client auto‑selects a tunnel from the ETS keyring and retries interfaces until authentication and connect succeed. The chosen IA is exposed runtime in `client._options.secureTunnelConfig.tunnelInterfaceIndividualAddress` after connect.
 - physAddr:

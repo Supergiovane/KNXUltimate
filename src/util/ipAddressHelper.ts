@@ -75,68 +75,72 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 }
 
 export function getLocalAddress(_interface = ''): string {
-    logger.debug('getLocalAddress: getting interfaces')
+	logger.debug('getLocalAddress: getting interfaces')
 
-    const candidateInterfaces = getIPv4Interfaces()
+	const candidateInterfaces = getIPv4Interfaces()
 
-    // 1) Explicit interface name takes precedence (option or env)
-    const envIface = process.env.KNX_INTERFACE || process.env.KNX_IFACE
-    const requested = _interface || envIface || ''
-    if (requested !== '') {
-        if (!hasProp(candidateInterfaces, requested)) {
-            logger.error(
-                `exports.getLocalAddress: Interface ${requested} not found or has no useful IPv4 address!`,
-            )
-            throw Error(
-                `Interface ${requested} not found or has no useful IPv4 address!`,
-            )
-        }
-        return candidateInterfaces[requested].address
-    }
+	// 1) Explicit interface name takes precedence (no env usage)
+	const requested = _interface || ''
+	if (requested !== '') {
+		if (!hasProp(candidateInterfaces, requested)) {
+			logger.error(
+				`exports.getLocalAddress: Interface ${requested} not found or has no useful IPv4 address!`,
+			)
+			throw Error(
+				`Interface ${requested} not found or has no useful IPv4 address!`,
+			)
+		}
+		return candidateInterfaces[requested].address
+	}
 
-    // 2) Heuristic selection: prefer physical LAN/Wi‑Fi over virtual/NAT
-    const entries = Object.entries(candidateInterfaces)
-    if (entries.length === 0) throw Error('No valid IPv4 interfaces detected')
+	// 2) Heuristic selection: prefer physical LAN/Wi‑Fi over virtual/NAT
+	const entries = Object.entries(candidateInterfaces)
+	if (entries.length === 0) throw Error('No valid IPv4 interfaces detected')
 
-    const isRfc1918 = (ip: string) => {
-        return (
-            ip.startsWith('10.') ||
-            ip.startsWith('192.168.') ||
-            (ip.startsWith('172.') && (() => {
-                const n = parseInt(ip.split('.')[1] || '0', 10)
-                return n >= 16 && n <= 31
-            })())
-        )
-    }
+	const isRfc1918 = (ip: string) => {
+		return (
+			ip.startsWith('10.') ||
+			ip.startsWith('192.168.') ||
+			(ip.startsWith('172.') &&
+				(() => {
+					const n = parseInt(ip.split('.')[1] || '0', 10)
+					return n >= 16 && n <= 31
+				})())
+		)
+	}
 
-    const isApipa = (ip: string) => ip.startsWith('169.254.')
+	const isApipa = (ip: string) => ip.startsWith('169.254.')
 
-    const looksVirtual = (name: string) => /(^|\b)(vnic|vmnet|utun|awdl|bridge|br-|vboxnet|docker|tap|zt|lo|gif|stf|ap|llw)/i.test(name)
+	const looksVirtual = (name: string) =>
+		/(^|\b)(vnic|vmnet|utun|awdl|bridge|br-|vboxnet|docker|tap|zt|lo|gif|stf|ap|llw)/i.test(
+			name,
+		)
 
-    const looksPhysical = (name: string) => /^(en\d+|eth\d+|wlan\d+|wlx\w+)/i.test(name) || /wi-?fi|ethernet/i.test(name)
+	const looksPhysical = (name: string) =>
+		/^(en\d+|eth\d+|wlan\d+|wlx\w+)/i.test(name) ||
+		/wi-?fi|ethernet/i.test(name)
 
-    const score = (name: string, ip: string) => {
-        let s = 0
-        if (looksPhysical(name)) s += 100
-        if (isRfc1918(ip)) s += 40
-        // Prefer classic home LAN 192.168.x slightly over 10.x/172.16-31
-        if (ip.startsWith('192.168.')) s += 20
-        if (looksVirtual(name)) s -= 200
-        if (isApipa(ip)) s -= 500
-        return s
-    }
+	const score = (name: string, ip: string) => {
+		let s = 0
+		if (looksPhysical(name)) s += 100
+		if (isRfc1918(ip)) s += 40
+		// Prefer classic home LAN 192.168.x slightly over 10.x/172.16-31
+		if (ip.startsWith('192.168.')) s += 20
+		if (looksVirtual(name)) s -= 200
+		if (isApipa(ip)) s -= 500
+		return s
+	}
 
-    const best = entries
-        .map(([name, info]) => ({ name, info, s: score(name, info.address) }))
-        .sort((a, b) => b.s - a.s)
-        [0]
+	const best = entries
+		.map(([name, info]) => ({ name, info, s: score(name, info.address) }))
+		.sort((a, b) => b.s - a.s)[0]
 
-    logger.debug(
-        'Selected interface: %s (%j) with score %d',
-        best.name,
-        best.info,
-        best.s,
-    )
+	logger.debug(
+		'Selected interface: %s (%j) with score %d',
+		best.name,
+		best.info,
+		best.s,
+	)
 
-    return best.info.address
+	return best.info.address
 }
