@@ -582,6 +582,12 @@ Authorized senders (Data Secure, secure routing)
 - Prerequisites: your `.knxkeys` (ETS Project Keyring) must include the target GA and its Senders list. If no Senders are present for that GA in the keyring, the client keeps `physAddr` and the router may still drop the frame as unauthorized.
 - This behavior is automatic whenever `hostProtocol: 'Multicast'` and `isSecureKNXEnabled: true` and the GA is protected by a Data Secure key in the keyring. No additional option is required.
 
+Mixed secure/plain on one instance
+- A single `KNXClient` instance can handle Data Secure and plain Group Addresses at the same time. Data Secure is applied per‑GA: if a GA has a key in the ETS keyring, the APDU is encrypted; if not, the APDU stays plain.
+- Secure routing (multicast): when `isSecureKNXEnabled: true`, all routing frames are transported inside the KNX/IP Secure Wrapper (`0x0950`). “Plain” APDUs still travel inside that wrapper. This allows mixing secure and plain GA on the same instance. If you also need to emit non‑wrapped plain routing frames simultaneously, run a second `KNXClient` with `isSecureKNXEnabled: false`.
+- Secure tunnelling (TCP): the tunnel is always wrapped (Secure Wrapper). APDU encryption (Data Secure) remains per‑GA; GA without keys remain plain.
+- Receive path: with secure enabled, the client decrypts `0x0950` frames and forwards the inner plain cEMI; it also accepts non‑wrapped routing frames if present on the bus. The `indication` event always exposes a plain (decrypted) cEMI when keys are available.
+
 Troubleshooting (routing)
 - If an actuator doesn’t react to writes sent over routing, verify that your app injects `L_DATA_IND` (not `L_DATA_REQ`). From version 5.0.0‑beta the library automatically uses `L_DATA_IND` for multicast writes/reads/responses.
 - For secure routing, ensure your ETS keyring contains a Backbone key and that the target Group Addresses are present with keys (Data Secure). You can list them with the example `examples/listSecureGroups.ts`.
