@@ -576,6 +576,12 @@ Routing (Multicast) specifics
 - Secure routing needs a synchronized timer. By default the client waits until the timer is authenticated before sending. Additionally, on secure multicast startup the client proactively sends a `TimerNotify (0x0955)` once, so the timer can authenticate immediately even if the router doesn’t broadcast it right away. Plain multicast is unaffected.
 - Option: `secureRoutingWaitForTimer` (default `true`) controls gating of outgoing frames until the timer is authenticated.
 
+Authorized senders (Data Secure, secure routing)
+- When sending to a Data Secure Group Address over routing, KNX routers enforce an “authorized senders” list per GA. If your current `physAddr` is not authorized for that GA, the router will drop the telegram.
+- The client automatically avoids this problem by selecting an allowed sender IA for each secure GA based on the ETS keyring. If the configured `physAddr` is not in the GA’s Senders list, the library overrides the source IA with one that is authorized for that GA (taken from the keyring’s Senders for that GA) before building the Secure APDU.
+- Prerequisites: your `.knxkeys` (ETS Project Keyring) must include the target GA and its Senders list. If no Senders are present for that GA in the keyring, the client keeps `physAddr` and the router may still drop the frame as unauthorized.
+- This behavior is automatic whenever `hostProtocol: 'Multicast'` and `isSecureKNXEnabled: true` and the GA is protected by a Data Secure key in the keyring. No additional option is required.
+
 Troubleshooting (routing)
 - If an actuator doesn’t react to writes sent over routing, verify that your app injects `L_DATA_IND` (not `L_DATA_REQ`). From version 5.0.0‑beta the library automatically uses `L_DATA_IND` for multicast writes/reads/responses.
 - For secure routing, ensure your ETS keyring contains a Backbone key and that the target Group Addresses are present with keys (Data Secure). You can list them with the example `examples/listSecureGroups.ts`.

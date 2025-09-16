@@ -53,7 +53,7 @@ async function main() {
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,
     loglevel: 'info',
-    physAddr: '1.1.0'
+    physAddr: '1.1.0' // The same as your KNX Router.
   })
 
   client.on('connected', () => console.log('✓ KNXClient connected (secure multicast)'))
