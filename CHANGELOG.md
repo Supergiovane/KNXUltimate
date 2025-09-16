@@ -1,5 +1,12 @@
 
 
+# [5.0.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.5...v5.0.0) (2025-09-16)
+
+
+### Bug Fixes
+
+* remover unwanted files ([34ca0ac](https://github.com/Supergiovane/KNXUltimate/commit/34ca0ac5e411a76ee0a88d7d077db0dcd00ff023))
+
 # [5.0.0-beta.5](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.4...v5.0.0-beta.5) (2025-09-15)
 
 
