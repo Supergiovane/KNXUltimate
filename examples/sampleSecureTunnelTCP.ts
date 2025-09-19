@@ -44,7 +44,7 @@ async function main() {
   // const secureCfg: SecureConfig = {
   //   tunnelInterfaceIndividualAddress: '1.1.254',
   //   tunnelUserPassword: 'passwordtunnel1',
-  //   tunnelUserId: 2,
+  //   //tunnelUserId: 2,
   // }
 
   const client = new KNXClient({
