@@ -75,9 +75,11 @@ Secure configuration object (`secureTunnelConfig`):
 | `tunnelInterfaceIndividualAddress` (string) Optional| Interface IA as in ETS. TunnelTCP: if unset/empty the client auto‑selects a usable tunnel from the ETS keyring (tries in sequence until auth/connect succeed) and uses it. Multicast: not used. |
 | `knxkeys_file_path` (string)            | Path to ETS keyring `.knxkeys` file. |
 | `knxkeys_password` (string)             | ETS project password to decrypt the keyring. |
+| `tunnelUserPassword` (string) Optional | Provide the KNX Secure tunnel password directly (no `.knxkeys`). Enables secure tunnelling only; Data Secure and secure routing stay disabled. |
+| `tunnelUserId` (number) Optional        | KNX Secure tunnel user ID. Defaults to `2`. Useful when your gateway uses a custom account. |
 
 
-Note on KNX Secure: `KNXClient` supports KNX/IP Secure for both tunnelling (TCP) and routing (multicast). Group Addresses found in the ETS keyring are protected with Data Secure; GA not in the keyring remain plain.
+Note on KNX Secure: `KNXClient` supports KNX/IP Secure for both tunnelling (TCP) and routing (multicast). Group Addresses found in the ETS keyring are protected with Data Secure; GA not in the keyring remain plain. With `tunnelUserPassword` alone you still get secure tunnelling, but Data Secure and secure multicast are unavailable.
 ## SUPPORTED DATAPOINTS
 
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
@@ -324,6 +326,33 @@ async function main() {
 }
 
 main().catch(console.error)
+```
+
+### 1b) Secure tunnelling with only tunnel password
+
+When you do not have access to the ETS keyring you can still negotiate KNX/IP Secure by providing the tunnel IA and password directly. This gives you encrypted tunnelling, while Data Secure and secure multicast stay disabled. The user ID defaults to `2`, which is the standard KNX Secure tunnel account.
+
+```ts
+import KNXClient, { SecureConfig } from 'knxultimate'
+
+const secureCfg: SecureConfig = {
+  tunnelInterfaceIndividualAddress: '1.1.254',
+  tunnelUserPassword: process.env.KNX_TUNNEL_PASSWORD || 'passwordtunnel1',
+  tunnelUserId: Number(process.env.KNX_TUNNEL_USER_ID ?? 2),
+}
+
+const client = new KNXClient({
+  hostProtocol: 'TunnelTCP',
+  ipAddr: '192.168.1.4',
+  ipPort: 3671,
+  isSecureKNXEnabled: true,
+  secureTunnelConfig: secureCfg,
+})
+
+client.on('connected', () => console.log('✓ Secure tunnel connected (manual password)'))
+client.on('error', (e) => console.error('Error:', e.message))
+
+client.Connect()
 ```
 
 ### 2) Decode datapoints (boolean 1.001) from decrypted payloads
