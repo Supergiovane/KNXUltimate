@@ -1,5 +1,12 @@
 
 
+# [5.1.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0...v5.1.0) (2025-09-19)
+
+
+### Features
+
+* Added secure tunnel/password authentication other than the keyring file. ([#62](https://github.com/Supergiovane/KNXUltimate/issues/62)) ([ca83ed0](https://github.com/Supergiovane/KNXUltimate/commit/ca83ed038829b641d00ae038c30d51de38f6595a))
+
 # [5.0.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.5...v5.0.0) (2025-09-16)
 
 
