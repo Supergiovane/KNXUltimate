@@ -13,6 +13,13 @@ async function main() {
     knxkeys_password: 'passwordprogetto',
   }
 
+  // To use manual credentials instead of the ETS keyring:
+  // const secureCfg: SecureConfig = {
+  //   tunnelInterfaceIndividualAddress: '1.1.254',
+  //   tunnelUserPassword: 'passwordtunnel1',
+  //   tunnelUserId: 2,
+  // }
+
   const client = new KNXClient({
     hostProtocol: 'TunnelTCP',
     ipAddr: '192.168.1.4',

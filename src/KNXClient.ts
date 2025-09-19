@@ -1,6 +1,7 @@
 import dgram, { RemoteInfo, Socket as UDPSocket } from 'dgram'
 import net, { Socket as TCPSocket } from 'net'
 import * as crypto from 'crypto'
+import { existsSync } from 'fs'
 import { ConnectionStatus, KNX_CONSTANTS } from './protocol/KNXConstants'
 import CEMIConstants from './protocol/cEMI/CEMIConstants'
 import CEMIFactory from './protocol/cEMI/CEMIFactory'
@@ -96,6 +97,8 @@ export interface SecureConfig {
 	tunnelInterfaceIndividualAddress?: string
 	knxkeys_file_path?: string
 	knxkeys_password?: string
+	tunnelUserPassword?: string
+	tunnelUserId?: number
 }
 
 export enum ConncetionState {
@@ -2024,7 +2027,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		if (!cfg) throw new Error('Secure config not provided')
 		// Load keyring once to access interfaces
 		const kr = new Keyring()
-		const path = cfg.knxkeys_file_path || DEFAULT_KNXKEYS_PATH
+		const explicitPath = cfg.knxkeys_file_path?.trim()
+		const fallbackPath =
+			!explicitPath &&
+			existsSync(DEFAULT_KNXKEYS_PATH)
+				? DEFAULT_KNXKEYS_PATH
+				: undefined
+		const path = explicitPath || fallbackPath
+		if (!path) {
+			throw new Error(
+				'IA discovery for KNX/IP Secure requires a .knxkeys file (set secureTunnelConfig.knxkeys_file_path).',
+			)
+		}
 		const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
 		await kr.load(path, pwd)
 
@@ -3125,66 +3139,116 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// Peer host/port now come from KNXClientOptions.ipAddr/ipPort (not from secure config)
 		// Drive secure logs from KNXClientOptions.loglevel; no separate boolean
 
-		// Always load ETS keyring and extract credentials based on current IA
-		const kr = new Keyring()
-		const path = cfg.knxkeys_file_path || DEFAULT_KNXKEYS_PATH
-		const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
-		await kr.load(path, pwd)
-		this._secureKeyring = kr
+		// Determine whether we have a keyring available
+		const explicitPath = cfg.knxkeys_file_path?.trim()
+		const fallbackPath =
+			!explicitPath &&
+			existsSync(DEFAULT_KNXKEYS_PATH)
+				? DEFAULT_KNXKEYS_PATH
+				: undefined
+		const keyringPath = explicitPath || fallbackPath
+		const hasKeyring = !!keyringPath
 
-		const iface = kr.getInterface(cfg.tunnelInterfaceIndividualAddress)
-		if (iface?.userId) this._secureUserId = iface.userId
-		const password = iface?.decryptedPassword || 'passwordtunnel1'
-
-		// Derive user password key
-		this._secureUserPasswordKey = crypto.pbkdf2Sync(
-			Buffer.from(password, 'latin1'),
-			Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
-			65536,
-			16,
-			'sha256',
-		)
-
-		// Load group keys (optional for Data Secure). Secure routing does not require them
+		// Reset caches that may depend on keyring contents
 		this._secureGroupKeys = new Map()
-		for (const [gaStr, g] of kr.getGroupAddresses()) {
-			if (!g.decryptedKey) continue
-			const ga = this.secureParseGroupAddress(gaStr)
-			this._secureGroupKeys.set(ga, g.decryptedKey.slice(0, 16))
-		}
+		this._secureBackboneKey = undefined
+		this._secureKeyring = undefined
 
 		// Initialize Data Secure sender sequence (48-bit)
 		const base = Date.parse('2018-01-05T00:00:00Z')
 		this._secureSendSeq48 = BigInt(Date.now() - base)
 
-		// Pick KNX Serial from gateway device if available
-		const gatewayIaStr =
-			iface?.host?.toString() || iface?.individualAddress?.toString()
-		const dev = gatewayIaStr ? kr.getDevice(gatewayIaStr) : undefined
-		if (dev?.serialNumber) {
+		if (hasKeyring) {
+			const kr = new Keyring()
+			const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
+			await kr.load(keyringPath!, pwd)
+			this._secureKeyring = kr
+
+			const iface = kr.getInterface(cfg.tunnelInterfaceIndividualAddress)
+			let userId: number | undefined
+			if (typeof cfg.tunnelUserId === 'number') {
+				userId = cfg.tunnelUserId
+			} else if (typeof iface?.userId === 'number') {
+				userId = iface.userId
+			}
+			this._secureUserId = typeof userId === 'number' ? userId : 2
+			const password =
+				iface?.decryptedPassword ||
+				cfg.tunnelUserPassword ||
+				'passwordtunnel1'
+
+			// Derive user password key
+			this._secureUserPasswordKey = crypto.pbkdf2Sync(
+				Buffer.from(password, 'latin1'),
+				Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
+				65536,
+				16,
+				'sha256',
+			)
+
+			// Load group keys (optional for Data Secure). Secure routing does not require them
+			for (const [gaStr, g] of kr.getGroupAddresses()) {
+				if (!g.decryptedKey) continue
+				const ga = this.secureParseGroupAddress(gaStr)
+				this._secureGroupKeys.set(ga, g.decryptedKey.slice(0, 16))
+			}
+
+			// Pick KNX Serial from gateway device if available
+			const gatewayIaStr =
+				iface?.host?.toString() || iface?.individualAddress?.toString()
+			const dev = gatewayIaStr ? kr.getDevice(gatewayIaStr) : undefined
+			if (dev?.serialNumber) {
+				try {
+					const ser = Buffer.from(dev.serialNumber, 'hex')
+					if (ser.length === 6) this._secureSerial = ser
+				} catch {}
+			}
+
+			// Load Backbone key for secure multicast routing (if present)
 			try {
-				const ser = Buffer.from(dev.serialNumber, 'hex')
-				if (ser.length === 6) this._secureSerial = ser
-			} catch {}
+				const backbones = kr.getBackbones()
+				if (backbones && backbones.length > 0) {
+					const bb = backbones[0]
+					if (bb?.decryptedKey && bb.decryptedKey.length >= 16) {
+						this._secureBackboneKey = bb.decryptedKey.subarray(0, 16)
+					}
+					if (typeof bb?.latency === 'number') {
+						this._secureRoutingLatencyMs = Math.max(100, bb.latency)
+					}
+				}
+			} catch (e) {
+				this.sysLogger.warn(
+					`Secure multicast: cannot read backbone key/latency: ${(e as Error).message}`,
+				)
+			}
+			return
 		}
 
-		// Load Backbone key for secure multicast routing (if present)
-		try {
-			const backbones = kr.getBackbones()
-			if (backbones && backbones.length > 0) {
-				const bb = backbones[0]
-				if (bb?.decryptedKey && bb.decryptedKey.length >= 16) {
-					this._secureBackboneKey = bb.decryptedKey.subarray(0, 16)
-				}
-				if (typeof bb?.latency === 'number') {
-					this._secureRoutingLatencyMs = Math.max(100, bb.latency)
-				}
-			}
-		} catch (e) {
-			this.sysLogger.warn(
-				`Secure multicast: cannot read backbone key/latency: ${(e as Error).message}`,
+		// Manual mode: derive credentials directly from provided tunnel password
+		const manualPassword = cfg.tunnelUserPassword
+		if (!manualPassword) {
+			throw new Error(
+				'KNX/IP Secure requires either a .knxkeys file or tunnelUserPassword.',
 			)
 		}
+
+		this._secureUserId =
+			typeof cfg.tunnelUserId === 'number' ? cfg.tunnelUserId : 2
+		this._secureUserPasswordKey = crypto.pbkdf2Sync(
+			Buffer.from(manualPassword, 'latin1'),
+			Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
+			65536,
+			16,
+			'sha256',
+		)
+		this._secureSerial = Buffer.from('000000000000', 'hex')
+		try {
+			if (this.isLevelEnabled('info')) {
+				this.sysLogger.info(
+					`[${getTimestamp()}] Secure TCP: using manual tunnel password (no keyring). Data Secure features disabled.`,
+				)
+			}
+		} catch {}
 	}
 
 	private async secureStartSession(): Promise<void> {
