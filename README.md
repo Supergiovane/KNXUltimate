@@ -41,8 +41,7 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 | --------------------- | -------------------------------------------------------------------- |
 | KNX Tunnelling (UDP)  | ![](https://placehold.co/200x20/green/white?text=YES)                |
 | KNX Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES)              |
-| KNX Secure Tunnelling (TCP) | ![](https://placehold.co/200x20/green/white?text=YES)         |
-| KNX Secure Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES)      |
+| KNX IP Secure/Data secure | ![](https://placehold.co/200x20/green/white?text=YES)         |
 
 
 Please subscribe to my channel, to learn how to use it [![Youtube][youtube-image]][youtube-url]  
