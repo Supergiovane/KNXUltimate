@@ -1,7 +1,6 @@
 import dgram, { RemoteInfo, Socket as UDPSocket } from 'dgram'
 import net, { Socket as TCPSocket } from 'net'
 import * as crypto from 'crypto'
-import { existsSync } from 'fs'
 import { ConnectionStatus, KNX_CONSTANTS } from './protocol/KNXConstants'
 import CEMIConstants from './protocol/cEMI/CEMIConstants'
 import CEMIFactory from './protocol/cEMI/CEMIFactory'
@@ -78,8 +77,6 @@ import {
 	AES_BLOCK_LEN,
 	MAC_LEN_FULL,
 	MAC_LEN_SHORT,
-	DEFAULT_KNXKEYS_PATH,
-	DEFAULT_KNXKEYS_PASSWORD,
 } from './secure/secure_knx_constants'
 
 export type DiscoveryInterface = {
@@ -557,7 +554,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this._secureRoutingSyncTimer = setTimeout(() => {
 						try {
 							// Ensure backbone key available
-							if (!this._secureBackboneKey) this.secureEnsureKeyring()
+							if (!this._secureBackboneKey)
+								this.secureEnsureKeyring()
 							this.secureSendTimerNotify()
 						} catch {}
 					}, 120)
@@ -2028,18 +2026,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// Load keyring once to access interfaces
 		const kr = new Keyring()
 		const explicitPath = cfg.knxkeys_file_path?.trim()
-		const fallbackPath =
-			!explicitPath &&
-			existsSync(DEFAULT_KNXKEYS_PATH)
-				? DEFAULT_KNXKEYS_PATH
-				: undefined
-		const path = explicitPath || fallbackPath
+		const path = explicitPath || undefined
 		if (!path) {
 			throw new Error(
 				'IA discovery for KNX/IP Secure requires a .knxkeys file (set secureTunnelConfig.knxkeys_file_path).',
 			)
 		}
-		const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
+		const pwd = cfg.knxkeys_password?.trim()
+		if (!pwd) {
+			throw new Error(
+				'IA discovery for KNX/IP Secure requires a keyring password (set secureTunnelConfig.knxkeys_password).',
+			)
+		}
 		await kr.load(path, pwd)
 
 		// Discover gateways and find the one matching ipAddr/ipPort
@@ -3141,13 +3139,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		// Determine whether we have a keyring available
 		const explicitPath = cfg.knxkeys_file_path?.trim()
-		const fallbackPath =
-			!explicitPath &&
-			existsSync(DEFAULT_KNXKEYS_PATH)
-				? DEFAULT_KNXKEYS_PATH
-				: undefined
-		const keyringPath = explicitPath || fallbackPath
+		const keyringPath = explicitPath || undefined
 		const hasKeyring = !!keyringPath
+
+			const rawTunnelUserId = cfg.tunnelUserId as unknown
+			let normalizedTunnelUserId: number | undefined
+			if (typeof rawTunnelUserId === 'string') {
+				const parsed = Number(rawTunnelUserId.trim())
+				normalizedTunnelUserId = Number.isNaN(parsed) ? undefined : parsed
+			} else if (typeof rawTunnelUserId === 'number') {
+				normalizedTunnelUserId = Number.isNaN(rawTunnelUserId)
+					? undefined
+					: rawTunnelUserId
+			}
+			const hasConfiguredUserId = typeof normalizedTunnelUserId === 'number'
 
 		// Reset caches that may depend on keyring contents
 		this._secureGroupKeys = new Map()
@@ -3158,33 +3163,56 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const base = Date.parse('2018-01-05T00:00:00Z')
 		this._secureSendSeq48 = BigInt(Date.now() - base)
 
+		const isTunnelTCP = this._options.hostProtocol === 'TunnelTCP'
+
 		if (hasKeyring) {
 			const kr = new Keyring()
-			const pwd = cfg.knxkeys_password || DEFAULT_KNXKEYS_PASSWORD
+			const pwd = cfg.knxkeys_password?.trim()
+			if (!pwd) {
+				throw new Error(
+					'KNX/IP Secure requires secureTunnelConfig.knxkeys_password when secureTunnelConfig.knxkeys_file_path is provided.',
+				)
+			}
 			await kr.load(keyringPath!, pwd)
 			this._secureKeyring = kr
 
-			const iface = kr.getInterface(cfg.tunnelInterfaceIndividualAddress)
-			let userId: number | undefined
-			if (typeof cfg.tunnelUserId === 'number') {
-				userId = cfg.tunnelUserId
-			} else if (typeof iface?.userId === 'number') {
-				userId = iface.userId
-			}
-			this._secureUserId = typeof userId === 'number' ? userId : 2
-			const password =
-				iface?.decryptedPassword ||
-				cfg.tunnelUserPassword ||
-				'passwordtunnel1'
+			const iface = cfg.tunnelInterfaceIndividualAddress
+				? kr.getInterface(cfg.tunnelInterfaceIndividualAddress)
+				: undefined
 
-			// Derive user password key
-			this._secureUserPasswordKey = crypto.pbkdf2Sync(
-				Buffer.from(password, 'latin1'),
-				Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
-				65536,
-				16,
-				'sha256',
-			)
+			if (isTunnelTCP) {
+				let userId: number | undefined
+				if (hasConfiguredUserId) {
+					userId = normalizedTunnelUserId!
+				} else if (typeof iface?.userId === 'number') {
+					userId = iface.userId
+				}
+				if (typeof userId !== 'number') {
+					throw new Error(
+						'KNX/IP Secure requires tunnelUserId when secureTunnelConfig.knxkeys_file_path is provided but the keyring lacks the interface user ID.',
+					)
+				}
+				this._secureUserId = userId
+				const password = (
+					iface?.decryptedPassword ||
+					cfg.tunnelUserPassword ||
+					''
+				).trim()
+				if (!password) {
+					throw new Error(
+						'KNX/IP Secure requires a tunnel user password; set secureTunnelConfig.tunnelUserPassword or provide one in the keyring.',
+					)
+				}
+
+				// Derive user password key
+				this._secureUserPasswordKey = crypto.pbkdf2Sync(
+					Buffer.from(password, 'latin1'),
+					Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
+					65536,
+					16,
+					'sha256',
+				)
+			}
 
 			// Load group keys (optional for Data Secure). Secure routing does not require them
 			for (const [gaStr, g] of kr.getGroupAddresses()) {
@@ -3210,7 +3238,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				if (backbones && backbones.length > 0) {
 					const bb = backbones[0]
 					if (bb?.decryptedKey && bb.decryptedKey.length >= 16) {
-						this._secureBackboneKey = bb.decryptedKey.subarray(0, 16)
+						this._secureBackboneKey = bb.decryptedKey.subarray(
+							0,
+							16,
+						)
 					}
 					if (typeof bb?.latency === 'number') {
 						this._secureRoutingLatencyMs = Math.max(100, bb.latency)
@@ -3231,9 +3262,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				'KNX/IP Secure requires either a .knxkeys file or tunnelUserPassword.',
 			)
 		}
+		if (!hasConfiguredUserId) {
+			throw new Error(
+				'KNX/IP Secure requires secureTunnelConfig.tunnelUserId when no keyring is provided.',
+			)
+		}
 
-		this._secureUserId =
-			typeof cfg.tunnelUserId === 'number' ? cfg.tunnelUserId : 2
+		this._secureUserId = normalizedTunnelUserId!
 		this._secureUserPasswordKey = crypto.pbkdf2Sync(
 			Buffer.from(manualPassword, 'latin1'),
 			Buffer.from('user-password.1.secure.ip.knx.org', 'latin1'),
@@ -3245,7 +3280,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		try {
 			if (this.isLevelEnabled('info')) {
 				this.sysLogger.info(
-					`[${getTimestamp()}] Secure TCP: using manual tunnel password (no keyring). Data Secure features disabled.`,
+					`[${getTimestamp()}] Secure TCP: using manual tunnel password (no keyring). Data Secure features disabled. tunnelUserId=${this._secureUserId}`,
 				)
 			}
 		} catch {}
@@ -3365,28 +3400,41 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this._secureHandshakeAuthTimer = undefined
 					}
 					// On success (status 0), send CONNECT_REQUEST (slight delay improves reliability)
-					if (inner[6] === 0) {
-						const conn = this.secureBuildConnectRequest()
-						setTimeout(() => {
-							try {
-								this.sysLogger.debug(
-									`[${getTimestamp()}] TX 0205 TUNNELING_CONNECT_REQUEST (wrapped)`,
-								)
-							} catch {}
-							this.tcpSocket.write(this.secureWrap(conn))
-							this._secureHandshakeState = 'connect'
-							this._secureHandshakeConnectTimer = setTimeout(
-								() =>
-									this.emit(
-										KNXClientEvents.error,
-										new Error(
-											'Timeout waiting for CONNECT_RESPONSE',
-										),
-									),
-								SECURE_CONNECT_TIMEOUT_MS,
-							)
-						}, CONNECT_SEND_DELAY_MS)
+					const status = inner[6]
+					if (status !== 0) {
+						const reason = this.secureDescribeSessionStatus(status)
+						const err = new Error(
+							reason ||
+								`Secure session failed with status ${status}`,
+						)
+						this.emit(KNXClientEvents.error, err)
+						this._secureHandshakeState = undefined
+						void this.setDisconnected(
+							reason ||
+								`Secure session failed (status ${status})`,
+						)
+						return
 					}
+					const conn = this.secureBuildConnectRequest()
+					setTimeout(() => {
+						try {
+							this.sysLogger.debug(
+								`[${getTimestamp()}] TX 0205 TUNNELING_CONNECT_REQUEST (wrapped)`,
+							)
+						} catch {}
+						this.tcpSocket.write(this.secureWrap(conn))
+						this._secureHandshakeState = 'connect'
+						this._secureHandshakeConnectTimer = setTimeout(
+							() =>
+								this.emit(
+									KNXClientEvents.error,
+									new Error(
+										'Timeout waiting for CONNECT_RESPONSE',
+									),
+								),
+							SECURE_CONNECT_TIMEOUT_MS,
+						)
+					}, CONNECT_SEND_DELAY_MS)
 				} else if (
 					innerType === KNXIP.TUNNELING_CONNECT_RESPONSE &&
 					this._secureHandshakeState === 'connect'
@@ -3561,6 +3609,23 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		])
 	}
 
+	private secureDescribeSessionStatus(status: number): string {
+		switch (status) {
+			case 0:
+				return 'Secure session established'
+			case 1:
+				return 'Secure session authentication failed: verify secureTunnelConfig.tunnelUserPassword and tunnelUserId.'
+			case 2:
+				return 'Secure session rejected by gateway (access denied or disabled user).'
+			case 3:
+				return 'Secure session aborted due to sequence or timing mismatch.'
+			case 4:
+				return 'Secure session aborted because the gateway detected a cryptographic integrity error.'
+			default:
+				return ''
+		}
+	}
+
 	// ===== KNX/IP Secure Multicast (routing) helpers =====
 	private secureRoutingTimerValue(): number {
 		// Monotonic-ish timer in ms; adjust by offset if synchronized
@@ -3595,12 +3660,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const timerValue = this.secureRoutingTimerValue()
 			const timerBytes = Buffer.alloc(SECURE_SEQ_LEN)
 			timerBytes.writeUIntBE(timerValue, 0, SECURE_SEQ_LEN)
-			const tag = messageTag && messageTag.length === 2 ? messageTag : crypto.randomBytes(2)
+			const tag =
+				messageTag && messageTag.length === 2
+					? messageTag
+					: crypto.randomBytes(2)
 			const serial = this._secureSerial
 			// Additional data = KNX/IP header of TimerNotify (06 10 09 55 00 24)
 			const additional = Buffer.from('061009550024', 'hex')
 			// Block0 = timer(6) + serial(6) + tag(2) + 00 00
-			const b0 = Buffer.concat([timerBytes, serial, tag, Buffer.from([0x00, 0x00])])
+			const b0 = Buffer.concat([
+				timerBytes,
+				serial,
+				tag,
+				Buffer.from([0x00, 0x00]),
+			])
 			const macCbc = calculateMessageAuthenticationCodeCBC(
 				this._secureBackboneKey,
 				additional,
@@ -3608,7 +3681,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				b0,
 			)
 			// CTR-enc mac with counter0 = timer + serial + tag + ff 00
-			const ctr0 = Buffer.concat([timerBytes, serial, tag, Buffer.from([0xff, 0x00])])
+			const ctr0 = Buffer.concat([
+				timerBytes,
+				serial,
+				tag,
+				Buffer.from([0xff, 0x00]),
+			])
 			const [, mac] = encryptDataCtr(
 				this._secureBackboneKey,
 				ctr0,
@@ -3618,12 +3696,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const body = Buffer.concat([timerBytes, serial, tag, mac])
 			const hdr = Buffer.from('061009550024', 'hex')
 			const frame = Buffer.concat([hdr, body])
-			this.udpSocket.send(
-				frame,
-				this._peerPort,
-				this._peerHost,
-				() => {},
-			)
+			this.udpSocket.send(frame, this._peerPort, this._peerHost, () => {})
 			try {
 				if (this.isLevelEnabled('debug')) {
 					this.sysLogger.debug(

@@ -33,18 +33,19 @@ async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): P
 
 async function main() {
   // KNX Secure + Data Secure configuration
-   const secureCfg: SecureConfig = {
-     knxkeys_file_path: '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
-     knxkeys_password: 'passwordprogetto',
+  // const secureCfg: SecureConfig = {
+  //   // tunnelInterfaceIndividualAddress: '1.1.254', // Optional. If not specified, will be auto discovered. Must be in the keyring
+  //   knxkeys_file_path: '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
+  //   knxkeys_password: 'passwordprogetto',
+  // }
 
-    // If you do not have the ETS keyring, comment the block above and use the
-    // manual secure credentials below. Data Secure will be unavailable.
-   tunnelInterfaceIndividualAddress: '1.1.254',
+  // If you do not have the ETS keyring, comment the block above and use the
+  // manual secure credentials below. Data Secure will be unavailable.
+  const secureCfg: SecureConfig = {
+    tunnelInterfaceIndividualAddress: '1.1.254',
     tunnelUserPassword: '6N.nv0sz', // Replace with your tunnel password
     tunnelUserId: 3, // Replace with the tunnel user ID defined in ETS
-   }
-
-  
+  }
 
   const client = new KNXClient({
     hostProtocol: 'TunnelTCP',
@@ -52,7 +53,7 @@ async function main() {
     ipPort: 3671,
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,
-    loglevel: 'info'
+    loglevel: 'debug'
   })
 
   client.on('connected', () => console.log('✓ KNXClient connected (secure)'))
@@ -65,19 +66,19 @@ async function main() {
 
     console.log('\nTEST: ON/OFF 1/1/1 with status check 1/1/2')
     // ON
-    client.write('1/1/1', true, '1.001')
+    client.write('1/2/1', true, '1.001')
     // Small delay before reading status to avoid racing immediately after write
     await new Promise((r) => setTimeout(r, 150))
-    client.read('1/1/2')
-    const onVal = await waitForStatus(client, '1/1/2', 5000)
+    client.read('1/2/2')
+    const onVal = await waitForStatus(client, '1/2/2', 5000)
     console.log(`Status after ON: ${onVal ? 'ON' : 'OFF'}`)
     if (onVal !== 1) throw new Error('Unexpected status after ON (expected ON)')
 
     // OFF
-    client.write('1/1/1', false, '1.001')
+    client.write('1/2/1', false, '1.001')
     await new Promise((r) => setTimeout(r, 150))
-    client.read('1/1/2')
-    const offVal = await waitForStatus(client, '1/1/2', 5000)
+    client.read('1/2/2')
+    const offVal = await waitForStatus(client, '1/2/2', 5000)
     console.log(`Status after OFF: ${offVal ? 'ON' : 'OFF'}`)
     if (offVal !== 0) throw new Error('Unexpected status after OFF (expected OFF)')
 

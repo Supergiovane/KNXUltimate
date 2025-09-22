@@ -335,10 +335,15 @@ When you do not have access to the ETS keyring you can still negotiate KNX/IP Se
 ```ts
 import KNXClient, { SecureConfig } from 'knxultimate'
 
+const tunnelPassword = process.env.KNX_TUNNEL_PASSWORD
+if (!tunnelPassword) {
+  throw new Error('Set KNX_TUNNEL_PASSWORD with your secure tunnel password')
+}
+
 const secureCfg: SecureConfig = {
   tunnelInterfaceIndividualAddress: '1.1.254',
-  tunnelUserPassword: process.env.KNX_TUNNEL_PASSWORD || 'passwordtunnel1',
-  tunnelUserId: Number(process.env.KNX_TUNNEL_USER_ID ?? 2),
+  tunnelUserPassword: tunnelPassword,
+  tunnelUserId: 2, // Replace with your tunnel user ID from ETS (number or numeric string)
 }
 
 const client = new KNXClient({
@@ -354,6 +359,18 @@ client.on('error', (e) => console.error('Error:', e.message))
 
 client.Connect()
 ```
+
+> **Note:** ETS assigns a dedicated `tunnelUserId` to each secure tunnel. Set `secureTunnelConfig.tunnelUserId` (number or numeric string) together with the password, otherwise the gateway replies with `Secure Session Status = 1` and the connection is closed.
+
+### Secure workflow recap
+
+- **KNX IP Tunnelling Secure** protects the TCP channel. The gateway authenticates a tunnel user by ID + password during the `Secure Session Authenticate (0x0953)` step. Provide the password either from the keyring (`secureTunnelConfig.knxkeys_*`) or manually via `secureTunnelConfig.tunnelUserPassword`; in both cases the `tunnelUserId` must match the ETS commissioning data.
+- **KNX Data Secure** protects group-address telegrams. It relies on group keys stored in the ETS keyring, so a `.knxkeys` file plus its password are mandatory whenever you need encrypted group communication.
+- **Supported combinations**
+  - *Keyring only*: set `knxkeys_file_path`/`knxkeys_password` and omit `tunnelUserPassword`. Both the tunnel password and the group keys are loaded from the keyring.
+- *Manual tunnel password only*: set both `tunnelUserPassword` and `tunnelUserId` without a keyring. The IP channel is secured, but Data Secure stays disabled because no group keys are present.
+  - *Keyring + manual password*: provide the keyring for Data Secure and override the tunnelling password with `tunnelUserPassword` (useful when the ETS export does not include the tunnel password). Ensure `knxkeys_*` and `tunnelUserPassword` are both configured.
+- To retrieve the tunnel user ID/password pair, open the secure tunnelling interface in ETS (or inspect the `.knxkeys` entry). Default ETS IDs are typically small integers (e.g. `2`, `3`, …) but may differ per installation.
 
 ### 2) Decode datapoints (boolean 1.001) from decrypted payloads
 
@@ -542,9 +559,14 @@ Examples overview:
 - [sampleSecureTunnelTCP](./examples/sampleSecureTunnelTCP.ts): KNX/IP Secure tunnelling over TCP (`hostProtocol: 'TunnelTCP'` + `isSecureKNXEnabled: true`). Performs session handshake + Secure Wrapper. Applies Data Secure for GA present in the ETS keyring. ON/OFF + status read.
   - Requires: set `.knxkeys` path + password in the example file. Optionally omit `tunnelInterfaceIndividualAddress` to auto‑select a free tunnel from the keyring.
   - Run: `npm run example:secure:tunnel` or `node -r esbuild-register -e "require('./examples/sampleSecureTunnelTCP.ts')"`
+- [sampleSecureTunnelTCPNoDataSecure](./examples/sampleSecureTunnelTCPNoDataSecure.ts): KNX/IP Secure tunnelling over TCP using only the manual tunnel password/ID (no keyring, Data Secure disabled). Demonstrates secure channel establishment when group keys are unavailable.
+  - Configure: set `tunnelInterfaceIndividualAddress`, `tunnelUserPassword`, and `tunnelUserId` in the file.
+  - Run: `node -r esbuild-register -e "require('./examples/sampleSecureTunnelTCPNoDataSecure.ts')"`
 - [sampleSecureMulticast](./examples/sampleSecureMulticast.ts): KNX/IP Secure routing over multicast (`hostProtocol: 'Multicast'` + `isSecureKNXEnabled: true`). Synchronizes timer via 0x0955, wraps frames in Secure Wrapper, and applies Data Secure per GA. ON/OFF + status read.
   - Requires: set `.knxkeys` path + password in the example file.
   - Run: `npm run example:secure:multicast` or `node -r esbuild-register -e "require('./examples/sampleSecureMulticast.ts')"`
+- [dumpKeyringCredentials](./examples/dumpKeyringCredentials.ts): Loads a `.knxkeys` file, decrypts all stored tunnel passwords, authentication codes, device credentials, group keys, and backbone keys, and prints them to the console. Safe.
+  - Run: `node -r esbuild-register -e "require('./examples/dumpKeyringCredentials.ts')" [path/to/keyring.knxkeys] [ets-password]`
 
 ### Discovery details
 

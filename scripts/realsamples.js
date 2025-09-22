@@ -11,6 +11,12 @@ const samples = [
   path.resolve(__dirname, '..', 'examples', 'samplePlainTunnelUPD.ts'),
   path.resolve(__dirname, '..', 'examples', 'sampleSecureMulticast.ts'),
   path.resolve(__dirname, '..', 'examples', 'sampleSecureTunnelTCP.ts'),
+  path.resolve(
+    __dirname,
+    '..',
+    'examples',
+    'sampleSecureTunnelTCPNoDataSecure.ts',
+  ),
 ]
 
 function wait(ms) {
@@ -48,4 +54,3 @@ async function runOne(file) {
   console.error('\nError while running samples:', err && err.message ? err.message : err)
   process.exit(1)
 })
-

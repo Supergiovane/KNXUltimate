@@ -85,11 +85,6 @@ export const SECURE_SESSION_TIMEOUT_MS = 5000 // wait for SESSION_RESPONSE
 export const SECURE_AUTH_TIMEOUT_MS = 5000 // wait for SESSION_STATUS
 export const SECURE_CONNECT_TIMEOUT_MS = 15000 // wait for CONNECT_RESPONSE
 
-// Default keyring location and password
-export const DEFAULT_KNXKEYS_PATH =
-	'/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys'
-export const DEFAULT_KNXKEYS_PASSWORD = 'passwordprogetto'
-
 // HPAI/CRD for connect request
 export const HPAI_CONTROL_ENDPOINT_EMPTY = Buffer.from(
 	'0802000000000000',

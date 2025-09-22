@@ -16,8 +16,8 @@ async function main() {
   // To use manual credentials instead of the ETS keyring:
   // const secureCfg: SecureConfig = {
   //   tunnelInterfaceIndividualAddress: '1.1.254',
-  //   tunnelUserPassword: 'passwordtunnel1',
-  //   tunnelUserId: 2,
+  //   tunnelUserPassword: '<your-tunnel-password>',
+  //   tunnelUserId: <your-tunnel-user-id>,
   // }
 
   const client = new KNXClient({
