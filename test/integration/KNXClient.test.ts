@@ -277,12 +277,12 @@ describe('KNXClient Tests', () => {
 				// Advance virtual time instead of waiting
 				await clock.tickAsync(50)
 
-			// Verify discovery results
-			const expectedHost = `${MockKNXServer.host}:${MockKNXServer.port}:KNX IP Secure Bridge:10.15.1`
-			assert.equal(
-				discovered[0],
-				expectedHost,
-				'Discovery should work',
+				// Verify discovery results
+				const expectedHost = `${MockKNXServer.host}:${MockKNXServer.port}:KNX IP Secure Bridge:10.15.1`
+				assert.equal(
+					discovered[0],
+					expectedHost,
+					'Discovery should work',
 				)
 
 				await client.Disconnect()
