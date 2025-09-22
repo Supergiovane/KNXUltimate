@@ -1,5 +1,14 @@
 
 
+## [5.1.2](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.1...v5.1.2) (2025-09-22)
+
+
+### Features
+
+* added mock secure server for tests ([80f2057](https://github.com/Supergiovane/KNXUltimate/commit/80f20579d5dbfdb04b0f81a724f6125c15ce33d1))
+* added tests on sec primitives ([5dc5d40](https://github.com/Supergiovane/KNXUltimate/commit/5dc5d40ca643a3534520fc2e74f5789cf31c0fa3))
+* more tests in secure ([db7b123](https://github.com/Supergiovane/KNXUltimate/commit/db7b123f2de211d7161644885250cbaee0729250))
+
 ## [5.1.1](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.0...v5.1.1) (2025-09-22)
 
 
