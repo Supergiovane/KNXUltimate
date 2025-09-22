@@ -1,5 +1,12 @@
 
 
+## [5.1.1](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.0...v5.1.1) (2025-09-22)
+
+
+### Features
+
+* added tunneluserID in case of manual credentials withoud keyring ([d98864e](https://github.com/Supergiovane/KNXUltimate/commit/d98864eef85f4766fde00ab50701ae48b4ac3015))
+
 # [5.1.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0...v5.1.0) (2025-09-19)
 
 
