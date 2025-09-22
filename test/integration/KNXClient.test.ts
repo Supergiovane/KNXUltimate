@@ -62,16 +62,16 @@ const getMockResponses = (): SnifferPacket[] => {
 
 	return [
 		{
+			// Plain search request - current clients send this first; no response required
+			request: `06100201000e0801${reqIPHex}0e57`,
+			deltaReq: 0,
+		},
+		{
 			// Accept extended search request (0x020b) first in our current client flow
 			request: `0610020b00180801${reqIPHex}0e5704830901060401020600`,
 			response: `06100202004e0801${knxGwIp}0e5736010200af010000006c00769395e000170c006c007693954b4e582049502053656375726520427269646765000000000000000000000a020201030104010501`,
 			deltaReq: 0,
 			deltaRes: 10,
-		},
-		{
-			// Plain search request may follow; no response needed (already sent above)
-			request: `06100201000e0801${reqIPHex}0e57`,
-			deltaReq: 0,
 		},
 	]
 }
@@ -277,12 +277,12 @@ describe('KNXClient Tests', () => {
 				// Advance virtual time instead of waiting
 				await clock.tickAsync(50)
 
-				// Verify discovery results
-				const expectedHost = `${MockKNXServer.host}:${MockKNXServer.port}:KNX IP Secure Bridge:10.15.1`
-				assert.equal(
-					discovered[0],
-					expectedHost,
-					'Discovery should work',
+			// Verify discovery results
+			const expectedHost = `${MockKNXServer.host}:${MockKNXServer.port}:KNX IP Secure Bridge:10.15.1`
+			assert.equal(
+				discovered[0],
+				expectedHost,
+				'Discovery should work',
 				)
 
 				await client.Disconnect()
@@ -315,7 +315,7 @@ describe('KNXClient Tests', () => {
 						const src = packet.cEMIMessage.srcAddress.toString()
 						const data = npdu.dataValue
 
-						assert.equal(dest, '0/1/1')
+						assert.equal(dest, groupId)
 						assert.equal(src, MockKNXServer.physicalAddress)
 
 						if (npdu.isGroupRead || npdu.isGroupWrite) {

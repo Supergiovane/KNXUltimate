@@ -30,7 +30,7 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 
 	public static host = '192.168.1.116'
 
-	public static physicalAddress = '10.15.2'
+	public static physicalAddress = '10.15.251'
 
 	private socket: UDPSocket | TCPSocket
 
@@ -291,6 +291,10 @@ export default class MockKNXServer extends TypedEventEmitter<MockServerEventCall
 			// Matched a request with no response defined; treat as no-op
 			this.log('Matched request with no response; continuing')
 		} else {
+			if (si === '0421') {
+				this.log('No expectation for tunneling ACK; ignoring')
+				return
+			}
 			this.error('No matching response found for this request.')
 		}
 	}
