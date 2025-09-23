@@ -1,5 +1,12 @@
 
 
+## [5.1.3](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.2...v5.1.3) (2025-09-23)
+
+
+### Features
+
+* added more examples ([2ca8c36](https://github.com/Supergiovane/KNXUltimate/commit/2ca8c36e13b0aa64b149f7e8e9ab57b3fc3c8bee))
+
 ## [5.1.2](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.1...v5.1.2) (2025-09-22)
 
 
