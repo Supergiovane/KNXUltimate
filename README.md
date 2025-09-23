@@ -573,10 +573,10 @@ Examples overview:
 - Functions: `KNXClient.discover()`, `KNXClient.discoverDetailed()`, `KNXClient.discoverInterfaces()`.
 - Default port: if a KNX interface does not advertise a port in the `SEARCH_RESPONSE` HPAI (missing or zero), discovery uses `3671` as the port.
 - Return formats:
-- `discover()` → strings formatted as `ip:port:name:ia:Security:Transport`.
+- `discover()` → strings formatted as `ip:port:name:ia:Security:Transport`; highlights whether the result is plain/secure and which transport to use.
   - Example: `192.168.1.4:3671:MyGW:1.1.1:Secure KNX:TCP`, `224.0.23.12:3671:MyRouter:1.1.0:Plain KNX:Multicast`.
-  - `discoverDetailed()` → strings formatted as `ip:port:name:ia:services:type:transport`.
-  - `discoverInterfaces()` → array of objects `{ ip, port, name, ia, services, type, transport }`.
+- `discoverDetailed()` → strings formatted as `ip:port:name:ia:service1,service2:type`; focuses on human-readable service families (`routing`, `tunnelling`, etc.) and whether the entry corresponds to tunnelling or routing.
+- `discoverInterfaces()` → array of objects `{ ip, port, name, ia, services, type, transport }`, giving parsed fields and an inferred transport, with `services` exposed as an array of service names.
 
 Example usage
 ```ts
@@ -591,7 +591,7 @@ for (const entry of list) {
 
 // Detailed strings
 const detailed = await KNXClient.discoverDetailed(5000)
-// ip:port:name:ia:services:type:transport
+// ip:port:name:ia:service1,service2:type
 
 // Structured objects
 const objects = await KNXClient.discoverInterfaces(5000)
