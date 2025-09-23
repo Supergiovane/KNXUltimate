@@ -549,8 +549,11 @@ Examples overview:
 - [test-toggle](./examples/test-toggle.ts): Interactive ON/OFF toggle from CLI. Warning: sends telegrams.
 - [disconnection](./examples/disconnection.ts): Demonstrates clean disconnects and error handling.
 - [logging](./examples/logging.ts): Shows how to attach to the log stream and change log levels.
+- [monitorBusMinimal](./examples/monitorBusMinimal.ts): Minimal listener that connects and prints incoming telegrams. Warning: connects to the bus but does not send telegrams.
 - [showDatapoints](./examples/showDatapoints.ts): Lists supported datapoints and shows how payloads are built. Safe: does not send to the bus.
+- [datapointBasics](./examples/datapointBasics.ts): Demonstrates encoding and decoding a few datapoint values locally. Safe.
 - [discovery](./examples/discovery.ts): Discovers KNX/IP interfaces/routers (SEARCH_REQUEST). Safe.
+- [discoverInterfacesSimple](./examples/discoverInterfacesSimple.ts): Uses `discoverInterfaces()` to print a concise summary of each gateway. Safe.
 - [gatewaydescription](./examples/gatewaydescription.ts): Requests and prints extended gateway information. Safe.
 - [samplePlainTunnelUPD](./examples/samplePlainTunnelUPD.ts): Plain KNX/IP tunnelling over UDP (`hostProtocol: 'TunnelUDP'`). ON/OFF + status read via a KNX interface.
   - Run: `node -r esbuild-register -e "require('./examples/samplePlainTunnelUPD.ts')"`
