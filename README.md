@@ -8,7 +8,7 @@
 [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 [![Youtube][youtube-image]][youtube-url]
 
-Control your KNX intallation via Node.js!  
+Control your KNX intallation via Node.js. It includes also KNX IP Secure and Data Secure!  
 
 This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](https://flows.nodered.org/node/node-red-contrib-knx-ultimate)  
 

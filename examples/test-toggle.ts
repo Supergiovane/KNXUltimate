@@ -1,3 +1,12 @@
+/**
+ * CLI example toggling a KNX group address interactively.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { KNXClient, KNXClientEvents } from '../src'
 
 if (process.argv.length < 3) {

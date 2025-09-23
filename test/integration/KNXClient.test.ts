@@ -1,3 +1,12 @@
+/**
+ * Integration tests covering KNX Client.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 // Ensure deterministic behavior in CI-like environments and lower log verbosity
 import { test, describe, after } from 'node:test'
 import assert from 'node:assert'

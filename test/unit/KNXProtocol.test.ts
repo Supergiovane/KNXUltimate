@@ -1,3 +1,12 @@
+/**
+ * Unit tests for KNX Protocol.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { describe, it, beforeEach } from 'node:test'
 import assert from 'assert'
 import KNXProtocol from '../../src/protocol/KNXProtocol'

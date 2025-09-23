@@ -1,4 +1,13 @@
 /**
+ * Provides KNX Data Point Type 242 encoding and decoding helpers.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
+/**
  * knx.js - a KNX protocol stack in pure Javascript
  *  Supergiovane
  */

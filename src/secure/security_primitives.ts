@@ -1,4 +1,13 @@
 /**
+ * Implements KNX Secure cryptographic primitives.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
+/**
  * Encryption and Decryption functions for KNX Secure
  */
 

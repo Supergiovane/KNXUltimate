@@ -1,3 +1,12 @@
+/**
+ * Mocks a KNX Secure gateway for tests.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { createServer, Server, Socket } from 'net'
 import { AddressInfo } from 'net'
 import * as crypto from 'crypto'

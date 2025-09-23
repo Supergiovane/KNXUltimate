@@ -1,3 +1,12 @@
+/**
+ * Defines the base KNX cEMI message structure.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import KNXAddress from '../KNXAddress'
 import KNXDataBuffer from '../KNXDataBuffer'
 import ControlField from './ControlField'

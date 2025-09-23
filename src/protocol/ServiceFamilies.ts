@@ -1,3 +1,12 @@
+/**
+ * Parses KNX service family descriptors.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { KNX_CONSTANTS } from './KNXConstants'
 
 export default class ServiceFamilies {

@@ -1,3 +1,12 @@
+/**
+ * Provides helpers for inspecting local network interfaces.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { hasProp } from '../utils'
 import { module } from '../KnxLog'
 import os, { NetworkInterfaceInfo } from 'os'

@@ -1,3 +1,12 @@
+/**
+ * Unit tests for KNX Utils.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { describe, it } from 'node:test'
 import assert from 'assert'
 import { splitIP, validateKNXAddress } from '../../src/protocol/KNXUtils'

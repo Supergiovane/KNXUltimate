@@ -1,3 +1,12 @@
+/**
+ * Example dumping credentials from a KNX keyring file.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import path from 'path'
 import { Keyring } from '../src/secure/keyring'
 

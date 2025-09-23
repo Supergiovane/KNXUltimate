@@ -1,3 +1,12 @@
+/**
+ * Example fetching KNX gateway descriptions.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 // Get the gateway description of each gatewau found
 import { setTimeout } from 'timers'
 import { KNXClient, KNXDescriptionResponse } from '../src'

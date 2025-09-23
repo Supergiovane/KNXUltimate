@@ -1,3 +1,12 @@
+/**
+ * Defines constants for KNX/IP Secure features.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 // Shared KNX/KNX Secure constants
 
 // Data Secure SCF for encryption + S_A_DATA, no tool/system broadcast

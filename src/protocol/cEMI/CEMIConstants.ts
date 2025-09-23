@@ -1,3 +1,12 @@
+/**
+ * Holds constants for KNX cEMI messages.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 const CEMIConstants = {
 	PL_MEDIUM_INFO: 0x01,
 	RF_MEDIUM_INFO: 0x02,

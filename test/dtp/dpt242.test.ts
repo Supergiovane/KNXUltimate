@@ -1,3 +1,12 @@
+/**
+ * Validates KNX Data Point Type 242 conversions.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import DPT242 from '../../src/dptlib/dpt242'

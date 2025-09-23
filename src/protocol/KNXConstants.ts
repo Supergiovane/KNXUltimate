@@ -1,3 +1,12 @@
+/**
+ * Holds core KNX protocol constants.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 export const KNX_CONSTANTS = {
 	KNXNETIP_VERSION_10: 0x10,
 	HEADER_SIZE_10: 0x6,

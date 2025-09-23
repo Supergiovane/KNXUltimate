@@ -1,3 +1,12 @@
+/**
+ * Implements the main KNX client managing tunnelling and routing.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import dgram, { RemoteInfo, Socket as UDPSocket } from 'dgram'
 import net, { Socket as TCPSocket } from 'net'
 import * as crypto from 'crypto'

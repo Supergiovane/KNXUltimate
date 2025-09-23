@@ -1,3 +1,12 @@
+/**
+ * Tests the KNX Secure tunnelling client workflows.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { describe, it, before, after } from 'node:test'
 import assert from 'assert'
 import fs from 'fs'

@@ -1,4 +1,13 @@
 /**
+ * Provides KNX Data Point Type 237 encoding and decoding helpers.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
+/**
  * knxultimate-api
  * (C) 2016-2019 Supergiovane
  */

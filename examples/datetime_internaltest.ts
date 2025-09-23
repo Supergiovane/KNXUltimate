@@ -1,3 +1,12 @@
+/**
+ * Internal example validating KNX datetime handling.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { KNXClientOptions } from "../src/KNXClient";
 import { KNXClientEvents, KNXClient, dptlib } from "../src";
 import { resolve, fromBuffer } from "../src/dptlib";
