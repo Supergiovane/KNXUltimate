@@ -42,6 +42,7 @@
     },
     "hooks": {
       "before:init": [
+        "npm run test:all",
         "npm run build"
       ]
     },

@@ -11,7 +11,7 @@ import { resolve, fromBuffer } from "../src/dptlib";
 import { KNXClientOptions } from "../src/KNXClient";
 import { KNXClientEvents, KNXClient, dptlib } from "../src";
 
-// Set the properties
+// Minimal multicast configuration; adjust GA/IP to match your setup
 let knxUltimateClientProperties: KNXClientOptions = {
     ipAddr: "224.0.23.12",
     ipPort: "3671",
@@ -80,6 +80,7 @@ knxUltimateClient.on(KNXClientEvents.connected, info => {
 
 knxUltimateClient.Connect();
 
+// Exit after 20 seconds so the demo does not run indefinitely
 setTimeout(() => {
     knxUltimateClient.Disconnect();
     process.exit

@@ -10,6 +10,7 @@
 import KNXClient, { SecureConfig } from '../src/KNXClient'
 
 function now() {
+  // Helper for consistent timestamped logging
   return new Date().toISOString()
 }
 
@@ -56,6 +57,7 @@ async function main() {
 
   // Start and keep the connection open
   client.Connect()
+  // Hold until the secure tunnel is fully established
   await new Promise<void>((resolve) => client.once('connected', () => resolve()))
 
   console.log(

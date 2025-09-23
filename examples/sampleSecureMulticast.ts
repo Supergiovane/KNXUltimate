@@ -16,6 +16,7 @@ async function waitForStatus(
   fallbackGa?: string,
   timeoutMs = 5000,
 ): Promise<number> {
+  // Listen for secure indications on either the status GA or an optional fallback
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       client.off('indication', onInd)
@@ -56,6 +57,7 @@ async function main() {
   }
 
   const client = new KNXClient({
+    // Enable secure routing; the keyring is referenced via secureTunnelConfig
     hostProtocol: 'Multicast',
     ipAddr: '224.0.23.12',
     ipPort: 3671,
@@ -71,6 +73,7 @@ async function main() {
 
   try {
     client.Connect()
+    // Wait for the secure session handshake to finish
     await new Promise<void>((resolve) => client.once('connected', () => resolve()))
 
     // Give the router a moment to emit TimerNotify (0955) and align our timer

@@ -14,10 +14,12 @@ async function main() {
   const ifaceArg = process.argv[2]
   const timeout = Number(process.argv[3] || 5000)
 
+  // Trigger classic discovery; returns an array of descriptor strings
   const list = await KNXClient.discover(
     ifaceArg ? (ifaceArg as any) : undefined,
     timeout,
   )
+  // Print each entry for quick inspection
   console.log(list)
 }
 

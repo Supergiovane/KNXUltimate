@@ -11,6 +11,7 @@ import KNXClient, { SecureConfig } from '../src/KNXClient'
 import CEMIConstants from '../src/protocol/cEMI/CEMIConstants'
 
 async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): Promise<number> {
+  // Wait for a single-bit response directed to the status GA
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       client.off('indication', onInd)
@@ -57,6 +58,7 @@ async function main() {
   }
 
   const client = new KNXClient({
+    // Secure tunnel without Data Secure (password/user provided manually)
     hostProtocol: 'TunnelTCP',
     ipAddr: '192.168.1.4',
     ipPort: 3671,
@@ -71,6 +73,7 @@ async function main() {
 
   try {
     client.Connect()
+    // Ensure the secure tunnel is established before continuing
     await new Promise<void>((resolve) => client.once('connected', () => resolve()))
 
     console.log('\nTEST: ON/OFF 1/1/1 with status check 1/1/2')

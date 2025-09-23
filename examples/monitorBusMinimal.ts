@@ -9,6 +9,7 @@
 
 import { KNXClient, KNXClientEvents, KNXClientOptions } from '../src'
 
+// Lightweight configuration for a multicast connection
 const options: KNXClientOptions = {
   ipAddr: '224.0.23.12', // Replace with your gateway IP if needed
   ipPort: 3671,
@@ -24,6 +25,7 @@ client.on(KNXClientEvents.connected, () => {
 })
 
 client.on(KNXClientEvents.indication, (datagram) => {
+  // Inspect the incoming frame and classify the cEMI event
   const npdu = datagram.cEMIMessage.npdu
   const event = npdu.isGroupWrite
     ? 'GroupValue_Write'
@@ -34,6 +36,7 @@ client.on(KNXClientEvents.indication, (datagram) => {
     : 'Other'
   const src = datagram.cEMIMessage.srcAddress.toString()
   const dst = datagram.cEMIMessage.dstAddress.toString()
+  // Print the raw payload; keep it hex to avoid accidental decoding mistakes
   const payload = npdu.dataValue ? npdu.dataValue.toString('hex') : '(no payload)'
   console.log(`[${event}] ${src} -> ${dst} payload: ${payload}`)
 })
@@ -51,6 +54,7 @@ client.Connect()
 async function shutdown() {
   console.log('\nStopping listener...')
   try {
+    // Gracefully close the tunnel before exiting
     await client.Disconnect()
   } catch (error) {
     console.error('Error during disconnect:', error)
@@ -58,5 +62,6 @@ async function shutdown() {
   process.exit(0)
 }
 
+// Ensure Ctrl+C or kill signals cleanup the session
 process.once('SIGINT', shutdown)
 process.once('SIGTERM', shutdown)

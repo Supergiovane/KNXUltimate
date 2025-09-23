@@ -16,6 +16,7 @@ async function waitForStatus(
   ga: string,
   timeoutMs = 5000,
 ): Promise<number> {
+  // Await a group indication targeting the provided GA and return its 1-bit value
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       client.off('indication', onInd)
@@ -49,6 +50,7 @@ async function main() {
   console.log('🚀 Connecting KNX/IP (TunnelUDP, plain)')
 
   const client = new KNXClient({
+    // Plain routing configuration: multicast + no secure wrapper
     hostProtocol: 'Multicast',
     ipAddr: '224.0.23.12',
     ipPort: 3671,
@@ -96,6 +98,7 @@ async function main() {
 
   try {
     client.Connect()
+    // Wait until the transport is ready before issuing telegrams
     await new Promise<void>((resolve) => client.once('connected', () => resolve()))
 
     console.log('\nTEST: ON/OFF 0/1/1 with status check 0/1/25')

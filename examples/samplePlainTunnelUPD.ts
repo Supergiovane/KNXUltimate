@@ -15,6 +15,7 @@ async function waitForStatus(
   ga: string,
   timeoutMs = 5000,
 ): Promise<number> {
+  // Resolve when a matching status indication arrives within the timeout window
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       client.off('indication', onInd)
@@ -48,6 +49,7 @@ async function main() {
   console.log('🚀 Connecting KNX/IP (TunnelUDP, plain)')
 
   const client = new KNXClient({
+    // Classic tunnelling to a unicast interface
     hostProtocol: 'TunnelUDP',
     ipAddr: '192.168.1.117',
     ipPort: 3671,
@@ -62,6 +64,7 @@ async function main() {
 
   try {
     client.Connect()
+    // Defer the test suite until the interface confirms the tunnel
     await new Promise<void>((resolve) => client.once('connected', () => resolve()))
 
     console.log('\nTEST: ON/OFF 0/1/1 with status check 0/1/25')

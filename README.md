@@ -27,8 +27,8 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 
 
 <p align='center'>
-<img width="110px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/KNX_CERTI_MARK_RGB.jpg" ></br></br>
-<img width="100px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/knxsecure.png" ></br>
+<img width="110px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/KNX_CERTI_MARK_RGB.jpg" ></br></br></br>
+<img width="100px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/knxsecure.png" ></br></br>
 <span style="font-size:0.5em;color:grey;">Authorized KNX logo by KNX Association*</span>
 </p>
 
@@ -543,6 +543,8 @@ All examples live in the [examples](./examples/) folder. You can run them direct
   - `npm run example:secure:multicast` (secure routing multicast)
 
 Examples overview:
+
+- **Recommended starting point → [template](./examples/template.ts):** well-commented skeleton showing how to configure plain vs secure connections, wire up core events, and encode/decode datapoint payloads. Use this file as a base for new scripts.
 
 - [sample](./examples/sample.ts): Full walkthrough — connect, read/write, decode values. Warning: sends telegrams to your KNX BUS.
 - [simpleSample](./examples/simpleSample.ts): Minimal connect + single write. Warning: sends telegrams.

@@ -11,6 +11,7 @@ import KNXClient, { SecureConfig } from '../src/KNXClient'
 import CEMIConstants from '../src/protocol/cEMI/CEMIConstants'
 
 async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): Promise<number> {
+  // Resolve once a status telegram reaches the provided GA
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       client.off('indication', onInd)
@@ -56,6 +57,7 @@ async function main() {
   
 
   const client = new KNXClient({
+    // Secure tunnel over TCP with Data Secure support from the keyring
     hostProtocol: 'TunnelTCP',
     ipAddr: '192.168.1.4',
     ipPort: 3671,
@@ -70,6 +72,7 @@ async function main() {
 
   try {
     client.Connect()
+    // Wait until the secure handshake finishes before driving the test
     await new Promise<void>((resolve) => client.once('connected', () => resolve()))
 
     console.log('\nTEST: ON/OFF 1/1/1 with status check 1/1/2')
