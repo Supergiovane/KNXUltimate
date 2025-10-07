@@ -1,3 +1,12 @@
+/**
+ * Unit tests for KNX Protocol.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { describe, it, beforeEach } from 'node:test'
 import assert from 'assert'
 import KNXProtocol from '../../src/protocol/KNXProtocol'
@@ -16,7 +25,6 @@ import KNXDisconnectResponse from '../../src/protocol/KNXDisconnectResponse'
 import KNXTunnelingAck from '../../src/protocol/KNXTunnelingAck'
 import KNXTunnelingRequest from '../../src/protocol/KNXTunnelingRequest'
 import KNXRoutingIndication from '../../src/protocol/KNXRoutingIndication'
-import KNXSecureSessionRequest from '../../src/protocol/KNXSecureSessionRequest'
 
 describe('KNXProtocol', () => {
 	let mockHPAI: HPAI

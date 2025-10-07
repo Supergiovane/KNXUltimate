@@ -1,3 +1,12 @@
+/**
+ * Holds core KNX protocol constants.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 export const KNX_CONSTANTS = {
 	KNXNETIP_VERSION_10: 0x10,
 	HEADER_SIZE_10: 0x6,
@@ -37,9 +46,11 @@ export const KNX_CONSTANTS = {
 	E_TUNNELING_LAYER: 0x29,
 	DEVICE_INFO: 0x01,
 	SUPP_SVC_FAMILIES: 0x02,
+	SECURED_SERVICE_FAMILIES: 0x06,
 	IP_CONFIG: 0x03,
 	IP_CUR_CONFIG: 0x04,
 	KNX_ADDRESSES: 0x05,
+	ADDITIONAL_DEVICE_INFO: 0x08,
 	MFR_DATA: 0xfe,
 	TP1: 0x02,
 	PL110: 0x04,
@@ -59,8 +70,8 @@ export const KNX_CONSTANTS = {
 	KNX_PORT: 3671,
 	KNX_IP: '224.0.23.12',
 	IPV4_ADDRESS_LENGTH: 4,
-	SECURE_SEARCH_REQUEST: 0x20b,
-	SECURE_SEARCH_RESPONSE: 0x20c,
+	SEARCH_REQUEST_EXTENDED: 0x020b,
+	SEARCH_RESPONSE_EXTENDED: 0x020c,
 	SECURE_WRAPPER: 0x0950,
 	SECURE_SESSION_REQUEST: 0x0951,
 	SECURE_SESSION_RESPONSE: 0x0952,

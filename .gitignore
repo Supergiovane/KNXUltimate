@@ -120,6 +120,11 @@ _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
 
+.Codex
+.claude
+# Local AI tooling + credentials (do not commit)
+Codex/
+
 # JustCode is a .NET coding add-in
 .JustCode
 
@@ -341,4 +346,5 @@ build
 
 /.nyc_output/
 
-
+# Ignore all PDF files
+*.[Pp][Dd][Ff]

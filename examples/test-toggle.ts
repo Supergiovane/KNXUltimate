@@ -1,3 +1,12 @@
+/**
+ * CLI example toggling a KNX group address interactively.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { KNXClient, KNXClientEvents } from '../src'
 
 if (process.argv.length < 3) {
@@ -11,6 +20,7 @@ const groupAddress = process.argv[2]
 let client: KNXClient
 
 async function initClient() {
+	// Discover a tunnel endpoint automatically (first result wins)
 	const interfaces = await KNXClient.discover(1000)
 
 	if(interfaces.length === 0) {
@@ -46,7 +56,7 @@ function onConnect() {
 	console.log('Connected!')
 	console.log('----------')
 
-	// Now send off a couple of requests:
+	// Prepare an interactive loop that toggles the target GA on any key press
 	console.log('\n\n\n')
 	console.log('PRESS ANY KEY TO TOGGLE %s AND "q" TO QUIT.', process.argv[2])
 	console.log('\n\n\n')
@@ -69,10 +79,12 @@ function onConnect() {
 		}
 
 		if(!client) {
+			// Quick reconnect once we have closed the tunnel
 			initClient()
 			return
 		}
 		dpVal = !dpVal
+		// Flip the datapoint state on each key press
 		console.log('Sending ' + dpVal, 'to', groupAddress)
 		client.write(groupAddress, dpVal, '1.001')
 	})

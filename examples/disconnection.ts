@@ -1,3 +1,12 @@
+/**
+ * Example showing clean KNX disconnection handling.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { KNXClient, KNXClientEvents } from '../src'
 import { wait } from '../src/utils'
 
@@ -5,6 +14,7 @@ async function capturePackets() {
     const events: string[] = []
     let client: KNXClient
     let heartbeatCount = 0
+    // Keep the timing budget tiny so the script completes quickly
     const REQUIRED_HEARTBEATS = 3  // For short disconnection test
     const HEARTBEAT_INTERVAL = 10  // 10 seconds between heartbeats
     const TOTAL_CAPTURE_TIME = (REQUIRED_HEARTBEATS + 2) * HEARTBEAT_INTERVAL * 1000
@@ -16,6 +26,7 @@ async function capturePackets() {
 
     try {
         console.log('\nPhase 1: Discovering KNX interfaces...')
+        // Discover an interface; reuse the first hit for this demo
         const interfaces = await KNXClient.discover(1000)
 
         if (interfaces.length === 0) {
@@ -27,6 +38,7 @@ async function capturePackets() {
         console.log('Using interface:', ip, 'port:', port)
 
         return new Promise<void>((resolve, reject) => {
+            // Build a tunnel client that captures packets in sniffing mode
             client = new KNXClient({
                 ipAddr: ip,
                 ipPort: port,

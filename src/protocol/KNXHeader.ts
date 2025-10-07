@@ -1,3 +1,12 @@
+/**
+ * Defines the KNX packet header structure.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { Buffer } from 'buffer'
 import { KNX_CONSTANTS } from './KNXConstants'
 import { module } from '../KnxLog'

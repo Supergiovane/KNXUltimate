@@ -1,3 +1,12 @@
+/**
+ * Example illustrating KNXUltimate logging controls.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { KNXClient, KNXClientEvents, logStream } from '../src'
 import { module, setLogLevel } from '../src/KnxLog'
 import { wait } from '../src/utils'
@@ -9,6 +18,7 @@ const logger = module('KNX-TEST')
 const logFileStream = new Writable({
     objectMode: true,
     write(chunk, encoding, callback) {
+        // Format the log entry before persisting to disk
         const formattedLog = `${chunk.timestamp} [${chunk.level}] ${chunk.label}: ${chunk.message}\n`
         fs.appendFile('knx-test.log', formattedLog, (err) => {
             if (err) {
@@ -27,6 +37,7 @@ logStream.pipe(logFileStream)
     })
 
 async function testKNXClient() {
+    // Elevate logging so we can observe heartbeat chatter
     setLogLevel('debug')
     
     let heartbeatCount = 0
@@ -60,6 +71,7 @@ async function testKNXClient() {
     })
 
     client.on(KNXClientEvents.response, (host, header, message) => {
+        // Track connection-state responses to keep an eye on heartbeats
         if (message.constructor.name === 'KNXConnectionStateResponse') {
             heartbeatCount++
             logger.info(`Heartbeat ${heartbeatCount}/${REQUIRED_HEARTBEATS} received`)

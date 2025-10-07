@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Keyring Project="Secure Test" CreatedBy="6.3.1" Created="2025-09-14T07:29:12" Signature="ngBEAf0L6VI5psu6UfrMQg==" xmlns="http://knx.org/xml/keyring/1">
+  <Backbone MulticastAddress="224.0.23.12" Latency="2000" Key="ewwYjB9lQUy2cD1xCQN0Sg==" />
+  <Interface IndividualAddress="1.1.252" Type="Tunneling" Host="1.1.0" UserID="5" Password="pknkNPOHPY643f3BuCPnrMjiE0qPqnlkq5HpZovL3D4=" Authentication="xvciNXh1/NDGrlvTW3EaFCKa2Ry8qWNcT56FLNmt0eA=">
+    <Group Address="2305" Senders="1.1.1 1.1.253 1.1.254 1.1.255" />
+    <Group Address="2306" Senders="1.1.1 1.1.253 1.1.254 1.1.255" />
+  </Interface>
+  <Interface IndividualAddress="1.1.253" Type="Tunneling" Host="1.1.0" UserID="4" Password="50nItXfHb4D79FBRLCE1fLXy/EXoOrAqtw3UZLnkaAU=" Authentication="qLqyYytrQwVXbl0cIlyim8uuTyhIw1UOVKX080F2kag=">
+    <Group Address="2305" Senders="1.1.1 1.1.252 1.1.254 1.1.255" />
+    <Group Address="2306" Senders="1.1.1 1.1.252 1.1.254 1.1.255" />
+  </Interface>
+  <Interface IndividualAddress="1.1.254" Type="Tunneling" Host="1.1.0" UserID="3" Password="Ggn6Psk+qPA8KHKYcq4GsI6vhR8Y99C2KP2Lfcp5YUg=" Authentication="1hwb7qmALZf05FvjF/5LlDEgUJmtvljVx1OL0jk1CYs=">
+    <Group Address="2305" Senders="1.1.1 1.1.252 1.1.253 1.1.255" />
+    <Group Address="2306" Senders="1.1.1 1.1.252 1.1.253 1.1.255" />
+  </Interface>
+  <Interface IndividualAddress="1.1.255" Type="Tunneling" Host="1.1.0" UserID="2" Password="KkmarKuV2DEerN0kK/nCJDEb0Ee5lTpIyxkTehP/KyA=" Authentication="9KMIf3MAV1ptU5YbRDbEyiL0CdN+j+YqwMwFGvkBPA4=">
+    <Group Address="2305" Senders="1.1.1 1.1.252 1.1.253 1.1.254" />
+    <Group Address="2306" Senders="1.1.1 1.1.252 1.1.253 1.1.254" />
+  </Interface>
+  <GroupAddresses>
+    <Group Address="2305" Key="38sYpw2b0rJ2NV3Ra/CMkg==" />
+    <Group Address="2306" Key="nTwvAMyTvEFvmv3kklJp4w==" />
+  </GroupAddresses>
+  <Devices>
+    <Device IndividualAddress="1.1.0" ToolKey="52c9dpyjrtNvKYoHUTYocA==" ManagementPassword="ZDhaXUXq8QNpMppkxiXL0hbDpD+FvSH3Um8YctQhHD4=" Authentication="hcRZsX2F9dj5zzTk3Gyt4+1UHMdgHI5tqoANctmEBIw=" SequenceNumber="242724394462" FDSK="rH5OzcTOosTVIG5T09wVoA==" SerialNumber="00A207164012" />
+    <Device IndividualAddress="1.1.1" ToolKey="dkVu3fd/C7IkrrIeXNyMtA==" SequenceNumber="240662586791" FDSK="CVwA/R5Jx7O1LPTFRwVP6w==" SerialNumber="000A28A90D19" />
+  </Devices>
+</Keyring>

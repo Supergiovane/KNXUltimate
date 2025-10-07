@@ -1,8 +1,17 @@
+/**
+ * Example demonstrating a minimal KNX write.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { resolve, fromBuffer } from "../src/dptlib";
 import { KNXClientOptions } from "../src/KNXClient";
 import { KNXClientEvents, KNXClient, dptlib } from "../src";
 
-// Set the properties
+// Minimal multicast configuration; adjust GA/IP to match your setup
 let knxUltimateClientProperties: KNXClientOptions = {
     ipAddr: "224.0.23.12",
     ipPort: "3671",
@@ -11,7 +20,6 @@ let knxUltimateClientProperties: KNXClientOptions = {
     loglevel: "error", // 'disable', 'error', 'warn', 'info', 'debug'
     hostProtocol: "Multicast", // "Multicast" in case you use a KNX/IP Router, "TunnelUDP" in case of KNX/IP Interface, "TunnelTCP" in case of secure KNX/IP Interface (not yet implemented)
     isSecureKNXEnabled: false, // Leave "false" until KNX-Secure has been released
-    jKNXSecureKeyring: "", // ETS Keyring JSON file (leave blank until KNX-Secure has been released)
     localIPAddress: "", // Leave blank, will be automatically filled by KNXUltimate
     KNXQueueSendIntervalMilliseconds:25 // Optrional. Queue interval between each KNX telegram. Default is 1 telegram each 25ms
 };
@@ -20,6 +28,8 @@ let knxUltimateClientProperties: KNXClientOptions = {
 const knxUltimateClient = new KNXClient(knxUltimateClientProperties);
 
 // Setting handlers
+// Note: datagram.cEMIMessage is ensured to be plain (decrypted)
+// if the telegram was Data Secure and keys are available.
 knxUltimateClient.on(KNXClientEvents.indication, (datagram, echoed) => {
 
     // This function is called whenever a KNX telegram arrives from BUS
@@ -70,8 +80,8 @@ knxUltimateClient.on(KNXClientEvents.connected, info => {
 
 knxUltimateClient.Connect();
 
+// Exit after 20 seconds so the demo does not run indefinitely
 setTimeout(() => {
     knxUltimateClient.Disconnect();
     process.exit
 }, 20000);
-

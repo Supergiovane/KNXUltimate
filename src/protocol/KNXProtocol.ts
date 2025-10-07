@@ -1,8 +1,19 @@
+/**
+ * High-level helpers for KNX protocol packet flows.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import KNXHeader from './KNXHeader'
 import KNXSearchRequest from './KNXSearchRequest'
 import KNXSearchResponse from './KNXSearchResponse'
 import KNXDescriptionRequest from './KNXDescriptionRequest'
 import KNXDescriptionResponse from './KNXDescriptionResponse'
+import KNXSecureSearchRequest from './KNXSecureSearchRequest'
+import KNXSecureSearchResponse from './KNXSecureSearchResponse'
 import KNXConnectRequest from './KNXConnectRequest'
 import KNXConnectResponse from './KNXConnectResponse'
 import KNXConnectionStateRequest from './KNXConnectionStateRequest'
@@ -12,7 +23,7 @@ import KNXDisconnectResponse from './KNXDisconnectResponse'
 import KNXTunnelingRequest from './KNXTunnelingRequest'
 import KNXTunnelingAck from './KNXTunnelingAck'
 import KNXRoutingIndication from './KNXRoutingIndication'
-import KNXSecureSessionRequest from './KNXSecureSessionRequest'
+// Legacy SecureSessionRequest removed; use SecureTunnelTCP instead
 import HPAI from './HPAI'
 import { KNX_CONSTANTS } from './KNXConstants'
 import TunnelCRI from './TunnelCRI'
@@ -48,6 +59,9 @@ export default class KNXProtocol {
 				break
 			case KNX_CONSTANTS.SEARCH_RESPONSE:
 				knxMessage = KNXSearchResponse.createFromBuffer(knxData)
+				break
+			case KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED:
+				knxMessage = KNXSecureSearchResponse.createFromBuffer(knxData)
 				break
 			case KNX_CONSTANTS.DESCRIPTION_REQUEST:
 				knxMessage = KNXDescriptionRequest.createFromBuffer(knxData)
@@ -91,6 +105,11 @@ export default class KNXProtocol {
 
 	static newKNXSearchRequest(hpai: HPAI) {
 		return new KNXSearchRequest(hpai)
+	}
+
+	static newKNXSecureSearchRequest(hpai: HPAI) {
+		// This is actually Search Request Extended (0x020B)
+		return new KNXSecureSearchRequest(hpai)
 	}
 
 	static newKNXDescriptionRequest(hpai: HPAI) {
@@ -143,11 +162,5 @@ export default class KNXProtocol {
 		return new KNXRoutingIndication(cEMIMessage)
 	}
 
-	static newKNXSecureSessionRequest(
-		cri: TunnelCRI,
-		hpaiData: HPAI = HPAI.NULLHPAI,
-		jKNXSecureKeyring?: any,
-	) {
-		return new KNXSecureSessionRequest(cri, hpaiData, jKNXSecureKeyring)
-	}
+	// Legacy SecureSessionRequest factory removed
 }

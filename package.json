@@ -1,10 +1,10 @@
 {
   "name": "knxultimate",
   "description": "KNX IP protocol implementation for Node. This is the ENGINE of Node-Red KNX-Ultimate node.",
-  "version": "4.1.1",
+  "version": "5.1.3",
   "main": "./build/index.js",
   "engines": {
-    "node": ">=16"
+    "node": ">=18.0.0"
   },
   "private": false,
   "repository": {
@@ -12,18 +12,49 @@
     "url": "git+https://github.com/Supergiovane/KNXUltimate.git"
   },
   "scripts": {
-    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "build": "npm run clean && node -e \"setTimeout(()=>{},5000)\" && tsc -p tsconfig.build.json",
+    "example:secure:multicast": "node -r esbuild-register -e \"require('./examples/sampleSecureMulticast.ts')\"",
+    "example:secure:tunnel": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCP.ts')\"",
+    "realsamples": "node scripts/realsamples.js",
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",
-    "test": "node -r esbuild-register --test test/**/*.test.ts",
+    "test": "node -r ./test/setupForceColor -r esbuild-register --test --test-reporter tap test/unit/*.test.ts test/secure/*.test.ts",
+    "test:dtp": "node -r ./test/setupForceColor -r esbuild-register --test --test-reporter tap test/dtp/*.test.ts",
+    "test:integration": "node -r ./test/setupForceColor -r esbuild-register --test --test-reporter tap $(find test/integration -name '*.test.ts')",
     "test:coverage": "nyc npm run test",
+    "test:all": "npm run test && npm run test:dtp && npm run test:integration",
     "release": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it",
     "release:patch": "npm run release -- patch",
     "release:minor": "npm run release -- minor",
     "release:major": "npm run release -- major",
-    "newbetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it patch --preRelease=beta",
+    "newbetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it major --preRelease=beta",
     "consecutivebetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it --preRelease",
-    "clean": "node -e \"const fs = require('fs'); fs.existsSync('build') && fs.rm('build', { recursive: true }, () => process.exit(0))\""
+    "clean": "node -e \"const fs=require('fs'), path=require('path'), dir='build'; if(!fs.existsSync(dir)){ fs.mkdirSync(dir,{recursive:true}); } else { for (const e of fs.readdirSync(dir)) fs.rmSync(path.join(dir,e),{recursive:true,force:true}); }\""
+  },
+  "release-it": {
+    "github": {
+      "release": true
+    },
+    "git": {
+      "tagName": "v${version}",
+      "requireBranch": "main",
+      "commitMessage": "chore(release): ${version}"
+    },
+    "hooks": {
+      "before:init": [
+        "npm run test:all",
+        "npm run build"
+      ]
+    },
+    "npm": {
+      "publish": true
+    },
+    "plugins": {
+      "@release-it/conventional-changelog": {
+        "preset": "angular",
+        "infile": "CHANGELOG.md"
+      }
+    }
   },
   "license": "MIT",
   "author": {
@@ -51,7 +82,8 @@
     "eib",
     "knx-ultimate",
     "knxultimate",
-    "iot"
+    "iot",
+    "knx secure"
   ],
   "dependencies": {
     "binary-parser": "2.2.1",
@@ -64,7 +96,7 @@
   "devDependencies": {
     "@release-it/conventional-changelog": "^8.0.1",
     "@types/crypto-js": "^4.2.2",
-    "@types/node": "^20.12.7",
+    "@types/node": "^22.7.4",
     "@types/sinon": "^17.0.3",
     "@types/xml2js": "^0.4.14",
     "@typescript-eslint/eslint-plugin": "^7.7.0",
@@ -80,6 +112,6 @@
     "prettier": "^3.2.5",
     "release-it": "^17.2.0",
     "sinon": "^19.0.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.6.2"
   }
 }

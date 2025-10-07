@@ -1,3 +1,12 @@
+/**
+ * Provides a strongly typed event emitter implementation.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import EventEmitter from 'events'
 
 // eslint-disable-next-line @typescript-eslint/ban-types

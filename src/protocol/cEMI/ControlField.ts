@@ -1,3 +1,12 @@
+/**
+ * Handles KNX cEMI control field parsing and building.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import { KNXAddressType } from '../KNXAddress'
 
 export enum FrameType {

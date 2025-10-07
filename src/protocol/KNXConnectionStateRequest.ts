@@ -1,3 +1,12 @@
+/**
+ * Builds KNX connection state request frames.
+ *
+ * Written in Italy with love, sun and passion, by Massimo Saccani.
+ *
+ * Released under the MIT License.
+ * Use at your own risk; the author assumes no liability for damages.
+ */
+
 import KNXPacket from './KNXPacket'
 import { KNX_CONSTANTS } from './KNXConstants'
 import HPAI from './HPAI'
