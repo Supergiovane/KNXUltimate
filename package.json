@@ -31,31 +31,6 @@
     "consecutivebetarelease": "read -p 'GITHUB_TOKEN: ' GITHUB_TOKEN && export GITHUB_TOKEN=$GITHUB_TOKEN && release-it --preRelease",
     "clean": "node -e \"const fs=require('fs'), path=require('path'), dir='build'; if(!fs.existsSync(dir)){ fs.mkdirSync(dir,{recursive:true}); } else { for (const e of fs.readdirSync(dir)) fs.rmSync(path.join(dir,e),{recursive:true,force:true}); }\""
   },
-  "release-it": {
-    "github": {
-      "release": true
-    },
-    "git": {
-      "tagName": "v${version}",
-      "requireBranch": "main",
-      "commitMessage": "chore(release): ${version}"
-    },
-    "hooks": {
-      "before:init": [
-        "npm run test:all",
-        "npm run build"
-      ]
-    },
-    "npm": {
-      "publish": true
-    },
-    "plugins": {
-      "@release-it/conventional-changelog": {
-        "preset": "angular",
-        "infile": "CHANGELOG.md"
-      }
-    }
-  },
   "license": "MIT",
   "author": {
     "name": "Massimo 'Supergiovane' Saccani",
