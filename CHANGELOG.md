@@ -1,5 +1,12 @@
 
 
+## [5.1.4](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.3...v5.1.4) (2025-10-11)
+
+
+### Features
+
+* discovery methods send both multicast and unicast bursts in parallel so as not to miss gateways that only respond to one of the two transports. ([#71](https://github.com/Supergiovane/KNXUltimate/issues/71)) ([f95b6d8](https://github.com/Supergiovane/KNXUltimate/commit/f95b6d863d70369aa1fb9904177e0abfbcd6da14))
+
 ## [5.1.3](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.2...v5.1.3) (2025-09-23)
 
 
