@@ -556,6 +556,7 @@ Examples overview:
 - [datapointBasics](./examples/datapointBasics.ts): Demonstrates encoding and decoding a few datapoint values locally. Safe.
 - [discovery](./examples/discovery.ts): Discovers KNX/IP interfaces/routers (SEARCH_REQUEST). Safe.
 - [discoverInterfacesSimple](./examples/discoverInterfacesSimple.ts): Uses `discoverInterfaces()` to print a concise summary of each gateway. Safe.
+- Run: `node -r esbuild-register -e "require('./examples/discoverInterfacesSimple.ts')" [iface] [timeoutMs]`
 - [gatewaydescription](./examples/gatewaydescription.ts): Requests and prints extended gateway information. Safe.
 - [samplePlainTunnelUPD](./examples/samplePlainTunnelUPD.ts): Plain KNX/IP tunnelling over UDP (`hostProtocol: 'TunnelUDP'`). ON/OFF + status read via a KNX interface.
   - Run: `node -r esbuild-register -e "require('./examples/samplePlainTunnelUPD.ts')"`
@@ -577,6 +578,7 @@ Examples overview:
 
 - Functions: `KNXClient.discover()`, `KNXClient.discoverDetailed()`, `KNXClient.discoverInterfaces()`.
 - Default port: if a KNX interface does not advertise a port in the `SEARCH_RESPONSE` HPAI (missing or zero), discovery uses `3671` as the port.
+- Each helper now fires both multicast and unicast search bursts concurrently on every selected NIC so interfaces that only answer one transport are still found.
 - Return formats:
 - `discover()` → strings formatted as `ip:port:name:ia:Security:Transport`; highlights whether the result is plain/secure and which transport to use.
   - Example: `192.168.1.4:3671:MyGW:1.1.1:Secure KNX:TCP`, `224.0.23.12:3671:MyRouter:1.1.0:Plain KNX:Multicast`.
