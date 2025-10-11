@@ -1650,35 +1650,39 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		// If a specific interface is provided, use a single client
 		if (eth && typeof eth === 'string') {
-			for (const proto of [
-				'Multicast',
-				'TunnelUDP',
-			] as KNXClientProtocol[]) {
+			const protocols: KNXClientProtocol[] = ['Multicast', 'TunnelUDP']
+			const clients = protocols.map((proto) => {
 				const client = new KNXClient({
 					interface: eth,
 					hostProtocol: proto,
 				})
-				try {
-					client.on(
-						KNXClientEvents.discover,
-						(host, header, searchResponse) => {
-							addResultsFromSearch(
-								host,
-								searchResponse,
-								results,
-								header?.service_type ===
-									KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED &&
-									!!(searchResponse as any)
-										?.securedServiceFamilies,
-							)
-						},
-					)
-					client.startDiscovery()
-					await wait(timeout)
-				} finally {
-					await client.Disconnect()
-				}
-				if (results.size > 0) break
+				client.on(
+					KNXClientEvents.discover,
+					(host, header, searchResponse) => {
+						addResultsFromSearch(
+							host,
+							searchResponse,
+							results,
+							header?.service_type ===
+								KNX_CONSTANTS.SEARCH_RESPONSE_EXTENDED &&
+								!!(searchResponse as any)
+									?.securedServiceFamilies,
+						)
+					},
+				)
+				return client
+			})
+			try {
+				clients.forEach((client) => {
+					try {
+						client.startDiscovery()
+					} catch {}
+				})
+				await wait(timeout)
+			} finally {
+				await Promise.allSettled(
+					clients.map((client) => client.Disconnect()),
+				)
 			}
 			return Array.from(results.entries()).map(
 				([k, meta]) =>
@@ -1805,24 +1809,26 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		const runOnInterface = async (iface: string) => {
-			for (const proto of [
-				'Multicast',
-				'TunnelUDP',
-			] as KNXClientProtocol[]) {
+			const protocols: KNXClientProtocol[] = ['Multicast', 'TunnelUDP']
+			const clients = protocols.map((proto) => {
 				const c = new KNXClient({
 					interface: iface,
 					hostProtocol: proto,
 				})
-				try {
-					c.on(KNXClientEvents.discover, (host, _h, sr) =>
-						handleSearch(host, sr),
-					)
-					c.startDiscovery()
-					await wait(timeout)
-				} finally {
-					await c.Disconnect()
-				}
-				if (detailed.size > 0) break
+				c.on(KNXClientEvents.discover, (host, _h, sr) =>
+					handleSearch(host, sr),
+				)
+				return c
+			})
+			try {
+				clients.forEach((c) => {
+					try {
+						c.startDiscovery()
+					} catch {}
+				})
+				await wait(timeout)
+			} finally {
+				await Promise.allSettled(clients.map((c) => c.Disconnect()))
 			}
 		}
 
@@ -1929,24 +1935,26 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		const runOnInterface = async (iface: string) => {
-			for (const proto of [
-				'Multicast',
-				'TunnelUDP',
-			] as KNXClientProtocol[]) {
+			const protocols: KNXClientProtocol[] = ['Multicast', 'TunnelUDP']
+			const clients = protocols.map((proto) => {
 				const c = new KNXClient({
 					interface: iface,
 					hostProtocol: proto,
 				})
-				try {
-					c.on(KNXClientEvents.discover, (host, _h, sr) =>
-						handleSearch(host, sr),
-					)
-					c.startDiscovery()
-					await wait(timeout)
-				} finally {
-					await c.Disconnect()
-				}
-				if (out.size > 0) break
+				c.on(KNXClientEvents.discover, (host, _h, sr) =>
+					handleSearch(host, sr),
+				)
+				return c
+			})
+			try {
+				clients.forEach((c) => {
+					try {
+						c.startDiscovery()
+					} catch {}
+				})
+				await wait(timeout)
+			} finally {
+				await Promise.allSettled(clients.map((c) => c.Disconnect()))
 			}
 		}
 
