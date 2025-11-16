@@ -37,12 +37,14 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 
 - [Changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOG.md)
 
+  
+
 | Technology            | Supported                                                            |
 | --------------------- | -------------------------------------------------------------------- |
 | KNX Tunnelling (UDP)  | ![](https://placehold.co/200x20/green/white?text=YES)                |
 | KNX Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES)              |
 | KNX IP Secure/Data secure | ![](https://placehold.co/200x20/green/white?text=YES)         |
-| Serial FT1.2 (BETA)   | ![](https://placehold.co/200x20/orange/white?text=BETA)             |
+| KNX TP Serial FT1.2 (BETA)   | ![](https://placehold.co/200x20/orange/white?text=BETA)             |
 
 
 Please subscribe to my channel, to learn how to use it [![Youtube][youtube-image]][youtube-url]  
