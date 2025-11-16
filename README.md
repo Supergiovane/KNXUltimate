@@ -54,19 +54,53 @@ These are the properties you can pass to `KNXClient` (see examples for full usag
 
 | Property                         | Applies to                         | Description |
 | -------------------------------- | ---------------------------------- | ----------- |
-| `hostProtocol` (string)          | all                                | One of: `"TunnelUDP"` (plain tunnelling via UDP), `"Multicast"` (plain routing via multicast 224.0.23.12), `"TunnelTCP"` (KNX/IP Secure tunnelling over TCP). |
+| `hostProtocol` (string)          | all                                | One of: `"TunnelUDP"` (plain tunnelling via UDP), `"Multicast"` (plain routing via multicast 224.0.23.12), `"TunnelTCP"` (KNX/IP Secure tunnelling over TCP), `"SerialFT12"` (direct TP/FT1.2 serial interface such as `/dev/ttyAMA0`). |
 | `ipAddr` (string)                | all                                | KNX/IP peer address. Use `"224.0.23.12"` for routing (multicast), or the interface/router IP for tunnelling. |
 | `ipPort` (number/string)         | all                                | KNX/IP port. Default `3671`. |
 | `physAddr` (string) Optional             | all                                | Source IA on bus (e.g. `"1.1.200"`). Multicast: required. TunnelUDP: used as cEMI source. TunnelTCP (secure): ignored as bus source — the gateway assigns the tunnel IA; Data Secure uses the interface IA from ETS for authentication. |
 | `loglevel` (string)              | all                                | One of: `disable`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `localIPAddress` (string)        | all                                | Optional. Binds the local UDP/TCP socket to a specific local interface IP. Useful with multiple NICs. |
 | `interface` (string)             | all                                | Optional. Local interface name to select the NIC (alternative to `localIPAddress`). |
+| `serialInterface` (object)       | SerialFT12                         | Serial port settings used when `hostProtocol === 'SerialFT12'`. Supports `path` (default `/dev/ttyAMA0`), `baudRate` (default 19200), `dataBits`, `stopBits`, `parity` (`'even'` by default), `rtscts`, `dtr`, `timeoutMs`. |
 | `KNXQueueSendIntervalMilliseconds` (number) | all              | Optional. Inter‑telegram delay in ms. Default ~25ms. Don’t go below 20ms. |
 | `suppress_ack_ldatareq` (bool)   | tunnelling (UDP/TCP)               | Optional. Avoid requesting/handling L_DATA_REQ bus ACK in tunnelling. Leave `false` unless your interface needs it. |
 | `theGatewayIsKNXVirtual` (bool)  | tunnelling                         | Optional. Special handling for ETS KNX Virtual (adds `localIPAddress` to tunnel endpoint). Default `false`. |
 | `isSecureKNXEnabled` (bool)      | secure tunnelling & secure routing | Enable KNX/IP Secure. With `TunnelTCP`: session handshake + Secure Wrapper. With `Multicast`: secure routing (Secure Wrapper, timer sync). |
 | `secureTunnelConfig` (object)    | secure tunnelling & secure routing | KNX Secure configuration. See below. |
 | `secureRoutingWaitForTimer` (bool)| secure routing (multicast)        | Optional. Wait for first timer sync (0955/0950) before sending. Default `true`. |
+
+### Serial FT1.2 (TP) mode
+
+Choose `hostProtocol: 'SerialFT12'` to connect directly to TP/FT1.2 interfaces (TPUART hats, Weinzierl 307x, etc.) via `/dev/tty*`. The driver speaks FT1.2 natively, so no KNXd is required. Configure the serial line via the `serialInterface` option; by default `/dev/ttyAMA0`, 19200 baud, 8E1, DTR on, RTS/CTS off are used.
+
+List all available serial devices before connecting:
+
+```ts
+import KNXClient from 'knxultimate'
+
+async function connectSerial() {
+  const ports = await KNXClient.listSerialInterfaces()
+  ports.forEach((p) => console.log('Serial port:', p.path))
+
+  const client = new KNXClient({
+    hostProtocol: 'SerialFT12',
+    serialInterface: { path: ports[0]?.path ?? '/dev/ttyAMA0' },
+    physAddr: '1.1.200', // interface IA from ETS
+    loglevel: 'info',
+    isSecureKNXEnabled: true,
+    secureTunnelConfig: {
+      knxkeys_file_path: '/home/pi/project.knxkeys',
+      knxkeys_password: 'supersecret',
+    },
+  })
+
+  client.on('connected', () => console.log('Serial FT1.2 ready'))
+  client.on('indication', (packet) => console.log('Telegram:', packet))
+  client.Connect()
+}
+```
+
+Remember to configure the physical address (`physAddr`) that ETS assigns to your TP interface; the serial transport uses that IA on the bus. KNX Data Secure works exactly like in routing mode: load your `.knxkeys` file and secure keys will be applied automatically to outgoing/incoming telegrams.
 
 Secure configuration object (`secureTunnelConfig`):
 

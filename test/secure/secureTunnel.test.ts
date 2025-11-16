@@ -14,7 +14,7 @@ import os from 'os'
 import path from 'path'
 import KNXClient, { KNXClientEvents } from '../../src/KNXClient'
 import CEMIConstants from '../../src/protocol/cEMI/CEMIConstants'
-import MockSecureGateway from './MockSecureGateway'
+import { MockSecureGateway } from './MockSecureGateway'
 
 const KEYRING_XML = `<?xml version="1.0" encoding="utf-8"?>
 <Keyring CreatedBy="UnitTest" Created="2024-10-03T12:34:56Z">
@@ -78,7 +78,10 @@ describe('KNX Secure Tunnel', () => {
 		await connected
 
 		const groupWriteReceived = new Promise<void>((resolve, reject) => {
-			const timeout = setTimeout(() => reject(new Error('Timeout waiting server group write')), 5000)
+			const timeout = setTimeout(
+				() => reject(new Error('Timeout waiting server group write')),
+				5000,
+			)
 			gateway.once('groupWrite', (packet) => {
 				try {
 					assert.strictEqual(packet.groupAddress, '1/2/3')
@@ -95,7 +98,10 @@ describe('KNX Secure Tunnel', () => {
 		await groupWriteReceived
 
 		const indication = new Promise<boolean>((resolve, reject) => {
-			const timeout = setTimeout(() => reject(new Error('Timeout waiting for indication')), 5000)
+			const timeout = setTimeout(
+				() => reject(new Error('Timeout waiting for indication')),
+				5000,
+			)
 			const handler = (packet: any) => {
 				try {
 					const cemi = packet?.cEMIMessage

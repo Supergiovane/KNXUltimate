@@ -41,6 +41,10 @@ import KNXTunnelingAck from './protocol/KNXTunnelingAck'
 import KNXSearchResponse from './protocol/KNXSearchResponse'
 import KNXDisconnectResponse from './protocol/KNXDisconnectResponse'
 import { wait, getTimestamp } from './utils'
+import SerialFT12, {
+	SerialFT12Options,
+	SerialPortSummary,
+} from './transports/SerialFT12'
 import { performance } from 'perf_hooks'
 // KNX Secure helpers (moved inlined usage from SecureTunnelTCP)
 import { Keyring } from './secure/keyring'
@@ -124,7 +128,11 @@ export enum SocketEvents {
 	connect = 'connect',
 }
 
-export type KNXClientProtocol = 'TunnelUDP' | 'Multicast' | 'TunnelTCP'
+export type KNXClientProtocol =
+	| 'TunnelUDP'
+	| 'Multicast'
+	| 'TunnelTCP'
+	| 'SerialFT12'
 
 export enum KNXClientEvents {
 	error = 'error',
@@ -193,6 +201,8 @@ export type KNXClientOptions = {
 	secureTunnelConfig?: SecureConfig
 	/** Secure multicast: wait to send until timer is authenticated (default: true) */
 	secureRoutingWaitForTimer?: boolean
+	/** Serial FT1.2 configuration (used when hostProtocol === 'SerialFT12') */
+	serialInterface?: SerialFT12Options
 } & KNXLoggerOptions
 
 const optionsDefaults: KNXClientOptions = {
@@ -271,6 +281,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private _awaitingResponseType: number
 
 	private _clientSocket: UDPSocket | TCPSocket
+
+	private _serialDriver?: SerialFT12
 
 	private sysLogger: KNXLogger
 
@@ -372,6 +384,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return null
 	}
 
+	private isSerialTransport(): boolean {
+		return this._options.hostProtocol === 'SerialFT12'
+	}
+
 	constructor(
 		options: KNXClientOptions,
 		createSocket?: (client: KNXClient) => void,
@@ -453,6 +469,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private createSocket() {
+		if (this.isSerialTransport()) {
+			this.socketReady = false
+			return
+		}
 		if (this._options.hostProtocol === 'TunnelUDP') {
 			this._clientSocket = dgram.createSocket({
 				type: 'udp4',
@@ -707,6 +727,93 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		})
 	}
 
+	private async connectSerialTransport() {
+		const options: SerialFT12Options = {
+			...(this._options.serialInterface || {}),
+		}
+		this._peerHost = options.path || '/dev/ttyAMA0'
+		this._peerPort = 0
+		this._serialDriver = new SerialFT12(options)
+		this._serialDriver.on('cemi', (payload) =>
+			this.handleSerialCemi(payload),
+		)
+		this._serialDriver.on('error', (err) => {
+			this.emit(
+				KNXClientEvents.error,
+				err instanceof Error ? err : new Error(String(err)),
+			)
+		})
+		this._serialDriver.on('close', () => {
+			if (this.isSerialTransport()) {
+				this.socketReady = false
+				if (
+					this._connectionState !== ConncetionState.DISCONNECTED &&
+					this._connectionState !== ConncetionState.DISCONNECTING
+				) {
+					this.setDisconnected('Serial FT1.2 port closed').catch(
+						() => {},
+					)
+				}
+			}
+		})
+		await this._serialDriver.open()
+	}
+
+	private async closeSerialTransport() {
+		if (!this._serialDriver) return
+		try {
+			await this._serialDriver.close()
+		} catch (error) {
+			this.sysLogger.warn(
+				`[${getTimestamp()}] Serial FT1.2 close error: ${(error as Error).message}`,
+			)
+		} finally {
+			this._serialDriver = undefined
+			this.socketReady = false
+		}
+	}
+
+	private handleSerialCemi(payload: Buffer) {
+		try {
+			if (!payload || payload.length < 2) return
+			const msgCode = payload.readUInt8(0)
+			// eslint-disable-next-line default-case
+			switch (msgCode) {
+				case CEMIConstants.L_DATA_IND: {
+					const cemi = CEMIFactory.createFromBuffer(
+						msgCode,
+						payload,
+						1,
+					)
+					this.ensurePlainCEMI(cemi)
+					this.emit(
+						KNXClientEvents.indication,
+						new KNXRoutingIndication(cemi),
+						false,
+					)
+					break
+				}
+				case CEMIConstants.L_DATA_CON: {
+					break
+				}
+			}
+		} catch (error) {
+			this.sysLogger.error(
+				`[${getTimestamp()}] Serial FT1.2 parse error: ${
+					(error as Error).message
+				}`,
+			)
+		}
+	}
+
+	private extractCemiMessage(packet: KNXPacket): CEMIMessage {
+		const cemi = (packet as any)?.cEMIMessage
+		if (!cemi) {
+			throw new Error('KNX packet does not contain a cEMI message')
+		}
+		return cemi
+	}
+
 	/**
 	 * The channel ID of the connection. Only defined after a successful connection
 	 */
@@ -846,6 +953,41 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 			}
 			// End Prepare the debug log ************************
+			if (this.isSerialTransport()) {
+				try {
+					const cemi = this.extractCemiMessage(_knxPacket)
+					if (
+						this._options.isSecureKNXEnabled &&
+						_knxPacket instanceof KNXRoutingIndication
+					) {
+						this.maybeApplyDataSecure(cemi as any)
+						try {
+							_knxPacket.length = cemi.length ?? _knxPacket.length
+						} catch {}
+					}
+					this._serialDriver
+						?.sendCemiPayload(cemi.toBuffer())
+						.then(() => resolve(true))
+						.catch((error) => {
+							this.emit(
+								KNXClientEvents.error,
+								error instanceof Error
+									? error
+									: new Error(String(error)),
+							)
+							resolve(false)
+						})
+				} catch (error) {
+					this.emit(
+						KNXClientEvents.error,
+						error instanceof Error
+							? error
+							: new Error(String(error)),
+					)
+					resolve(false)
+				}
+				return
+			}
 
 			if (
 				this._options.hostProtocol === 'Multicast' ||
@@ -1206,7 +1348,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		const srcAddress = this.physAddr
 
-		if (this._options.hostProtocol === 'Multicast') {
+		if (
+			this._options.hostProtocol === 'Multicast' ||
+			this.isSerialTransport()
+		) {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'write',
@@ -1292,7 +1437,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		const srcAddress = this.physAddr
 
-		if (this._options.hostProtocol === 'Multicast') {
+		if (
+			this._options.hostProtocol === 'Multicast' ||
+			this.isSerialTransport()
+		) {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'response',
@@ -1361,7 +1509,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		const srcAddress = this.physAddr
 
-		if (this._options.hostProtocol === 'Multicast') {
+		if (
+			this._options.hostProtocol === 'Multicast' ||
+			this.isSerialTransport()
+		) {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'read',
@@ -1468,7 +1619,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				KNXAddress.TYPE_GROUP,
 			)
 		const srcAddress = this.physAddr
-		if (this._options.hostProtocol === 'Multicast') {
+		if (
+			this._options.hostProtocol === 'Multicast' ||
+			this.isSerialTransport()
+		) {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'write',
@@ -1970,6 +2124,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return Array.from(out.values())
 	}
 
+	public static async listSerialInterfaces(): Promise<SerialPortSummary[]> {
+		return SerialFT12.listPorts()
+	}
+
 	/**
 	 * Returns true if the gw description's gatherer is running
 	 */
@@ -2370,6 +2528,25 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.clearTimer(KNXTimer.CONNECTION)
 		// Emit connecting
 		this.emit(KNXClientEvents.connecting, this._options)
+		if (this.isSerialTransport()) {
+			this.connectSerialTransport()
+				.then(() => {
+					this.socketReady = true
+					this._connectionState = ConncetionState.CONNECTED
+					this._numFailedTelegramACK = 0
+					this.clearToSend = true
+					this._clientTunnelSeqNumber = -1
+					this.emit(KNXClientEvents.connected, this._options)
+					this.handleKNXQueue()
+				})
+				.catch((err) => {
+					this.emit(
+						KNXClientEvents.error,
+						err instanceof Error ? err : new Error(String(err)),
+					)
+				})
+			return
+		}
 		if (this._options.hostProtocol === 'TunnelUDP') {
 			// Unicast, need to explicitly create the connection
 			const timeoutError = new Error(
@@ -2523,7 +2700,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Sends a DISCONNECT_REQUEST telegram to the BUS and closes the socket
 	 */
 	async Disconnect() {
-		if (this._clientSocket === null) {
+		if (!this.isSerialTransport() && this._clientSocket === null) {
 			throw new Error('No client socket defined')
 		}
 
@@ -2533,6 +2710,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		// clear active timers
 		this.clearAllTimers()
+
+		if (this.isSerialTransport()) {
+			this._connectionState = ConncetionState.DISCONNECTING
+			this.exitProcessingKNXQueueLoop = true
+			await this.closeSerialTransport()
+			this._connectionState = ConncetionState.DISCONNECTED
+			this.emit(KNXClientEvents.disconnected, 'Serial interface closed')
+			return
+		}
 
 		this._connectionState = ConncetionState.DISCONNECTING
 
@@ -2594,7 +2780,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._clientTunnelSeqNumber = -1
 		this._channelID = null
 
-		await this.closeSocket()
+		if (this.isSerialTransport()) {
+			await this.closeSerialTransport()
+		} else {
+			await this.closeSocket()
+		}
 
 		this.emit(
 			KNXClientEvents.disconnected,
@@ -2607,6 +2797,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Send a connection state request message to the KNX bus and schedule the next heartbeat
 	 */
 	private runHeartbeat() {
+		if (this.isSerialTransport()) {
+			return
+		}
 		if (!this._heartbeatRunning) {
 			return
 		}
@@ -3159,17 +3352,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const keyringPath = explicitPath || undefined
 		const hasKeyring = !!keyringPath
 
-			const rawTunnelUserId = cfg.tunnelUserId as unknown
-			let normalizedTunnelUserId: number | undefined
-			if (typeof rawTunnelUserId === 'string') {
-				const parsed = Number(rawTunnelUserId.trim())
-				normalizedTunnelUserId = Number.isNaN(parsed) ? undefined : parsed
-			} else if (typeof rawTunnelUserId === 'number') {
-				normalizedTunnelUserId = Number.isNaN(rawTunnelUserId)
-					? undefined
-					: rawTunnelUserId
-			}
-			const hasConfiguredUserId = typeof normalizedTunnelUserId === 'number'
+		const rawTunnelUserId = cfg.tunnelUserId as unknown
+		let normalizedTunnelUserId: number | undefined
+		if (typeof rawTunnelUserId === 'string') {
+			const parsed = Number(rawTunnelUserId.trim())
+			normalizedTunnelUserId = Number.isNaN(parsed) ? undefined : parsed
+		} else if (typeof rawTunnelUserId === 'number') {
+			normalizedTunnelUserId = Number.isNaN(rawTunnelUserId)
+				? undefined
+				: rawTunnelUserId
+		}
+		const hasConfiguredUserId = typeof normalizedTunnelUserId === 'number'
 
 		// Reset caches that may depend on keyring contents
 		this._secureGroupKeys = new Map()
@@ -3426,10 +3619,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						)
 						this.emit(KNXClientEvents.error, err)
 						this._secureHandshakeState = undefined
-						void this.setDisconnected(
+						this.setDisconnected(
 							reason ||
 								`Secure session failed (status ${status})`,
-						)
+						).catch(() => {})
 						return
 					}
 					const conn = this.secureBuildConnectRequest()
