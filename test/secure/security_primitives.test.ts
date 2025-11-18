@@ -23,7 +23,12 @@ import {
 	extractPassword,
 	decryptAes128Cbc,
 } from '../../src/secure/util'
-import { createCipheriv, createPublicKey, diffieHellman, randomBytes } from 'crypto'
+import {
+	createCipheriv,
+	createPublicKey,
+	diffieHellman,
+	randomBytes,
+} from 'crypto'
 
 describe('secure util', () => {
 	describe('bytePad', () => {
@@ -40,7 +45,7 @@ describe('secure util', () => {
 		})
 	})
 
-		describe('sha256Hash', () => {
+	describe('sha256Hash', () => {
 		it('produces a stable digest', () => {
 			const digest = sha256Hash(Buffer.from('secure-data'))
 			assert.strictEqual(
@@ -50,7 +55,7 @@ describe('secure util', () => {
 		})
 	})
 
-		describe('extractPassword', () => {
+	describe('extractPassword', () => {
 		it('removes PKCS#7 padding and stops at the first null byte', () => {
 			const payload = Buffer.from('secretPass\u0000ignored', 'utf-8')
 			const blockSize = 16
@@ -70,33 +75,62 @@ describe('secure util', () => {
 
 	describe('decryptAes128Cbc', () => {
 		it('decrypts data encrypted with AES-128-CBC', () => {
-			const key = Buffer.concat([Buffer.from('00112233445566778899aabbccddeeff', 'hex'), randomBytes(8)])
-			const iv = Buffer.concat([Buffer.from('0102030405060708090a0b0c0d0e0f10', 'hex'), randomBytes(8)])
-			const cipher = createCipheriv('aes-128-cbc', key.slice(0, 16), iv.slice(0, 16))
+			const key = Buffer.concat([
+				Buffer.from('00112233445566778899aabbccddeeff', 'hex'),
+				randomBytes(8),
+			])
+			const iv = Buffer.concat([
+				Buffer.from('0102030405060708090a0b0c0d0e0f10', 'hex'),
+				randomBytes(8),
+			])
+			const cipher = createCipheriv(
+				'aes-128-cbc',
+				key.slice(0, 16),
+				iv.slice(0, 16),
+			)
 			const plaintext = Buffer.from('AES util test payload', 'utf-8')
-			const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()])
+			const encrypted = Buffer.concat([
+				cipher.update(plaintext),
+				cipher.final(),
+			])
 			const decrypted = decryptAes128Cbc(encrypted, key, iv)
-			assert.strictEqual(decrypted.toString('utf-8'), 'AES util test payload')
+			assert.strictEqual(
+				decrypted.toString('utf-8'),
+				'AES util test payload',
+			)
 		})
 	})
 })
 
 describe('security primitives', () => {
-		describe('calculateMessageAuthenticationCodeCBC', () => {
+	describe('calculateMessageAuthenticationCodeCBC', () => {
 		it('matches the expected MAC output', () => {
 			const key = Buffer.from('00112233445566778899aabbccddeeff', 'hex')
 			const additional = Buffer.from('aabbccddeeff', 'hex')
 			const payload = Buffer.from('0102030405060708', 'hex')
-			const mac = calculateMessageAuthenticationCodeCBC(key, additional, payload)
-			assert.strictEqual(mac.toString('hex'), 'b976d4018e1ff050c0eab59b292df818')
+			const mac = calculateMessageAuthenticationCodeCBC(
+				key,
+				additional,
+				payload,
+			)
+			assert.strictEqual(
+				mac.toString('hex'),
+				'b976d4018e1ff050c0eab59b292df818',
+			)
 		})
 	})
 
 	describe('encryptDataCtr and decryptCtr', () => {
 		it('encrypts and decrypts payloads symmetrically and preserves MAC', () => {
 			const key = Buffer.from('00112233445566778899aabbccddeeff', 'hex')
-			const counter0 = Buffer.from('000102030405060708090a0b0c0d0e0f', 'hex')
-			const macCbc = Buffer.from('f0e1d2c3b4a5968778695a4b3c2d1e0f', 'hex')
+			const counter0 = Buffer.from(
+				'000102030405060708090a0b0c0d0e0f',
+				'hex',
+			)
+			const macCbc = Buffer.from(
+				'f0e1d2c3b4a5968778695a4b3c2d1e0f',
+				'hex',
+			)
 			const payload = Buffer.from('010203040506', 'hex')
 			const [encryptedPayload, encryptedMac] = encryptDataCtr(
 				key,
@@ -124,12 +158,18 @@ describe('security primitives', () => {
 	describe('password derivation', () => {
 		it('derives the expected device authentication key', () => {
 			const derived = deriveDeviceAuthenticationPassword('testDevice')
-			assert.strictEqual(derived.toString('hex'), '7ee704e7f2293774d34dcc29a616b49f')
+			assert.strictEqual(
+				derived.toString('hex'),
+				'7ee704e7f2293774d34dcc29a616b49f',
+			)
 		})
 
 		it('derives the expected user password key', () => {
 			const derived = deriveUserPassword('testUser')
-			assert.strictEqual(derived.toString('hex'), '25fa29619a35d35c515dbacee4f080e9')
+			assert.strictEqual(
+				derived.toString('hex'),
+				'25fa29619a35d35c515dbacee4f080e9',
+			)
 		})
 	})
 
@@ -139,11 +179,19 @@ describe('security primitives', () => {
 			const [privB, pubB] = generateEcdhKeyPair()
 			const sharedA = diffieHellman({
 				privateKey: privA,
-				publicKey: createPublicKey({ key: pubB, format: 'der', type: 'spki' }),
+				publicKey: createPublicKey({
+					key: pubB,
+					format: 'der',
+					type: 'spki',
+				}),
 			})
 			const sharedB = diffieHellman({
 				privateKey: privB,
-				publicKey: createPublicKey({ key: pubA, format: 'der', type: 'spki' }),
+				publicKey: createPublicKey({
+					key: pubA,
+					format: 'der',
+					type: 'spki',
+				}),
 			})
 			assert.strictEqual(sharedA.length, 32)
 			assert.strictEqual(sharedA.toString('hex'), sharedB.toString('hex'))

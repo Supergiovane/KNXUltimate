@@ -6,4 +6,3 @@
  * Released under the MIT License.
  * Use at your own risk; the author assumes no liability for damages.
  */
-

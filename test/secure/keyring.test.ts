@@ -70,7 +70,10 @@ describe('secure keyring', () => {
 
 		const device = keyring.getDevice('1.1.10')
 		assert.ok(device)
-		assert.strictEqual(device?.decryptedToolKey?.toString('hex'), 'aabbccddeeff00112233445566778899')
+		assert.strictEqual(
+			device?.decryptedToolKey?.toString('hex'),
+			'aabbccddeeff00112233445566778899',
+		)
 		assert.strictEqual(device?.decryptedManagementPassword, 'devMgmt789')
 		assert.strictEqual(device?.decryptedAuthentication, 'devAuth987')
 		assert.strictEqual(device?.sequenceNumber, 42)

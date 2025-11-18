@@ -7,8 +7,7 @@
  * Use at your own risk; the author assumes no liability for damages.
  */
 
-import { createServer, Server, Socket } from 'net'
-import { AddressInfo } from 'net'
+import { createServer, Server, Socket, AddressInfo } from 'net'
 import * as crypto from 'crypto'
 import { TypedEventEmitter } from '../../src/TypedEmitter'
 import {
@@ -122,11 +121,13 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		this.port = options.port ?? 0
 		this.sessionId = options.sessionId ?? 0x5100
 		this.channelId = options.channelId ?? 0x51
-		this.serial = (options.serial && options.serial.length === SERIAL_LEN)
-			? Buffer.from(options.serial)
-			: Buffer.from('a1b2c3d4e5f6', 'hex')
+		this.serial =
+			options.serial && options.serial.length === SERIAL_LEN
+				? Buffer.from(options.serial)
+				: Buffer.from('a1b2c3d4e5f6', 'hex')
 		const interfaceIaStr = options.interfaceIndividualAddress ?? '1.1.1'
-		const tunnelIaStr = options.tunnelAssignedIndividualAddress ?? '10.15.251'
+		const tunnelIaStr =
+			options.tunnelAssignedIndividualAddress ?? '10.15.251'
 		this.interfaceIa = new IndividualAddress(interfaceIaStr).raw
 		this.assignedIa = new IndividualAddress(tunnelIaStr).raw
 		this.groupKeys = new Map()
@@ -140,14 +141,21 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		this.sendSeq48 = this.sendSeq48Start
 		const keyPair = crypto.generateKeyPairSync('x25519')
 		this.serverPrivateKey = keyPair.privateKey
-		const exported = keyPair.publicKey.export({ type: 'spki', format: 'der' }) as Buffer
-		this.serverPublicKeyRaw = exported.subarray(exported.length - PUBLIC_KEY_LEN)
+		const exported = keyPair.publicKey.export({
+			type: 'spki',
+			format: 'der',
+		}) as Buffer
+		this.serverPublicKeyRaw = exported.subarray(
+			exported.length - PUBLIC_KEY_LEN,
+		)
 	}
 
 	async start(): Promise<void> {
 		if (this.server) return
 		await new Promise<void>((resolve, reject) => {
-			this.server = createServer((socket) => this.handleConnection(socket))
+			this.server = createServer((socket) =>
+				this.handleConnection(socket),
+			)
 			this.server.once('error', reject)
 			this.server.listen(this.port, this.host, () => {
 				const addr = this.server?.address()
@@ -183,7 +191,11 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		groupAddress: string,
 		value: boolean,
 	): Promise<void> {
-		if (!this.socket || !this.sessionKey || this.handshakeState !== 'connected') {
+		if (
+			!this.socket ||
+			!this.sessionKey ||
+			this.handshakeState !== 'connected'
+		) {
 			throw new Error('Secure session not established')
 		}
 		const dst = new GroupAddress(groupAddress).raw
@@ -195,7 +207,10 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		control.addressType = KNXAddressType.TYPE_GROUP
 		control.ack = 0
 		control.repeat = 1
-		const srcAddress = new KNXAddress(this.interfaceIa, KNXAddressType.TYPE_INDIVIDUAL)
+		const srcAddress = new KNXAddress(
+			this.interfaceIa,
+			KNXAddressType.TYPE_INDIVIDUAL,
+		)
 		const dstAddress = new KNXAddress(dst, KNXAddressType.TYPE_GROUP)
 		const apci = 0x80 | (value ? 0x01 : 0x00)
 		const npdu = new NPDU(0x00, apci, null)
@@ -249,7 +264,6 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		}
 		if (service === KNXIP.SECURE_WRAPPER) {
 			this.handleSecureWrapper(frame)
-			return
 		}
 		// ignore unexpected frames
 	}
@@ -266,7 +280,9 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		if (clientKey.length !== PUBLIC_KEY_LEN) {
 			this.emit(
 				'error',
-				new Error(`Invalid client public key length ${clientKey.length}`),
+				new Error(
+					`Invalid client public key length ${clientKey.length}`,
+				),
 			)
 			return
 		}
@@ -296,7 +312,10 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		if (!this.sessionKey) return
 		const inner = this.unwrapFrame(frame)
 		const type = inner.readUInt16BE(2)
-		if (type === KNXIP.SECURE_SESSION_AUTHENTICATE && this.handshakeState === 'session') {
+		if (
+			type === KNXIP.SECURE_SESSION_AUTHENTICATE &&
+			this.handshakeState === 'session'
+		) {
 			this.handshakeState = 'auth'
 			const status = Buffer.concat([
 				Buffer.from('06100954', 'hex'),
@@ -306,21 +325,33 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 			this.socket?.write(this.wrapFrame(status))
 			return
 		}
-		if (type === KNXIP.TUNNELING_CONNECT_REQUEST && this.handshakeState === 'auth') {
+		if (
+			type === KNXIP.TUNNELING_CONNECT_REQUEST &&
+			this.handshakeState === 'auth'
+		) {
 			this.handshakeState = 'connected'
 			const connect = this.buildConnectResponse()
 			this.socket?.write(this.wrapFrame(connect))
 			this.emit('connected')
 			return
 		}
-		if (type === KNXIP.TUNNELING_REQUEST && this.handshakeState === 'connected') {
+		if (
+			type === KNXIP.TUNNELING_REQUEST &&
+			this.handshakeState === 'connected'
+		) {
 			this.handleTunnelingRequest(inner)
 			return
 		}
-		if (type === KNXIP.TUNNELING_ACK && this.handshakeState === 'connected') {
+		if (
+			type === KNXIP.TUNNELING_ACK &&
+			this.handshakeState === 'connected'
+		) {
 			return
 		}
-		if (type === KNXIP.CONNECTIONSTATE_REQUEST && this.handshakeState === 'connected') {
+		if (
+			type === KNXIP.CONNECTIONSTATE_REQUEST &&
+			this.handshakeState === 'connected'
+		) {
 			const stateResponse = this.buildConnectionStateResponse(inner)
 			this.socket?.write(this.wrapFrame(stateResponse))
 			return
@@ -328,14 +359,17 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		if (type === KNXIP.DISCONNECT_REQUEST) {
 			const disconnect = this.buildDisconnectResponse(inner)
 			this.socket?.write(this.wrapFrame(disconnect))
-			return
 		}
 	}
 
 	private handleTunnelingRequest(inner: Buffer) {
 		const { knxMessage } = KNXProtocol.parseMessage(inner)
 		const request = knxMessage as KNXTunnelingRequest
-		const ack = KNXProtocol.newKNXTunnelingACK(this.channelId, request.seqCounter, 0)
+		const ack = KNXProtocol.newKNXTunnelingACK(
+			this.channelId,
+			request.seqCounter,
+			0,
+		)
 		this.socket?.write(this.wrapFrame(ack.toBuffer()))
 		const cemi = request.cEMIMessage
 		if (cemi.msgCode !== CEMIConstants.L_DATA_REQ) {
@@ -385,7 +419,12 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 			addrFields,
 			DATA_SECURE_CTR_SUFFIX,
 		])
-		const [plainPayload, macTr] = decryptCtr(key, counter0, encMac, encPayload)
+		const [plainPayload, macTr] = decryptCtr(
+			key,
+			counter0,
+			encMac,
+			encPayload,
+		)
 		const block0 = Buffer.concat([
 			seq,
 			addrFields,
@@ -439,7 +478,11 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 			npdu.dataBuffer?.value ?? Buffer.alloc(0),
 		])
 		const seqBuf = Buffer.alloc(SECURE_SEQ_LEN)
-		seqBuf.writeUIntBE(Number(this.sendSeq48 & 0xffffffffffffn), 0, SECURE_SEQ_LEN)
+		seqBuf.writeUIntBE(
+			Number(this.sendSeq48 & 0xffffffffffffn),
+			0,
+			SECURE_SEQ_LEN,
+		)
 		this.sendSeq48 = (this.sendSeq48 + 1n) & 0xffffffffffffn
 		const addrFields = Buffer.from([
 			(srcIa >> 8) & 0xff,
@@ -466,11 +509,7 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 			block0,
 		)
 		const macShort = macFull.subarray(0, 4)
-		const ctr0 = Buffer.concat([
-			seqBuf,
-			addrFields,
-			DATA_SECURE_CTR_SUFFIX,
-		])
+		const ctr0 = Buffer.concat([seqBuf, addrFields, DATA_SECURE_CTR_SUFFIX])
 		const [encPayload, encMac] = encryptDataCtr(
 			key,
 			ctr0,
@@ -496,10 +535,7 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 			new KNXAddress(this.assignedIa, KNXAddressType.TYPE_INDIVIDUAL),
 		)
 		const response = new KNXConnectResponse(this.channelId, 0, hpai, crd)
-		return Buffer.concat([
-			response.header.toBuffer(),
-			response.toBuffer(),
-		])
+		return Buffer.concat([response.header.toBuffer(), response.toBuffer()])
 	}
 
 	private buildConnectionStateResponse(request: Buffer): Buffer {
