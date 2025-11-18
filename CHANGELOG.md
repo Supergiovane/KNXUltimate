@@ -1,5 +1,12 @@
 
 
+# [5.2.0-beta.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.4...v5.2.0-beta.0) (2025-11-18)
+
+
+### Features
+
+* Feature/serial ft12 interface ([#72](https://github.com/Supergiovane/KNXUltimate/issues/72)) ([e36e63a](https://github.com/Supergiovane/KNXUltimate/commit/e36e63a7d1ee29b4d0b2aef875e467a6b2b4ed78))
+
 ## [5.1.4](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.3...v5.1.4) (2025-10-11)
 
 
