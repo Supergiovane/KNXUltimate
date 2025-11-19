@@ -21,6 +21,10 @@ export interface SerialFT12Options {
 	rtscts?: boolean
 	dtr?: boolean
 	timeoutMs?: number
+	/** Treat the interface as a Weinzierl KBerry/BAOS module and run BAOS init (LinkLayer, indication, GA filter off). Default: true */
+	isKBERRY?: boolean
+	/** Forward to SerialPort "lock" flag. Default: true */
+	lock?: boolean
 }
 
 type SerialFT12Events = {
@@ -115,18 +119,105 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 	}
 
 	private async initialize() {
+		const isKBERRY = this.options.isKBERRY ?? true
+		// Weinzierl KBerry / BAOS: full init sequence
 		await this.sendReset()
-		await this.sendCommMode()
+		if (isKBERRY) {
+			try {
+				this.logger.debug('FT1.2 → SetServerItem indication sending=on')
+			} catch {}
+			await this.setIndicationSending(true)
+			try {
+				this.logger.debug(
+					'FT1.2 → M_PropWrite COMM_MODE LinkLayer (f6 00 08 01 34 10 01 00)',
+				)
+			} catch {}
+			await this.sendCommMode()
+			try {
+				this.logger.debug(
+					'FT1.2 → M_PropWrite AddressTable length=0 (f6 04 00 01 02 10 01 00 00)',
+				)
+			} catch {}
+			try {
+				await this.disableGroupFilter()
+			} catch (err) {
+				this.logger.warn(
+					`Unable to disable group-address filter: ${
+						(err as Error).message
+					}`,
+				)
+			}
+		} else {
+			// Generic FT1.2: only reset + COMM_MODE if requested
+			await this.sendCommMode()
+		}
 		this.emit('ready')
 	}
 
 	private async sendReset() {
+		try {
+			this.logger.debug('FT1.2 → RESET_REQ 10 40 40 16')
+		} catch {}
 		await this.writeRaw(Buffer.from([0x10, 0x40, 0x40, 0x16]))
 		await this.waitForAck('reset')
 	}
 
 	private async sendCommMode() {
 		await this.sendCemiPayload(COMM_MODE_FRAME)
+	}
+
+	/**
+	 * Enable/disable BAOS indication sending (ServerItem #16).
+	 * When enabled, BAOS forwards cEMI indications to the host.
+	 */
+	private async setIndicationSending(enable: boolean) {
+		const itemId = 0x0010
+		const value = Buffer.from([enable ? 0x01 : 0x00])
+		await this.sendBaosServerItem(itemId, value)
+	}
+
+	/**
+	 * Set Address Table length = 0 so that KBerry forwards all group addresses.
+	 * This affects receive-side filtering only.
+	 */
+	private async disableGroupFilter() {
+		const cemi = Buffer.from([
+			0xf6, // M_PropWrite.req
+			0x04,
+			0x00, // Interface Object: Address Table (4.0)
+			0x01, // Object instance 1
+			0x02, // Property ID 2 (Length)
+			0x10, // descriptor: 1 element
+			0x01, // start index = 1
+			0x00,
+			0x00, // new length = 0 (UINT16)
+		])
+		await this.sendCemiPayload(cemi)
+	}
+
+	private async sendBaosServerItem(itemId: number, data: Buffer) {
+		const payload = Buffer.alloc(9 + data.length)
+		let offset = 0
+		payload[offset++] = 0xf0 // Main service: BAOS
+		payload[offset++] = 0x02 // Sub service: SetServerItem
+		payload.writeUInt16BE(itemId, offset)
+		offset += 2 // start item id
+		payload.writeUInt16BE(1, offset)
+		offset += 2 // number of items
+		payload.writeUInt16BE(itemId, offset)
+		offset += 2 // first item id
+		payload[offset++] = data.length
+		data.copy(payload, offset)
+		await this.sendBaosPayload(payload)
+	}
+
+	private async sendBaosPayload(payload: Buffer) {
+		if (!this.port) throw new Error('Serial FT1.2 port is not open')
+		try {
+			this.logger.debug(`FT1.2 TX BAOS ${payload.toString('hex')}`)
+		} catch {}
+		const frame = this.buildLongFrame(payload)
+		await this.writeFrameWithAck(frame)
 	}
 
 	private async createSerialPort(): Promise<SerialPort> {
@@ -137,6 +228,7 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 			stopBits: (this.options.stopBits ?? 1) as 1 | 1.5 | 2,
 			parity: this.options.parity ?? 'even',
 			rtscts: this.options.rtscts ?? false,
+			lock: this.options.lock ?? true,
 			autoOpen: false,
 		}
 		return new Promise((resolve, reject) => {
@@ -169,6 +261,9 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 	}
 
 	private handleChunk(chunk: Buffer) {
+		try {
+			this.logger.debug(`FT1.2 RX chunk ${chunk.toString('hex')}`)
+		} catch {}
 		this.rxBuffer = Buffer.concat([this.rxBuffer, chunk])
 		while (this.rxBuffer.length > 0) {
 			const byte = this.rxBuffer[0]
@@ -236,6 +331,20 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		}
 		this.sendAck()
 		if (payload.length === 0) return
+		// BAOS payload (0xF0...) vs plain cEMI (0x11/0x29/0xF6/...)
+		if (payload[0] === 0xf0) {
+			try {
+				this.logger.debug(
+					`FT1.2 RX BAOS ${payload.toString('hex')}`,
+				)
+			} catch {}
+			return
+		}
+		try {
+			this.logger.debug(
+				`FT1.2 RX cEMI ${payload.toString('hex')}`,
+			)
+		} catch {}
 		this.emit('cemi', payload)
 	}
 
@@ -264,6 +373,11 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 
 	private async writeFrameWithAck(frame: Buffer): Promise<void> {
 		const ackPromise = this.waitForAck('frame')
+		try {
+			this.logger.debug(
+				`FT1.2 TX frame ${frame.toString('hex')}`,
+			)
+		} catch {}
 		await this.writeRaw(frame)
 		await ackPromise
 	}

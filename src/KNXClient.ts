@@ -1348,10 +1348,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		const srcAddress = this.physAddr
 
-		if (
-			this._options.hostProtocol === 'Multicast' ||
-			this.isSerialTransport()
-		) {
+		if (this._options.hostProtocol === 'Multicast') {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'write',
@@ -1364,11 +1361,32 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.priority = 3
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
-			// Data Secure si applica solo se GA è sicura (TunnelTCP o, opzionalmente, anche qui se chiavi presenti)
 			const knxPacketRequest =
 				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
-			// 06/12/2021 Multivast automaticalli echoes telegrams
+			// 06/12/2021 Multicast automatically echoes telegrams
+		} else if (this.isSerialTransport()) {
+			// Serial FT1.2 (KBerry): send as L_DATA_REQ over cEMI/FT1.2
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'write',
+				srcAddress,
+				dstAddress,
+				knxBuffer,
+			)
+			// Request bus ACK unless suppressed
+			cEMIMessage.control.ack = this._options.suppress_ack_ldatareq
+				? 0
+				: 1
+			cEMIMessage.control.broadcast = 1
+			cEMIMessage.control.priority = 3
+			cEMIMessage.control.addressType = 1
+			cEMIMessage.control.hopCount = 6
+			const knxPacketRequest =
+				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
+			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
+			// Echo on local client as indication
+			this.ensurePlainCEMI(cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
 		} else {
 			// Tunneling
 			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
@@ -1437,10 +1455,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		const srcAddress = this.physAddr
 
-		if (
-			this._options.hostProtocol === 'Multicast' ||
-			this.isSerialTransport()
-		) {
+		if (this._options.hostProtocol === 'Multicast') {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'response',
@@ -1453,11 +1468,29 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			cEMIMessage.control.priority = 3
 			cEMIMessage.control.addressType = 1
 			cEMIMessage.control.hopCount = 6
-			// Data Secure opzionale se GA è sicura
 			const knxPacketRequest =
 				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
-			// 06/12/2021 Multivast automatically echoes telegrams
+			// 06/12/2021 Multicast automatically echoes telegrams
+		} else if (this.isSerialTransport()) {
+			// Serial FT1.2 (KBerry): send as L_DATA_REQ over cEMI/FT1.2
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'response',
+				srcAddress,
+				dstAddress,
+				knxBuffer,
+			)
+			// No ACK request on bus for responses
+			cEMIMessage.control.ack = 0
+			cEMIMessage.control.broadcast = 1
+			cEMIMessage.control.priority = 3
+			cEMIMessage.control.addressType = 1
+			cEMIMessage.control.hopCount = 6
+			const knxPacketRequest =
+				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
+			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
+			this.ensurePlainCEMI(cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
 		} else {
 			// Tunneling
 			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
@@ -1509,10 +1542,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 		const srcAddress = this.physAddr
 
-		if (
-			this._options.hostProtocol === 'Multicast' ||
-			this.isSerialTransport()
-		) {
+		if (this._options.hostProtocol === 'Multicast') {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'read',
@@ -1528,7 +1558,28 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const knxPacketRequest =
 				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
-			// 06/12/2021 Multivast automaticalli echoes telegrams
+			// 06/12/2021 Multicast automatically echoes telegrams
+		} else if (this.isSerialTransport()) {
+			// Serial FT1.2 (KBerry): send as L_DATA_REQ over cEMI/FT1.2
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'read',
+				srcAddress,
+				dstAddress,
+				null,
+			)
+			// Request bus ACK unless suppressed
+			cEMIMessage.control.ack = this._options.suppress_ack_ldatareq
+				? 0
+				: 1
+			cEMIMessage.control.broadcast = 1
+			cEMIMessage.control.priority = 3
+			cEMIMessage.control.addressType = 1
+			cEMIMessage.control.hopCount = 6
+			const knxPacketRequest =
+				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
+			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
+			this.ensurePlainCEMI(cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
 		} else {
 			// Tunneling
 			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
@@ -1619,10 +1670,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				KNXAddress.TYPE_GROUP,
 			)
 		const srcAddress = this.physAddr
-		if (
-			this._options.hostProtocol === 'Multicast' ||
-			this.isSerialTransport()
-		) {
+		if (this._options.hostProtocol === 'Multicast') {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND
 			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
 				'write',
@@ -1638,7 +1686,28 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const knxPacketRequest =
 				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
 			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
-			// 06/12/2021 Multivast automaticalli echoes telegrams
+			// 06/12/2021 Multicast automatically echoes telegrams
+		} else if (this.isSerialTransport()) {
+			// Serial FT1.2 (KBerry): send as L_DATA_REQ over cEMI/FT1.2
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'write',
+				srcAddress,
+				dstAddress,
+				data,
+			)
+			// Request bus ACK unless suppressed (TunnelTCP rules don't apply here)
+			cEMIMessage.control.ack = this._options.suppress_ack_ldatareq
+				? 0
+				: 1
+			cEMIMessage.control.broadcast = 1
+			cEMIMessage.control.priority = 3
+			cEMIMessage.control.addressType = 1
+			cEMIMessage.control.hopCount = 6
+			const knxPacketRequest =
+				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
+			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
+			this.ensurePlainCEMI(cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
 		} else {
 			// Tunneling
 			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
@@ -2505,7 +2574,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Connect to the KNX bus
 	 */
 	Connect(knxLayer = TunnelTypes.TUNNEL_LINKLAYER) {
-		if (this._clientSocket === null) {
+		if (!this.isSerialTransport() && this._clientSocket === null) {
 			throw new Error('No client socket defined')
 		}
 		if (this._connectionState === ConncetionState.DISCONNECTING) {
