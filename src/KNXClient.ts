@@ -733,6 +733,22 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 		this._peerHost = options.path || '/dev/ttyAMA0'
 		this._peerPort = 0
+
+		// Prepare KNX Data Secure for serial mode (KBerry):
+		// if a .knxkeys file is configured, load group keys so that
+		// maybeApplyDataSecure / maybeDecryptDataSecure can work on cEMI frames.
+		if (this._options.isSecureKNXEnabled) {
+			try {
+				await this.secureEnsureKeyring()
+			} catch (err) {
+				try {
+					this.sysLogger.error(
+						`[${getTimestamp()}] Serial FT1.2: secure keyring error: ${(err as Error).message}`,
+					)
+				} catch {}
+			}
+		}
+
 		this._serialDriver = new SerialFT12(options)
 		this._serialDriver.on('cemi', (payload) =>
 			this.handleSerialCemi(payload),

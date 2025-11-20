@@ -68,13 +68,13 @@ These are the properties you can pass to `KNXClient` (see examples for full usag
 | `KNXQueueSendIntervalMilliseconds` (number) | all              | Optional. Inter‑telegram delay in ms. Default ~25ms. Don’t go below 20ms. |
 | `suppress_ack_ldatareq` (bool)   | tunnelling (UDP/TCP)               | Optional. Avoid requesting/handling L_DATA_REQ bus ACK in tunnelling. Leave `false` unless your interface needs it. |
 | `theGatewayIsKNXVirtual` (bool)  | tunnelling                         | Optional. Special handling for ETS KNX Virtual (adds `localIPAddress` to tunnel endpoint). Default `false`. |
-| `isSecureKNXEnabled` (bool)      | secure tunnelling & secure routing | Enable KNX/IP Secure. With `TunnelTCP`: session handshake + Secure Wrapper. With `Multicast`: secure routing (Secure Wrapper, timer sync). |
-| `secureTunnelConfig` (object)    | secure tunnelling & secure routing | KNX Secure configuration. See below. |
+| `isSecureKNXEnabled` (bool)      | IP secure, serial Data Secure      | Enable KNX/IP Secure. With `TunnelTCP`: session handshake + Secure Wrapper. With `Multicast`: secure routing (Secure Wrapper, timer sync). With `SerialFT12`: enable KNX Data Secure on TP (group keys only, no IP wrapper). |
+| `secureTunnelConfig` (object)    | secure tunnelling, routing, serial | KNX Secure configuration. For `TunnelTCP`/routing it drives both tunnel auth and Data Secure; for `SerialFT12` only the keyring fields (`knxkeys_file_path`, `knxkeys_password`) are used to load group keys for Data Secure on TP. |
 | `secureRoutingWaitForTimer` (bool)| secure routing (multicast)        | Optional. Wait for first timer sync (0955/0950) before sending. Default `true`. |
 
 ### Serial FT1.2 (TP) mode / KBerry
 
-Choose `hostProtocol: 'SerialFT12'` to connect directly to KNX TP via a serial FT1.2 interface. This mode is primarily designed and tested for **Weinzierl KBerry / BAOS** modules running in Link Layer (`cEMI`) mode over FT1.2; no `knxd` is required. Configure the serial line via the `serialInterface` option; by default `/dev/ttyAMA0`, 19200 baud, 8E1, DTR on, RTS/CTS off are used.
+Choose `hostProtocol: 'SerialFT12'` to connect directly to KNX TP via a serial FT1.2 interface. This mode is primarily designed and tested for **Weinzierl KBerry / BAOS** modules running in Link Layer (`cEMI`) mode over FT1.2. Configure the serial line via the `serialInterface` option; by default `/dev/ttyAMA0`, 19200 baud, 8E1, DTR on, RTS/CTS off are used.
 
 List all available serial devices before connecting:
 
@@ -88,7 +88,7 @@ async function connectSerial() {
   const client = new KNXClient({
     hostProtocol: 'SerialFT12',
     serialInterface: {
-      path: ports[0]?.path ?? '/dev/ttyAMA0',
+      path: '/dev/ttyAMA0',
       baudRate: 19200,
       dataBits: 8,
       stopBits: 1,
@@ -97,8 +97,15 @@ async function connectSerial() {
       isKBERRY: true,   // default
       lock: false,      // optional, useful on macOS
     },
-    physAddr: '1.1.200', // source IA on the bus
+    physAddr: '15.15.255', // source IA on the bus
     loglevel: 'info',
+    // Optional: enable KNX Data Secure on TP using an ETS keyring
+    isSecureKNXEnabled: true,
+    secureTunnelConfig: {
+      knxkeys_file_path: '/path/to/Project.knxkeys',
+      knxkeys_password: 'your-ets-password',
+      // tunnel* fields are ignored in SerialFT12 mode (no IP tunnel auth); only group keys are used.
+    },
   })
 
   client.on('connected', () => console.log('Serial FT1.2 ready'))
@@ -113,8 +120,7 @@ Remember to configure the physical address (`physAddr`) that ETS assigns to your
 - Switches the BAOS communication mode to Link Layer (`cEMI`)
 - Enables indication sending
 - Sets the Address Table length to 0 (no GA filter, all group telegrams are forwarded)
-
-KNX/IP Secure and Data Secure apply only to IP transports (`TunnelTCP` / secure routing); serial FT1.2 does not use `secureTunnelConfig`.
+- If `isSecureKNXEnabled: true` and a `.knxkeys` file is configured in `secureTunnelConfig`, loads group keys and applies **KNX Data Secure** on TP for those Group Addresses (cEMI `L_Data.req` / `L_Data.ind` are encrypted/decrypted end‑to‑end). No IP Secure wrapper is used on the serial line; only the APDU is protected.
 ## SUPPORTED DATAPOINTS
 
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
