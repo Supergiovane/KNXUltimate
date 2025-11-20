@@ -64,17 +64,17 @@ These are the properties you can pass to `KNXClient` (see examples for full usag
 | `loglevel` (string)              | all                                | One of: `disable`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `localIPAddress` (string)        | all                                | Optional. Binds the local UDP/TCP socket to a specific local interface IP. Useful with multiple NICs. |
 | `interface` (string)             | all                                | Optional. Local interface name to select the NIC (alternative to `localIPAddress`). |
-| `serialInterface` (object)       | SerialFT12                         | Serial port settings used when `hostProtocol === 'SerialFT12'`. Supports `path` (default `/dev/ttyAMA0`), `baudRate` (default 19200), `dataBits`, `stopBits`, `parity` (`'even'` by default), `rtscts`, `dtr`, `timeoutMs`. |
+| `serialInterface` (object)       | SerialFT12                         | Serial port settings used when `hostProtocol === 'SerialFT12'`. Supports `path` (default `/dev/ttyAMA0`), `baudRate` (default 19200), `dataBits`, `stopBits`, `parity` (`'even'` by default), `rtscts`, `dtr`, `timeoutMs`, `lock` (forwarded to `serialport`), and `isKBERRY` (default `true`, enable Weinzierl KBerry/BAOS initialisation). |
 | `KNXQueueSendIntervalMilliseconds` (number) | all              | Optional. Inter‑telegram delay in ms. Default ~25ms. Don’t go below 20ms. |
 | `suppress_ack_ldatareq` (bool)   | tunnelling (UDP/TCP)               | Optional. Avoid requesting/handling L_DATA_REQ bus ACK in tunnelling. Leave `false` unless your interface needs it. |
 | `theGatewayIsKNXVirtual` (bool)  | tunnelling                         | Optional. Special handling for ETS KNX Virtual (adds `localIPAddress` to tunnel endpoint). Default `false`. |
-| `isSecureKNXEnabled` (bool)      | secure tunnelling & secure routing | Enable KNX/IP Secure. With `TunnelTCP`: session handshake + Secure Wrapper. With `Multicast`: secure routing (Secure Wrapper, timer sync). |
-| `secureTunnelConfig` (object)    | secure tunnelling & secure routing | KNX Secure configuration. See below. |
+| `isSecureKNXEnabled` (bool)      | IP secure, serial Data Secure      | Enable KNX/IP Secure. With `TunnelTCP`: session handshake + Secure Wrapper. With `Multicast`: secure routing (Secure Wrapper, timer sync). With `SerialFT12`: enable KNX Data Secure on TP (group keys only, no IP wrapper). |
+| `secureTunnelConfig` (object)    | secure tunnelling, routing, serial | KNX Secure configuration. For `TunnelTCP`/routing it drives both tunnel auth and Data Secure; for `SerialFT12` only the keyring fields (`knxkeys_file_path`, `knxkeys_password`) are used to load group keys for Data Secure on TP. |
 | `secureRoutingWaitForTimer` (bool)| secure routing (multicast)        | Optional. Wait for first timer sync (0955/0950) before sending. Default `true`. |
 
-### Serial FT1.2 (TP) mode
+### Serial FT1.2 (TP) mode / KBerry
 
-Choose `hostProtocol: 'SerialFT12'` to connect directly to TP/FT1.2 interfaces (TPUART hats, Weinzierl 307x, etc.) via `/dev/tty*`. The driver speaks FT1.2 natively, so no KNXd is required. Configure the serial line via the `serialInterface` option; by default `/dev/ttyAMA0`, 19200 baud, 8E1, DTR on, RTS/CTS off are used.
+Choose `hostProtocol: 'SerialFT12'` to connect directly to KNX TP via a serial FT1.2 interface. This mode is primarily designed and tested for **Weinzierl KBerry / BAOS** modules running in Link Layer (`cEMI`) mode over FT1.2. Configure the serial line via the `serialInterface` option; by default `/dev/ttyAMA0`, 19200 baud, 8E1, DTR on, RTS/CTS off are used.
 
 List all available serial devices before connecting:
 
@@ -87,13 +87,24 @@ async function connectSerial() {
 
   const client = new KNXClient({
     hostProtocol: 'SerialFT12',
-    serialInterface: { path: ports[0]?.path ?? '/dev/ttyAMA0' },
-    physAddr: '1.1.200', // interface IA from ETS
+    serialInterface: {
+      path: '/dev/ttyAMA0',
+      baudRate: 19200,
+      dataBits: 8,
+      stopBits: 1,
+      parity: 'even',
+      // KBerry / BAOS helpers:
+      isKBERRY: true,   // default
+      lock: false,      // optional, useful on macOS
+    },
+    physAddr: '15.15.255', // source IA on the bus
     loglevel: 'info',
+    // Optional: enable KNX Data Secure on TP using an ETS keyring
     isSecureKNXEnabled: true,
     secureTunnelConfig: {
-      knxkeys_file_path: '/home/pi/project.knxkeys',
-      knxkeys_password: 'supersecret',
+      knxkeys_file_path: '/path/to/Project.knxkeys',
+      knxkeys_password: 'your-ets-password',
+      // tunnel* fields are ignored in SerialFT12 mode (no IP tunnel auth); only group keys are used.
     },
   })
 
@@ -103,20 +114,13 @@ async function connectSerial() {
 }
 ```
 
-Remember to configure the physical address (`physAddr`) that ETS assigns to your TP interface; the serial transport uses that IA on the bus. KNX Data Secure works exactly like in routing mode: load your `.knxkeys` file and secure keys will be applied automatically to outgoing/incoming telegrams.
+Remember to configure the physical address (`physAddr`) that ETS assigns to your TP interface; the serial transport uses that IA on the bus. In KBerry mode (`isKBERRY: true`) the driver automatically:
 
-Secure configuration object (`secureTunnelConfig`):
-
-| Field                                   | Description |
-| --------------------------------------- | ----------- |
-| `tunnelInterfaceIndividualAddress` (string) Optional| Interface IA as in ETS. TunnelTCP: if unset/empty the client auto‑selects a usable tunnel from the ETS keyring (tries in sequence until auth/connect succeed) and uses it. Multicast: not used. |
-| `knxkeys_file_path` (string)            | Path to ETS keyring `.knxkeys` file. |
-| `knxkeys_password` (string)             | ETS project password to decrypt the keyring. |
-| `tunnelUserPassword` (string) Optional | Provide the KNX Secure tunnel password directly (no `.knxkeys`). Enables secure tunnelling only; Data Secure and secure routing stay disabled. |
-| `tunnelUserId` (number) Optional        | KNX Secure tunnel user ID. Defaults to `2`. Useful when your gateway uses a custom account. |
-
-
-Note on KNX Secure: `KNXClient` supports KNX/IP Secure for both tunnelling (TCP) and routing (multicast). Group Addresses found in the ETS keyring are protected with Data Secure; GA not in the keyring remain plain. With `tunnelUserPassword` alone you still get secure tunnelling, but Data Secure and secure multicast are unavailable.
+- Sends an FT1.2 reset
+- Switches the BAOS communication mode to Link Layer (`cEMI`)
+- Enables indication sending
+- Sets the Address Table length to 0 (no GA filter, all group telegrams are forwarded)
+- If `isSecureKNXEnabled: true` and a `.knxkeys` file is configured in `secureTunnelConfig`, loads group keys and applies **KNX Data Secure** on TP for those Group Addresses (cEMI `L_Data.req` / `L_Data.ind` are encrypted/decrypted end‑to‑end). No IP Secure wrapper is used on the serial line; only the APDU is protected.
 ## SUPPORTED DATAPOINTS
 
 For each Datapoint, there is a sample on how to format the payload (telegram) to be passed.<br/>
