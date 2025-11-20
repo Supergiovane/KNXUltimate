@@ -41,10 +41,10 @@ If you enjoy my work developing this package, do today a kind thing for someone 
 
 | Technology            | Supported                                                            |
 | --------------------- | -------------------------------------------------------------------- |
-| KNX Tunnelling (UDP)  | ![](https://placehold.co/200x20/green/white?text=YES)                |
-| KNX Routing (Multicast) | ![](https://placehold.co/200x20/green/white?text=YES)              |
-| KNX IP Secure/Data secure | ![](https://placehold.co/200x20/green/white?text=YES)         |
-| KNX TP Serial FT1.2 (BETA)   | ![](https://placehold.co/200x20/orange/white?text=BETA)             |
+| KNX IP Full Stack  | ![](https://placehold.co/200x20/green/white?text=YES)                |
+| KNX IP Secure Full stack | ![](https://placehold.co/200x20/green/white?text=YES)         |
+| KNX TP Serial FT1.2/KBERRY/BAOS | ![](https://placehold.co/200x20/green/white?text=YES) |
+| KNX TP Secure Full stack| ![](https://placehold.co/200x20/green/white?text=YES) |
 
 
 Please subscribe to my channel, to learn how to use it [![Youtube][youtube-image]][youtube-url]  
@@ -74,7 +74,9 @@ These are the properties you can pass to `KNXClient` (see examples for full usag
 
 ### Serial FT1.2 (TP) mode / KBerry
 
-Choose `hostProtocol: 'SerialFT12'` to connect directly to KNX TP via a serial FT1.2 interface. This mode is primarily designed and tested for **Weinzierl KBerry / BAOS** modules running in Link Layer (`cEMI`) mode over FT1.2. Configure the serial line via the `serialInterface` option; by default `/dev/ttyAMA0`, 19200 baud, 8E1, DTR on, RTS/CTS off are used.
+Choose `hostProtocol: 'SerialFT12'` to connect directly to KNX TP via a serial FT1.2 interface. This mode is primarily designed and tested for **Weinzierl KBerry / BAOS** modules running in Link Layer (`cEMI`) mode over FT1.2. Configure the serial line via the `serialInterface` option; by default `/dev/ttyAMA0`, 19200 baud, 8E1, DTR on, RTS/CTS off are used.
+
+This transport supports KNX Data Secure on TP: set `isSecureKNXEnabled: true` and provide `secureTunnelConfig.knxkeys_file_path` / `secureTunnelConfig.knxkeys_password` with your ETS keyring. Verified with **Weinzierl KBerry / BAOS** modules; leave `serialInterface.isKBERRY` at its default `true` to run their FT1.2 init sequence automatically.
 
 List all available serial devices before connecting:
 
