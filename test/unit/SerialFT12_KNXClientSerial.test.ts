@@ -129,7 +129,9 @@ describe('KNXClient serial FT1.2 (KBerry) behaviour', () => {
 		client.write('0/1/26', true, '1.001')
 
 		// Allow the internal queue/async processing to run
-		await new Promise((resolve) => setTimeout(resolve, 50))
+		await new Promise<void>((resolve) => {
+			setTimeout(resolve, 50)
+		})
 
 		assert.strictEqual(
 			sentPayloads.length,

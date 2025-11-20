@@ -334,16 +334,12 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		// BAOS payload (0xF0...) vs plain cEMI (0x11/0x29/0xF6/...)
 		if (payload[0] === 0xf0) {
 			try {
-				this.logger.debug(
-					`FT1.2 RX BAOS ${payload.toString('hex')}`,
-				)
+				this.logger.debug(`FT1.2 RX BAOS ${payload.toString('hex')}`)
 			} catch {}
 			return
 		}
 		try {
-			this.logger.debug(
-				`FT1.2 RX cEMI ${payload.toString('hex')}`,
-			)
+			this.logger.debug(`FT1.2 RX cEMI ${payload.toString('hex')}`)
 		} catch {}
 		this.emit('cemi', payload)
 	}
@@ -374,9 +370,7 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 	private async writeFrameWithAck(frame: Buffer): Promise<void> {
 		const ackPromise = this.waitForAck('frame')
 		try {
-			this.logger.debug(
-				`FT1.2 TX frame ${frame.toString('hex')}`,
-			)
+			this.logger.debug(`FT1.2 TX frame ${frame.toString('hex')}`)
 		} catch {}
 		await this.writeRaw(frame)
 		await ackPromise
