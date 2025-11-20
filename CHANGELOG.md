@@ -1,5 +1,12 @@
 
 
+# [5.2.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.0-beta.0...v5.2.0) (2025-11-20)
+
+
+### Features
+
+* Kberry compatibility and Serial FT1.2 Data Security ([#73](https://github.com/Supergiovane/KNXUltimate/issues/73)) ([8d244d2](https://github.com/Supergiovane/KNXUltimate/commit/8d244d22fbc9c29b35a250011b65086b26831601))
+
 # [5.2.0-beta.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.1.4...v5.2.0-beta.0) (2025-11-18)
 
 
