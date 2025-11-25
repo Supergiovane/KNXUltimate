@@ -72,7 +72,7 @@ These are the properties you can pass to `KNXClient` (see examples for full usag
 | `secureTunnelConfig` (object)    | secure tunnelling, routing, serial | KNX Secure configuration. For `TunnelTCP`/routing it drives both tunnel auth and Data Secure; for `SerialFT12` only the keyring fields (`knxkeys_file_path`, `knxkeys_password`) are used to load group keys for Data Secure on TP. |
 | `secureRoutingWaitForTimer` (bool)| secure routing (multicast)        | Optional. Wait for first timer sync (0955/0950) before sending. Default `true`. |
 
-### Serial FT1.2 (TP) mode / KBerry
+### Serial FT1.2 (TP) mode / KBerry (see below how to setup the RPi and KBERRY)
 
 Choose `hostProtocol: 'SerialFT12'` to connect directly to KNX TP via a serial FT1.2 interface. This mode is primarily designed and tested for **Weinzierl KBerry / BAOS** modules running in Link Layer (`cEMI`) mode over FT1.2. Configure the serial line via the `serialInterface` option; by default `/dev/ttyAMA0`, 19200 baud, 8E1, DTR on, RTS/CTS off are used.
 
@@ -701,6 +701,123 @@ Secure TCP auto‑selection details
 - Logging: look for lines starting with “Secure TCP:” to follow selection steps (discovered Host IA, candidates, chosen IA).
 - Override: set `secureTunnelConfig.tunnelInterfaceIndividualAddress` and/or `interface` explicitly to skip the auto‑selection.
 
+# Using KNX Ultimate with kBerry on Raspberry Pi 3 (UART / FT1.2)
+
+This guide explains how to connect a **kBerry** KNX interface directly
+to a **Raspberry Pi 3** and use it with **KNX Ultimate** over the
+**hardware UART** (`ttyAMA0`) using the **FT1.2 (TPUART)** protocol.
+
+> ✅ This procedure is tested with Raspberry Pi OS Bookworm on a
+> Raspberry Pi 3 and has been written on November, 25, 2025.
+
+## 1. Prerequisites
+
+- Raspberry Pi 3 (Model B or B+)
+- Raspberry Pi OS (Bookworm recommended)
+- kBerry KNX interface mounted on the GPIO header
+- Node-RED with KNX Ultimate installed
+- Basic terminal access (SSH or local console)
+
+## 2. Wiring / Hardware Overview
+
+The kBerry uses the Raspberry Pi's primary UART:
+
+- **TX / RX**: GPIO14 (TXD) and GPIO15 (RXD)
+- **GND**: A common ground between Raspberry Pi and kBerry
+- **Power**: Provided via the GPIO header
+
+Make sure the kBerry is properly seated on the Raspberry Pi GPIO header
+and that no other HAT is conflicting with those pins.
+
+## 3. Disable Bluetooth and Enable the Hardware UART
+
+### 3.1 Edit the correct config file (Bookworm)
+
+```bash
+sudo nano /boot/firmware/config.txt
+```
+
+Add:
+
+```ini
+enable_uart=1
+dtoverlay=pi3-disable-bt
+```
+
+### 3.2 Disable ModemManager
+
+```bash
+sudo systemctl disable --now ModemManager
+```
+
+### 3.3 Disable Bluetooth service
+
+```bash
+sudo systemctl disable --now bluetooth.service
+```
+
+## 4. Disable Serial Login Console / Enable Hardware UART
+
+```bash
+sudo raspi-config
+```
+
+- Disable login shell on serial → **No**
+- Enable serial hardware → **Yes**
+
+Reboot.
+
+## 5. Verify UART
+
+```bash
+ls -l /dev/serial0
+ls -l /dev/ttyAMA0
+dmesg | grep tty
+```
+
+Expected:
+
+    /dev/serial0 -> ttyAMA0
+    /dev/ttyAMA0 exists
+
+## 6. Add Node-RED User to dialout
+
+```bash
+sudo usermod -aG dialout nodered
+sudo reboot
+```
+
+## 7. Configure KNX Ultimate
+
+- **Interface type**: Serial FT1.2 / TPUART
+- **Serial port**: `/dev/ttyAMA0`
+- **Baud rate**: 19200
+- **Data bits**: 8
+- **Parity**: Even
+- **Stop bits**: 1
+
+## 9. Troubleshooting
+
+### No `/dev/ttyAMA0`
+
+- Check `/boot/firmware/config.txt` entries
+- Reboot
+- Re-check `dmesg`
+
+### `/dev/serial0` → `ttyS0`
+
+- `dtoverlay=pi3-disable-bt` not applied
+- Re-check config file path
+- Reboot
+
+### Serial cannot be opened
+
+- Ensure user is in `dialout`
+- Check that no other program uses `/dev/ttyAMA0`
+
+---
+
+Done.
 
 
 ## HOW TO COLLABORATE

@@ -45,6 +45,12 @@ const COMM_MODE_FRAME = Buffer.from([
 export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 	private port?: SerialPort
 
+	private portListeners?: {
+		data: (chunk: Buffer) => void
+		error: (error: Error) => void
+		close: () => void
+	}
+
 	private rxBuffer: Buffer = Buffer.alloc(0)
 
 	private awaitingAck?: {
@@ -87,28 +93,52 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 
 	async close(): Promise<void> {
 		this.isClosing = true
-		if (!this.port) {
+		const port = this.port
+		if (!port) {
 			this.isClosing = false
 			return
 		}
 		await new Promise<void>((resolve) => {
-			const done = () => resolve()
-			this.port?.once('close', done)
+			let settled = false
+			let timeout: NodeJS.Timeout | undefined
+			const done = () => {
+				if (settled) return
+				settled = true
+				if (timeout) clearTimeout(timeout)
+				port.off('close', done)
+				resolve()
+			}
+			timeout = setTimeout(() => {
+				try {
+					this.logger.warn('FT1.2 close timed out; forcing cleanup')
+				} catch {}
+				done()
+			}, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+			timeout.unref?.()
+			port.once('close', done)
 			try {
-				this.port?.close((err) => {
+				port.close((err) => {
 					if (err) {
 						this.logger.error(`FT1.2 close error: ${err.message}`)
-						resolve()
 					}
+					done()
 				})
 			} catch (error) {
 				this.logger.error(
 					`FT1.2 close exception: ${(error as Error).message}`,
 				)
-				resolve()
+				done()
 			}
 		})
+		this.detachPortListeners(port)
+		const pendingAck = this.awaitingAck
+		if (pendingAck) {
+			clearTimeout(pendingAck.timer)
+			pendingAck.reject(new Error('Serial FT1.2 port closed'))
+			this.awaitingAck = undefined
+		}
 		this.port = undefined
+		this.rxBuffer = Buffer.alloc(0)
 		this.isClosing = false
 	}
 
@@ -250,14 +280,31 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 	}
 
 	private attachPort(port: SerialPort) {
-		port.on('data', (chunk) => this.handleChunk(chunk))
-		port.on('error', (error) => this.emit('error', error))
-		port.on('close', () => {
+		const onData = (chunk: Buffer) => this.handleChunk(chunk)
+		const onError = (error: Error) => this.emit('error', error)
+		const onClose = () => {
 			this.port = undefined
 			if (!this.isClosing) {
 				this.emit('close')
 			}
-		})
+		}
+		this.portListeners = {
+			data: onData,
+			error: onError,
+			close: onClose,
+		}
+		port.on('data', onData)
+		port.on('error', onError)
+		port.on('close', onClose)
+	}
+
+	private detachPortListeners(port: SerialPort) {
+		if (!this.portListeners) return
+		const { data, error, close } = this.portListeners
+		port.off('data', data)
+		port.off('error', error)
+		port.off('close', close)
+		this.portListeners = undefined
 	}
 
 	private handleChunk(chunk: Buffer) {
