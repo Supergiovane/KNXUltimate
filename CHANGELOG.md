@@ -1,5 +1,7 @@
 
 
+## [5.2.2](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.1...v5.2.2) (2025-11-25)
+
 ## [5.2.1](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.0...v5.2.1) (2025-11-25)
 
 # [5.2.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.0-beta.0...v5.2.0) (2025-11-20)
