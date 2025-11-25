@@ -702,8 +702,7 @@ Secure TCP auto‑selection details
 - Override: set `secureTunnelConfig.tunnelInterfaceIndividualAddress` and/or `interface` explicitly to skip the auto‑selection.
 
 <div style="background:#e9f7e9;border:1px solid #c8e6c8;border-radius:10px;padding:14px 16px;margin:16px 0;">
-<strong>Tip (solo per pochi utenti kBerry su Raspberry Pi 3)</strong><br/>
-<span style="font-size:0.9em;color:#3c5f3c;">Se non usi kBerry su Raspberry Pi 3, puoi saltare questa sezione.</span>
+
 
 ### Using KNX Ultimate with kBerry on Raspberry Pi 3 (UART / FT1.2)
 
