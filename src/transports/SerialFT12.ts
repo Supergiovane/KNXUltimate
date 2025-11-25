@@ -36,6 +36,9 @@ type SerialFT12Events = {
 
 const DEFAULT_PATH = '/dev/ttyAMA0'
 const DEFAULT_TIMEOUT_MS = 1200
+const RESET_TIMEOUT_MS = 3000
+const RESET_RETRIES = 3
+const CLOSE_GRACE_MS = 2000
 const ACK_BYTE = 0xe5
 
 const COMM_MODE_FRAME = Buffer.from([
@@ -52,6 +55,12 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 	}
 
 	private rxBuffer: Buffer = Buffer.alloc(0)
+
+	// Some KBerry/FT1.2 devices can emit an ACK before we arm waitForAck (e.g. on DTR toggle).
+	// Keep a spare counter so the next waitForAck can resolve immediately.
+	private pendingAck = 0
+
+	private lastCloseAt?: number
 
 	private awaitingAck?: {
 		resolve: () => void
@@ -85,6 +94,7 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 
 	async open(): Promise<void> {
 		if (this.port) return
+		await this.waitAfterCloseIfNeeded()
 		const handler = await this.createSerialPort()
 		this.port = handler
 		this.attachPort(handler)
@@ -97,6 +107,20 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		if (!port) {
 			this.isClosing = false
 			return
+		}
+		// Politely notify the interface before closing to avoid leftover state on KBerry/BAOS.
+		try {
+			await this.sendReset()
+			// Small grace to let the interface settle after reset.
+			await new Promise((resolve) => setTimeout(resolve, 50))
+		} catch (err) {
+			try {
+				this.logger.warn(
+					`FT1.2 close: reset before close failed: ${
+						(err as Error).message
+					}`,
+				)
+			} catch {}
 		}
 		await new Promise<void>((resolve) => {
 			let settled = false
@@ -130,6 +154,35 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 				done()
 			}
 		})
+		// Ensure the underlying serial handle really closes; retry once if it still reports open.
+		try {
+			if ((port as any).isOpen) {
+				try {
+					this.logger.warn(
+						'FT1.2 close: port still open after close request, retrying',
+					)
+				} catch {}
+				try {
+					port.close((err) => {
+						if (err) {
+							try {
+								this.logger.error(
+									`FT1.2 force close error: ${err.message}`,
+								)
+							} catch {}
+						}
+					})
+				} catch (err) {
+					try {
+						this.logger.error(
+							`FT1.2 force close exception: ${
+								(err as Error).message
+							}`,
+						)
+					} catch {}
+				}
+			}
+		} catch {}
 		this.detachPortListeners(port)
 		const pendingAck = this.awaitingAck
 		if (pendingAck) {
@@ -139,6 +192,8 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		}
 		this.port = undefined
 		this.rxBuffer = Buffer.alloc(0)
+		this.pendingAck = 0
+		this.lastCloseAt = Date.now()
 		this.isClosing = false
 	}
 
@@ -185,11 +240,45 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 	}
 
 	private async sendReset() {
+		let attempt = 0
+		let lastErr: Error | undefined
+		while (attempt < RESET_RETRIES) {
+			attempt += 1
+			try {
+				this.logger.debug(
+					`FT1.2 → RESET_REQ 10 40 40 16 (attempt ${attempt}/${RESET_RETRIES})`,
+				)
+			} catch {}
+			const ackPromise = this.waitForAck(
+				'reset',
+				this.options.timeoutMs ?? RESET_TIMEOUT_MS,
+			)
+			await this.writeRaw(Buffer.from([0x10, 0x40, 0x40, 0x16]))
+			try {
+				await ackPromise
+				return
+			} catch (err) {
+				lastErr = err as Error
+				try {
+					this.logger.warn(
+						`FT1.2 RESET ack timeout (attempt ${attempt}/${RESET_RETRIES}): ${
+							(lastErr as Error).message
+						}`,
+					)
+				} catch {}
+				if (attempt < RESET_RETRIES) {
+					// Short backoff before retrying reset
+					await new Promise((resolve) => setTimeout(resolve, 200))
+				}
+			}
+		}
+		// Exhausted retries: continue initialisation anyway to avoid endless reconnect loops on devices
+		// that sometimes drop the reset ACK (observed on some KBERRY units).
 		try {
-			this.logger.debug('FT1.2 → RESET_REQ 10 40 40 16')
+			this.logger.warn(
+				`FT1.2 RESET ack missing after ${RESET_RETRIES} attempts, continuing initialisation`,
+			)
 		} catch {}
-		await this.writeRaw(Buffer.from([0x10, 0x40, 0x40, 0x16]))
-		await this.waitForAck('reset')
 	}
 
 	private async sendCommMode() {
@@ -284,9 +373,10 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		const onError = (error: Error) => this.emit('error', error)
 		const onClose = () => {
 			this.port = undefined
-			if (!this.isClosing) {
+			// Delay the close notification (even on intentional closes) to let the serial interface settle
+			setTimeout(() => {
 				this.emit('close')
-			}
+			}, 2000).unref?.()
 		}
 		this.portListeners = {
 			data: onData,
@@ -444,18 +534,30 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		})
 	}
 
-	private waitForAck(label: string) {
+	private waitForAck(
+		label: string,
+		timeoutMs = this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+	) {
 		if (this.awaitingAck) {
 			this.awaitingAck.reject(
 				new Error('Previous FT1.2 ACK promise was still pending'),
 			)
 			this.awaitingAck = undefined
 		}
+		// Resolve immediately if we already saw an ACK while no waiter was registered
+		if (this.pendingAck > 0) {
+			this.pendingAck -= 1
+			return Promise.resolve()
+		}
 		return new Promise<void>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				this.awaitingAck = undefined
-				reject(new Error(`Timeout waiting for FT1.2 ACK (${label})`))
-			}, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+				reject(
+					new Error(
+						`Timeout BANANA waiting for FT1.2 ACK (${label})`,
+					),
+				)
+			}, timeoutMs)
 			this.awaitingAck = {
 				resolve: () => {
 					clearTimeout(timer)
@@ -475,5 +577,14 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 	private resolveAck() {
 		if (!this.awaitingAck) return
 		this.awaitingAck.resolve()
+	}
+
+	private async waitAfterCloseIfNeeded() {
+		if (!this.lastCloseAt) return
+		const elapsed = Date.now() - this.lastCloseAt
+		const delay = CLOSE_GRACE_MS - elapsed
+		if (delay > 0) {
+			await new Promise((resolve) => setTimeout(resolve, delay))
+		}
 	}
 }

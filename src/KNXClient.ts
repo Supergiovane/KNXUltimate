@@ -2629,6 +2629,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						KNXClientEvents.error,
 						err instanceof Error ? err : new Error(String(err)),
 					)
+					this.setDisconnected(
+						err instanceof Error
+							? err.message
+							: 'Serial FT1.2 connect failed',
+					).catch(() => {})
 				})
 			return
 		}

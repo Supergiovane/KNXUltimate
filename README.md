@@ -701,13 +701,17 @@ Secure TCP auto‑selection details
 - Logging: look for lines starting with “Secure TCP:” to follow selection steps (discovered Host IA, candidates, chosen IA).
 - Override: set `secureTunnelConfig.tunnelInterfaceIndividualAddress` and/or `interface` explicitly to skip the auto‑selection.
 
-# Using KNX Ultimate with kBerry on Raspberry Pi 3 (UART / FT1.2)
+<div style="background:#e9f7e9;border:1px solid #c8e6c8;border-radius:10px;padding:14px 16px;margin:16px 0;">
+<strong>Tip (solo per pochi utenti kBerry su Raspberry Pi 3)</strong><br/>
+<span style="font-size:0.9em;color:#3c5f3c;">Se non usi kBerry su Raspberry Pi 3, puoi saltare questa sezione.</span>
+
+### Using KNX Ultimate with kBerry on Raspberry Pi 3 (UART / FT1.2)
 
 This guide explains how to connect a **kBerry** KNX interface directly
 to a **Raspberry Pi 3** and use it with **KNX Ultimate** over the
 **hardware UART** (`ttyAMA0`) using the **FT1.2 (TPUART)** protocol.
 
-> ✅ This procedure is tested with Raspberry Pi OS Bookworm on a
+> This procedure is tested with Raspberry Pi OS Bookworm on a  
 > Raspberry Pi 3 and has been written on November, 25, 2025.
 
 ## 1. Prerequisites
@@ -818,6 +822,7 @@ sudo reboot
 ---
 
 Done.
+</div>
 
 
 ## HOW TO COLLABORATE
