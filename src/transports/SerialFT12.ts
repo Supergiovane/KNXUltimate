@@ -539,9 +539,14 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		timeoutMs = this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
 	) {
 		if (this.awaitingAck) {
-			this.awaitingAck.reject(
-				new Error('Previous FT1.2 ACK promise was still pending'),
-			)
+			// Overlapping ACK wait (for example during close/reset). Drop the previous waiter
+			// instead of throwing, to avoid crashing the host application.
+			try {
+				this.logger.warn(
+					`Previous FT1.2 ACK promise was still pending (${label}), dropping it`,
+				)
+			} catch {}
+			clearTimeout(this.awaitingAck.timer)
 			this.awaitingAck = undefined
 		}
 		// Resolve immediately if we already saw an ACK while no waiter was registered
@@ -554,7 +559,7 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 				this.awaitingAck = undefined
 				reject(
 					new Error(
-						`Timeout BANANA waiting for FT1.2 ACK (${label})`,
+						`Timeout waiting for FT1.2 ACK (${label})`,
 					),
 				)
 			}, timeoutMs)
