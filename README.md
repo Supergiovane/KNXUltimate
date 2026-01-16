@@ -8,13 +8,9 @@
 [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 [![Youtube][youtube-image]][youtube-url]
 
-Control your KNX intallation via Node.js. It includes also KNX IP Secure and Data Secure!  
+KNX protocol implementation for Node.js, support KNX/IP Tunneling/Routing, KNX/IP Secure and Data Secure, FT1.2/KBerry TP plain KNXas well as full secure KNX stack. 
 
 This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](https://flows.nodered.org/node/node-red-contrib-knx-ultimate)  
-
-Many of you asked for a node.js release of that engine, so i decided to create this package.  
-
-If you enjoy my work developing this package, do today a kind thing for someone too. This will be the reward for my work.  
 
 <br/>
 
