@@ -112,7 +112,9 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		try {
 			await this.sendReset()
 			// Small grace to let the interface settle after reset.
-			await new Promise((resolve) => setTimeout(resolve, 50))
+			await new Promise<void>((resolve) => {
+				setTimeout(resolve, 50)
+			})
 		} catch (err) {
 			try {
 				this.logger.warn(
@@ -268,7 +270,9 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 				} catch {}
 				if (attempt < RESET_RETRIES) {
 					// Short backoff before retrying reset
-					await new Promise((resolve) => setTimeout(resolve, 200))
+					await new Promise<void>((resolve) => {
+						setTimeout(resolve, 200)
+					})
 				}
 			}
 		}
@@ -557,11 +561,7 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		return new Promise<void>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				this.awaitingAck = undefined
-				reject(
-					new Error(
-						`Timeout waiting for FT1.2 ACK (${label})`,
-					),
-				)
+				reject(new Error(`Timeout waiting for FT1.2 ACK (${label})`))
 			}, timeoutMs)
 			this.awaitingAck = {
 				resolve: () => {
@@ -589,7 +589,9 @@ export default class SerialFT12 extends TypedEventEmitter<SerialFT12Events> {
 		const elapsed = Date.now() - this.lastCloseAt
 		const delay = CLOSE_GRACE_MS - elapsed
 		if (delay > 0) {
-			await new Promise((resolve) => setTimeout(resolve, delay))
+			await new Promise<void>((resolve) => {
+				setTimeout(resolve, delay)
+			})
 		}
 	}
 }
