@@ -1543,6 +1543,126 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/**
+	 * Sends a RESPONSE telegram to the BUS with a raw APDU payload.
+	 * `dstAddress` is the group address (for example "0/0/1"),
+	 * `rawDataBuffer` is the buffer you want to send,
+	 * `bitlength` is the payload length in bits (used especially for payloads <= 6 bits)
+	 */
+	respondRaw(
+		dstAddress: KNXAddress | string,
+		rawDataBuffer: Buffer,
+		bitlength: number,
+	): void {
+		if (this._connectionState !== ConncetionState.CONNECTED)
+			throw new Error(
+				'The socket is not connected. Unable to access the KNX BUS',
+			)
+
+		if (!Buffer.isBuffer(rawDataBuffer)) {
+			this.sysLogger.error(
+				'KNXClient: respondRaw: Value must be a buffer! ',
+			)
+			return
+		}
+
+		const isSixBits: boolean = bitlength <= 6
+		const datapoint: IDataPoint = {
+			id: '',
+			value: 'any',
+			type: { type: isSixBits },
+			bind: null,
+			read: () => null,
+			write: null,
+		}
+		// Get the KNDDataBuffer
+		const baseBufferFromBitLength: Buffer = Buffer.alloc(
+			Math.ceil(bitlength / 8),
+		) // The buffer length must be like specified by bitlength
+		rawDataBuffer.copy(baseBufferFromBitLength, 0)
+		const data: KNXDataBuffer = new KNXDataBuffer(
+			baseBufferFromBitLength,
+			datapoint,
+		)
+
+		if (typeof dstAddress === 'string')
+			dstAddress = KNXAddress.createFromString(
+				dstAddress,
+				KNXAddress.TYPE_GROUP,
+			)
+		const srcAddress = this.physAddr
+
+		if (this._options.hostProtocol === 'Multicast') {
+			// Multicast: per KNX Routing spec, inject as L_DATA_IND
+			const cEMIMessage = CEMIFactory.newLDataIndicationMessage(
+				'response',
+				srcAddress,
+				dstAddress,
+				data,
+			)
+			cEMIMessage.control.ack = 0 // No ack like telegram sent from ETS (0 means don't care)
+			cEMIMessage.control.broadcast = 1
+			cEMIMessage.control.priority = 3
+			cEMIMessage.control.addressType = 1
+			cEMIMessage.control.hopCount = 6
+			const knxPacketRequest =
+				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
+			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
+			// 06/12/2021 Multicast automatically echoes telegrams
+		} else if (this.isSerialTransport()) {
+			// Serial FT1.2 (KBerry): send as L_DATA_REQ over cEMI/FT1.2
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'response',
+				srcAddress,
+				dstAddress,
+				data,
+			)
+			// No ACK request on bus for responses
+			cEMIMessage.control.ack = 0
+			cEMIMessage.control.broadcast = 1
+			cEMIMessage.control.priority = 3
+			cEMIMessage.control.addressType = 1
+			cEMIMessage.control.hopCount = 6
+			const knxPacketRequest =
+				KNXProtocol.newKNXRoutingIndication(cEMIMessage)
+			this.send(knxPacketRequest, undefined, false, this.getSeqNumber())
+			this.ensurePlainCEMI(cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
+		} else {
+			// Tunneling
+			const cEMIMessage = CEMIFactory.newLDataRequestMessage(
+				'response',
+				srcAddress,
+				dstAddress,
+				data,
+			)
+			// No ACK request on bus
+			cEMIMessage.control.ack = 0
+			cEMIMessage.control.broadcast = 1
+			cEMIMessage.control.priority = 3
+			cEMIMessage.control.addressType = 1
+			cEMIMessage.control.hopCount = 6
+			// Data Secure si applica solo in TunnelTCP
+			const seqNum: number =
+				this._options.hostProtocol === 'TunnelTCP'
+					? 0
+					: this.incSeqNumber()
+			const knxPacketRequest = KNXProtocol.newKNXTunnelingRequest(
+				this._channelID,
+				seqNum,
+				cEMIMessage,
+			)
+			if (!this._options.suppress_ack_ldatareq) {
+				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
+			} else {
+				this.send(knxPacketRequest, undefined, false, seqNum)
+			}
+			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
+			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
+			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
+		}
+	}
+
+	/**
 	 * Sends a READ telegram to the BUS. GA is the group address (for example "0/0/1").
 	 */
 	read(dstAddress: KNXAddress | string): void {

@@ -142,6 +142,7 @@ You should see something like this in the console window (the **msg.payload** is
 | .write (GA, payload, datapoint)    | Sends a WRITE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
 | .writeRaw (GA, payload, bitlength) | Sends a WRITE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the raw buffer you want to send, **bitlength** is the payload length in bits (used especially for payloads <= 6 bits) |
 | .respond (GA, payload, datapoint)  | Sends a RESPONSE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
+| .respondRaw (GA, payload, bitlength) | Sends a RESPONSE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the raw buffer you want to send, **bitlength** is the payload length in bits (used especially for payloads <= 6 bits) |
 | .read (GA)                         | Sends a READ telegram to the BUS. **GA** is the group address (for example "0/0/1").                 |
 | . discover()                        | Sends a discover request on the KNX default multicast port and returns the results as an array. This is an async method. See the example in the **examples** folder |
 | .getGatewayDescription()           | Sends a gateway description request. It works after an established connection. The async results will be sent to the *descriptionResponse* event. There is an example in the **examples** folder named **gatewaydescription.ts** . |
@@ -153,6 +154,13 @@ You should see something like this in the console window (the **msg.payload** is
 - Use `bitlength <= 6` for "6-bit" payloads (the value is encoded into the low APCI bits, so `payloadBuffer` should be 1 byte and `<= 0x3f`).
 - For normal datapoints, you can build `(payloadBuffer, bitlength)` with `dptlib.populateAPDU(...)` and pass them to `writeRaw`.
 - See `examples/writeRaw.ts`.
+
+### respondRaw notes
+
+`respondRaw(GA, payloadBuffer, bitlength)` sends a GroupValue_Response with a raw APDU payload.
+
+- Payload rules are the same as `writeRaw` (including `bitlength <= 6` handling).
+- See `examples/respondRaw.ts`.
 
 | Property       | Description                                                                                          |
 | -------------- | ---------------------------------------------------------------------------------------------------- |

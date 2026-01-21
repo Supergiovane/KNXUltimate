@@ -28,6 +28,7 @@
     "example:secure:multicast": "node -r esbuild-register -e \"require('./examples/sampleSecureMulticast.ts')\"",
     "example:secure:tunnel": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCP.ts')\"",
     "example:writeRaw": "node -r esbuild-register -e \"require('./examples/writeRaw.ts')\"",
+    "example:respondRaw": "node -r esbuild-register -e \"require('./examples/respondRaw.ts')\"",
     "realsamples": "node scripts/realsamples.js",
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",
