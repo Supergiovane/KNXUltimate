@@ -7,6 +7,8 @@
  * Use at your own risk; the author assumes no liability for damages.
  */
 
+import fs from 'node:fs'
+import path from 'node:path'
 import KNXClient, { SecureConfig } from '../src/KNXClient'
 import CEMIConstants from '../src/protocol/cEMI/CEMIConstants'
 
@@ -43,8 +45,11 @@ async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): P
 
 async function main() {
   // KNX Secure + Data Secure configuration
+  const knxkeysPath = path.join(process.cwd(), 'documents', 'Secure Test.knxkeys')
    const secureCfg: SecureConfig = {
-     knxkeys_file_path: '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
+     knxkeys_buffer: fs.readFileSync(knxkeysPath),
+     // Alternative to knxkeys_buffer:
+     // knxkeys_file_path: knxkeysPath,
      knxkeys_password: 'passwordprogetto',
 
     // If you do not have the ETS keyring, comment the block above and use the

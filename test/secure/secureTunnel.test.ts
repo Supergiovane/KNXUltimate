@@ -12,7 +12,10 @@ import assert from 'assert'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import KNXClient, { KNXClientEvents } from '../../src/KNXClient'
+import KNXClient, {
+	KNXClientEvents,
+	type SecureConfig,
+} from '../../src/KNXClient'
 import CEMIConstants from '../../src/protocol/cEMI/CEMIConstants'
 import { MockSecureGateway } from './MockSecureGateway'
 
@@ -33,11 +36,13 @@ const KEYRING_XML = `<?xml version="1.0" encoding="utf-8"?>
 describe('KNX Secure Tunnel', () => {
 	let tmpDir: string
 	let keyringPath: string
+	let keyringBuffer: Buffer
 
 	before(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'knx-secure-'))
 		keyringPath = path.join(tmpDir, 'test.knxkeys')
 		fs.writeFileSync(keyringPath, KEYRING_XML, 'utf8')
+		keyringBuffer = fs.readFileSync(keyringPath)
 	})
 
 	after(() => {
@@ -46,90 +51,102 @@ describe('KNX Secure Tunnel', () => {
 		} catch {}
 	})
 
-	it('handshakes and exchanges Data Secure telegrams', async () => {
-		const gateway = new MockSecureGateway({
-			groupKeys: {
-				'1/2/3': Buffer.from('00112233445566778899aabbccddeeff', 'hex'),
-			},
-			interfaceIndividualAddress: '1.1.1',
-			tunnelAssignedIndividualAddress: '10.15.251',
-			serial: Buffer.from('010203040506', 'hex'),
+	it('handshakes and exchanges Data Secure telegrams (keyring file path)', async () => {
+		await runSecureTunnelScenario({
+			knxkeys_file_path: keyringPath,
+			knxkeys_password: 'knxPassword',
+			tunnelInterfaceIndividualAddress: '1.1.1',
 		})
-		await gateway.start()
+	})
 
-		const address = gateway.address
-		assert.ok(address, 'gateway should expose address')
-
-		const client = new KNXClient({
-			hostProtocol: 'TunnelTCP',
-			ipAddr: address!.address === '::' ? '127.0.0.1' : address!.address,
-			ipPort: address!.port,
-			isSecureKNXEnabled: true,
-			secureTunnelConfig: {
-				knxkeys_file_path: keyringPath,
-				knxkeys_password: 'knxPassword',
-				tunnelInterfaceIndividualAddress: '1.1.1',
-			},
-			loglevel: 'error',
+	it('handshakes and exchanges Data Secure telegrams (keyring buffer)', async () => {
+		await runSecureTunnelScenario({
+			knxkeys_buffer: keyringBuffer,
+			knxkeys_password: 'knxPassword',
+			tunnelInterfaceIndividualAddress: '1.1.1',
 		})
-
-		const connected = onceEvent(client, KNXClientEvents.connected)
-		client.Connect()
-		await connected
-
-		const groupWriteReceived = new Promise<void>((resolve, reject) => {
-			const timeout = setTimeout(
-				() => reject(new Error('Timeout waiting server group write')),
-				5000,
-			)
-			gateway.once('groupWrite', (packet) => {
-				try {
-					assert.strictEqual(packet.groupAddress, '1/2/3')
-					assert.strictEqual(packet.value, true)
-					clearTimeout(timeout)
-					resolve()
-				} catch (err) {
-					reject(err)
-				}
-			})
-		})
-
-		client.write('1/2/3', true, '1.001')
-		await groupWriteReceived
-
-		const indication = new Promise<boolean>((resolve, reject) => {
-			const timeout = setTimeout(
-				() => reject(new Error('Timeout waiting for indication')),
-				5000,
-			)
-			const handler = (packet: any) => {
-				try {
-					const cemi = packet?.cEMIMessage
-					if (cemi?.msgCode !== CEMIConstants.L_DATA_IND) return
-					if (cemi.dstAddress?.toString?.() !== '1/2/3') return
-					const value = (cemi.npdu?.dataValue?.[0] ?? 0) & 0x01
-					client.off('indication', handler)
-					clearTimeout(timeout)
-					resolve(value === 1)
-				} catch (err) {
-					reject(err)
-				}
-			}
-			client.on('indication', handler)
-		})
-
-		try {
-			await gateway.sendGroupValueWriteSecure('1/2/3', false)
-			const receivedValue = await indication
-			assert.strictEqual(receivedValue, false)
-		} finally {
-			try {
-				await client.Disconnect()
-			} catch {}
-			await gateway.stop()
-		}
 	})
 })
+
+async function runSecureTunnelScenario(secureTunnelConfig: SecureConfig) {
+	const gateway = new MockSecureGateway({
+		groupKeys: {
+			'1/2/3': Buffer.from('00112233445566778899aabbccddeeff', 'hex'),
+		},
+		interfaceIndividualAddress: '1.1.1',
+		tunnelAssignedIndividualAddress: '10.15.251',
+		serial: Buffer.from('010203040506', 'hex'),
+	})
+	await gateway.start()
+
+	const address = gateway.address
+	assert.ok(address, 'gateway should expose address')
+
+	const client = new KNXClient({
+		hostProtocol: 'TunnelTCP',
+		ipAddr: address!.address === '::' ? '127.0.0.1' : address!.address,
+		ipPort: address!.port,
+		isSecureKNXEnabled: true,
+		secureTunnelConfig,
+		loglevel: 'error',
+	})
+
+	const connected = onceEvent(client, KNXClientEvents.connected)
+	client.Connect()
+	await connected
+
+	const groupWriteReceived = new Promise<void>((resolve, reject) => {
+		const timeout = setTimeout(
+			() => reject(new Error('Timeout waiting server group write')),
+			5000,
+		)
+		gateway.once('groupWrite', (packet) => {
+			try {
+				assert.strictEqual(packet.groupAddress, '1/2/3')
+				assert.strictEqual(packet.value, true)
+				clearTimeout(timeout)
+				resolve()
+			} catch (err) {
+				reject(err)
+			}
+		})
+	})
+
+	client.write('1/2/3', true, '1.001')
+	await groupWriteReceived
+
+	const indication = new Promise<boolean>((resolve, reject) => {
+		const timeout = setTimeout(
+			() => reject(new Error('Timeout waiting for indication')),
+			5000,
+		)
+		const handler = (packet: any) => {
+			try {
+				const cemi = packet?.cEMIMessage
+				if (cemi?.msgCode !== CEMIConstants.L_DATA_IND) return
+				if (cemi.dstAddress?.toString?.() !== '1/2/3') return
+				const value = (cemi.npdu?.dataValue?.[0] ?? 0) & 0x01
+				client.off('indication', handler)
+				clearTimeout(timeout)
+				resolve(value === 1)
+			} catch (err) {
+				reject(err)
+			}
+		}
+		client.on('indication', handler)
+	})
+
+	try {
+		await gateway.sendGroupValueWriteSecure('1/2/3', false)
+		const receivedValue = await indication
+		assert.strictEqual(receivedValue, false)
+	} finally {
+		try {
+			await client.Disconnect()
+		} catch {}
+		await gateway.stop()
+	}
+}
 
 function onceEvent(client: KNXClient, event: KNXClientEvents): Promise<void> {
 	return new Promise((resolve) => {

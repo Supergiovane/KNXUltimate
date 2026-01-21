@@ -106,6 +106,11 @@ export type DiscoveryInterface = {
 export interface SecureConfig {
 	tunnelInterfaceIndividualAddress?: string
 	knxkeys_file_path?: string
+	/**
+	 * ETS keyring content as a Buffer (typically the raw `.knxkeys` file bytes).
+	 * If provided, it is used instead of `knxkeys_file_path`.
+	 */
+	knxkeys_buffer?: Buffer
 	knxkeys_password?: string
 	tunnelUserPassword?: string
 	tunnelUserId?: number
@@ -2403,11 +2408,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		if (!cfg) throw new Error('Secure config not provided')
 		// Load keyring once to access interfaces
 		const kr = new Keyring()
+		const keyringBuffer =
+			Buffer.isBuffer(cfg.knxkeys_buffer) && cfg.knxkeys_buffer.length > 0
+				? cfg.knxkeys_buffer
+				: undefined
 		const explicitPath = cfg.knxkeys_file_path?.trim()
 		const path = explicitPath || undefined
-		if (!path) {
+		if (!path && !keyringBuffer) {
 			throw new Error(
-				'IA discovery for KNX/IP Secure requires a .knxkeys file (set secureTunnelConfig.knxkeys_file_path).',
+				'IA discovery for KNX/IP Secure requires an ETS keyring (set secureTunnelConfig.knxkeys_file_path or secureTunnelConfig.knxkeys_buffer).',
 			)
 		}
 		const pwd = cfg.knxkeys_password?.trim()
@@ -2416,7 +2425,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				'IA discovery for KNX/IP Secure requires a keyring password (set secureTunnelConfig.knxkeys_password).',
 			)
 		}
-		await kr.load(path, pwd)
+		if (keyringBuffer) {
+			await kr.loadFromBuffer(keyringBuffer, pwd)
+		} else {
+			await kr.load(path!, pwd)
+		}
 
 		// Discover gateways and find the one matching ipAddr/ipPort
 		const timeout = 3000
@@ -3556,9 +3569,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// Drive secure logs from KNXClientOptions.loglevel; no separate boolean
 
 		// Determine whether we have a keyring available
+		const keyringBuffer =
+			Buffer.isBuffer(cfg.knxkeys_buffer) && cfg.knxkeys_buffer.length > 0
+				? cfg.knxkeys_buffer
+				: undefined
 		const explicitPath = cfg.knxkeys_file_path?.trim()
 		const keyringPath = explicitPath || undefined
-		const hasKeyring = !!keyringPath
+		const hasKeyring = !!keyringPath || !!keyringBuffer
 
 		const rawTunnelUserId = cfg.tunnelUserId as unknown
 		let normalizedTunnelUserId: number | undefined
@@ -3588,10 +3605,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const pwd = cfg.knxkeys_password?.trim()
 			if (!pwd) {
 				throw new Error(
-					'KNX/IP Secure requires secureTunnelConfig.knxkeys_password when secureTunnelConfig.knxkeys_file_path is provided.',
+					'KNX/IP Secure requires secureTunnelConfig.knxkeys_password when secureTunnelConfig.knxkeys_file_path or secureTunnelConfig.knxkeys_buffer is provided.',
 				)
 			}
-			await kr.load(keyringPath!, pwd)
+			if (keyringBuffer) {
+				await kr.loadFromBuffer(keyringBuffer, pwd)
+			} else {
+				await kr.load(keyringPath!, pwd)
+			}
 			this._secureKeyring = kr
 
 			const iface = cfg.tunnelInterfaceIndividualAddress
@@ -3607,7 +3628,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 				if (typeof userId !== 'number') {
 					throw new Error(
-						'KNX/IP Secure requires tunnelUserId when secureTunnelConfig.knxkeys_file_path is provided but the keyring lacks the interface user ID.',
+						'KNX/IP Secure requires tunnelUserId when a keyring is provided but the keyring lacks the interface user ID.',
 					)
 				}
 				this._secureUserId = userId
@@ -3677,7 +3698,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const manualPassword = cfg.tunnelUserPassword
 		if (!manualPassword) {
 			throw new Error(
-				'KNX/IP Secure requires either a .knxkeys file or tunnelUserPassword.',
+				'KNX/IP Secure requires either an ETS keyring (knxkeys_file_path or knxkeys_buffer) or tunnelUserPassword.',
 			)
 		}
 		if (!hasConfiguredUserId) {

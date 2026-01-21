@@ -165,17 +165,7 @@ export class Keyring {
 			}
 		}
 
-		// Parse XML
-		const parser = new xml2js.Parser()
-		const result = await parser.parseStringPromise(xmlContent)
-
-		// Hash the password using PBKDF2 (MUST use salt "1.keyring.ets.knx.org")
-		this.passwordHash = this.hashKeyringPassword(password)
-		if (process.env.KNX_DEBUG === '1')
-			console.log('Password hash:', this.passwordHash.toString('hex'))
-
-		// Extract keyring data
-		await this.parseKeyring(result)
+		await this.loadFromXml(xmlContent, password)
 	}
 
 	/**
@@ -183,6 +173,14 @@ export class Keyring {
 	 */
 	async loadFromString(content: string, password: string): Promise<void> {
 		return this.load(content, password)
+	}
+
+	/**
+	 * Explicit helper to load from a Buffer (typically the raw `.knxkeys` file bytes).
+	 */
+	async loadFromBuffer(content: Buffer, password: string): Promise<void> {
+		const xmlContent = await this.unzipKnxKeys(content)
+		await this.loadFromXml(xmlContent, password)
 	}
 
 	getCreatedBy(): string | undefined {
@@ -205,6 +203,21 @@ export class Keyring {
 			16, // key length
 			'sha256',
 		)
+	}
+
+	private async loadFromXml(
+		xmlContent: string,
+		password: string,
+	): Promise<void> {
+		const parser = new xml2js.Parser()
+		const result = await parser.parseStringPromise(xmlContent)
+
+		// Hash the password using PBKDF2 (MUST use salt "1.keyring.ets.knx.org")
+		this.passwordHash = this.hashKeyringPassword(password)
+		if (process.env.KNX_DEBUG === '1')
+			console.log('Password hash:', this.passwordHash.toString('hex'))
+
+		await this.parseKeyring(result)
 	}
 
 	/**
