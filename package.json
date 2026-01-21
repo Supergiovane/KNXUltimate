@@ -3,6 +3,17 @@
   "description": "KNX protocol implementation for Node.js, support KNX/IP Tunneling/Routing, KNX/IP Secure and Data Secure, FT1.2/KBerry TP plain KNXas well as full secure KNX stack. This is the ENGINE of Node-Red KNX-Ultimate node. Go check it!",
   "version": "5.2.3",
   "main": "./build/index.js",
+  "types": "./build/index.d.ts",
+  "files": [
+    "build/**/*.js",
+    "build/**/*.d.ts",
+    "build/**/*.js.map",
+    "src/**/*.ts",
+    "CHANGELOG.md",
+    "DEVELOPMENT.md",
+    "LICENSE",
+    "README.md"
+  ],
   "engines": {
     "node": ">=18.0.0"
   },
@@ -13,8 +24,10 @@
   },
   "scripts": {
     "build": "npm run clean && node -e \"setTimeout(()=>{},5000)\" && tsc -p tsconfig.build.json",
+    "prepack": "npm run build && node scripts/cleanupPackArtifacts.js",
     "example:secure:multicast": "node -r esbuild-register -e \"require('./examples/sampleSecureMulticast.ts')\"",
     "example:secure:tunnel": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCP.ts')\"",
+    "example:writeRaw": "node -r esbuild-register -e \"require('./examples/writeRaw.ts')\"",
     "realsamples": "node scripts/realsamples.js",
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",

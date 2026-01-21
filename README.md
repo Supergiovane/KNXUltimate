@@ -146,6 +146,14 @@ You should see something like this in the console window (the **msg.payload** is
 | . discover()                        | Sends a discover request on the KNX default multicast port and returns the results as an array. This is an async method. See the example in the **examples** folder |
 | .getGatewayDescription()           | Sends a gateway description request. It works after an established connection. The async results will be sent to the *descriptionResponse* event. There is an example in the **examples** folder named **gatewaydescription.ts** . |
 
+### writeRaw notes
+
+`writeRaw(GA, payloadBuffer, bitlength)` sends a GroupValue_Write with a raw APDU payload.
+
+- Use `bitlength <= 6` for "6-bit" payloads (the value is encoded into the low APCI bits, so `payloadBuffer` should be 1 byte and `<= 0x3f`).
+- For normal datapoints, you can build `(payloadBuffer, bitlength)` with `dptlib.populateAPDU(...)` and pass them to `writeRaw`.
+- See `examples/writeRaw.ts`.
+
 | Property       | Description                                                                                          |
 | -------------- | ---------------------------------------------------------------------------------------------------- |
 | .isConnected() | Returns **true** if you the client is connected to the KNX Gateway Router/Interface, **false** if not connected. |
