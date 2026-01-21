@@ -1,5 +1,12 @@
 
 
+## [5.2.4](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.3...v5.2.4) (2026-01-21)
+
+
+### Bug Fixes
+
+* **ft12:** satisfy eslint/prettier ([cdc26f4](https://github.com/Supergiovane/KNXUltimate/commit/cdc26f4930480797d4e4601975d77274c14ec0e8))
+
 ## [5.2.3](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.2...v5.2.3) (2025-11-25)
 
 ## [5.2.2](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.1...v5.2.2) (2025-11-25)
