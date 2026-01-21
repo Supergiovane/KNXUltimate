@@ -1,4 +1,6 @@
 img
 examples/
+test/
+documents/
 .*
 tsconfig*
