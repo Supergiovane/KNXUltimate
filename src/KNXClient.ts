@@ -1640,15 +1640,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Sends a WRITE telegram to the BUS.
 	 * `dstAddress` is the group address (for example "0/0/1"),
 	 * `rawDataBuffer` is the buffer you want to send,
-	 * `dptid` is a string/number representing the datapoint (for example "5.001")
+	 * `bitlength` is the payload length in bits (used especially for payloads <= 6 bits)
 	 */
 	writeRaw(
 		dstAddress: KNXAddress | string,
 		rawDataBuffer: Buffer,
 		bitlength: number,
 	): void {
-		// bitlength is unused and only for backward compatibility
-
 		if (this._connectionState !== ConncetionState.CONNECTED)
 			throw new Error(
 				'The socket is not connected. Unable to access the KNX BUS',

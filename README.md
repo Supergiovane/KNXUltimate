@@ -140,7 +140,7 @@ You should see something like this in the console window (the **msg.payload** is
 | .Connect()                         | Connects to the KNX Gateway                                                                          |
 | .Disconnect()                      | Gracefully disconnects from the KNX Gateway                                                          |
 | .write (GA, payload, datapoint)    | Sends a WRITE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
-| .writeRaw (GA, payload, datapoint) | Sends a WRITE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the buffer you want to send, **datapoint** is a string representing the datapoint (for example "5.001") |
+| .writeRaw (GA, payload, bitlength) | Sends a WRITE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the raw buffer you want to send, **bitlength** is the payload length in bits (used especially for payloads <= 6 bits) |
 | .respond (GA, payload, datapoint)  | Sends a RESPONSE telegram to the BUS. **GA** is the group address (for example "0/0/1"), **payload** is the value you want to send (for example true), **datapoint** is a string representing the datapoint (for example "5.001") |
 | .read (GA)                         | Sends a READ telegram to the BUS. **GA** is the group address (for example "0/0/1").                 |
 | . discover()                        | Sends a discover request on the KNX default multicast port and returns the results as an array. This is an async method. See the example in the **examples** folder |
