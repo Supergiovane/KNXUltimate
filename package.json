@@ -1,7 +1,7 @@
 {
   "name": "knxultimate",
   "description": "KNX protocol implementation for Node.js, support KNX/IP Tunneling/Routing, KNX/IP Secure and Data Secure, FT1.2/KBerry TP plain KNXas well as full secure KNX stack. This is the ENGINE of Node-Red KNX-Ultimate node. Go check it!",
-  "version": "5.2.5",
+  "version": "5.2.6",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "files": [

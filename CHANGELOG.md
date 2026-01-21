@@ -1,5 +1,12 @@
 
 
+## [5.2.6](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.5...v5.2.6) (2026-01-21)
+
+
+### Features
+
+* **secure:** support knxkeys keyring as Buffer ([dcb366b](https://github.com/Supergiovane/KNXUltimate/commit/dcb366bc0ef56e1915525b9ee59016fe1a5be4de))
+
 ## [5.2.5](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.4...v5.2.5) (2026-01-21)
 
 
