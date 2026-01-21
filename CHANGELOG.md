@@ -1,5 +1,12 @@
 
 
+## [5.2.5](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.4...v5.2.5) (2026-01-21)
+
+
+### Features
+
+* respondRaw added ([5ab7553](https://github.com/Supergiovane/KNXUltimate/commit/5ab7553e038b848669f69bc337d879a7db6f9669))
+
 ## [5.2.4](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.3...v5.2.4) (2026-01-21)
 
 
