@@ -61,7 +61,11 @@ export type KNXRawTelegram = {
 type TunnelServerEvents = {
 	error: (error: Error) => void
 	listening: (info: { host: string; port: number }) => void
-	sessionUp: (info: { clientHost: string; clientPort: number; channelId: number }) => void
+	sessionUp: (info: {
+		clientHost: string
+		clientPort: number
+		channelId: number
+	}) => void
 	sessionDown: (info: {
 		clientHost: string
 		clientPort: number
@@ -145,7 +149,8 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 			listenPort: options.listenPort ?? KNX_CONSTANTS.KNX_PORT,
 			advertiseHost:
 				options.advertiseHost ?? guessAdvertiseHost(options.listenHost),
-			assignedIndividualAddress: options.assignedIndividualAddress ?? '15.15.255',
+			assignedIndividualAddress:
+				options.assignedIndividualAddress ?? '15.15.255',
 			maxSessions: options.maxSessions ?? 1,
 			loglevel: options.loglevel,
 		}
@@ -295,7 +300,8 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 
 	private freeChannelId(channelId: number) {
 		if (channelId <= 0 || channelId > 255) return
-		if (!this.channelPool.includes(channelId)) this.channelPool.unshift(channelId)
+		if (!this.channelPool.includes(channelId))
+			this.channelPool.unshift(channelId)
 	}
 
 	private ensureSession(rinfo: dgram.RemoteInfo): Session {
@@ -308,7 +314,9 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 
 		// Evict oldest if needed
 		if (this.sessions.size >= this.options.maxSessions) {
-			const firstKey = this.sessions.keys().next().value as string | undefined
+			const firstKey = this.sessions.keys().next().value as
+				| string
+				| undefined
 			if (firstKey) {
 				const s = this.sessions.get(firstKey)
 				if (s) this.closeSession(s, 'evicted')
@@ -362,21 +370,21 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 		switch (header.service_type) {
 			case KNX_CONSTANTS.CONNECT_REQUEST:
 				this.handleConnectRequest(msg, rinfo)
-				return
+				break
 			case KNX_CONSTANTS.CONNECTIONSTATE_REQUEST:
 				this.handleConnectionStateRequest(msg, rinfo)
-				return
+				break
 			case KNX_CONSTANTS.DISCONNECT_REQUEST:
 				this.handleDisconnectRequest(msg, rinfo)
-				return
+				break
 			case KNX_CONSTANTS.TUNNELING_REQUEST:
 				this.handleTunnelingRequest(msg, rinfo)
-				return
+				break
 			case KNX_CONSTANTS.TUNNELING_ACK:
 				// optional; we currently ignore server->client ACKs
-				return
+				break
 			default:
-				return
+				break
 		}
 	}
 
@@ -386,7 +394,8 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 			throw new Error('Invalid packet buffer')
 		}
 		// Most packets already include the KNXnet/IP header in toBuffer().
-		if (body.length >= 2 && body[0] === 0x06 && body[1] === 0x10) return body
+		if (body.length >= 2 && body[0] === 0x06 && body[1] === 0x10)
+			return body
 		const hdr = packet?.header?.toBuffer?.()
 		if (Buffer.isBuffer(hdr)) return Buffer.concat([hdr, body])
 		return body
@@ -399,7 +408,9 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 	) {
 		if (!this.socket) return
 		const hpai =
-			target === 'data' ? session.clientDataHpai : session.clientControlHpai
+			target === 'data'
+				? session.clientDataHpai
+				: session.clientControlHpai
 		const ep = effectiveEndpoint(hpai, session.clientRInfo)
 		this.socket.send(payload, ep.port, ep.host)
 	}
@@ -415,7 +426,10 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 			const parsed = KNXProtocol.parseMessage(msg)
 			connect = parsed.knxMessage as KNXConnectRequest
 		} catch (e) {
-			this.emit('error', e instanceof Error ? e : new Error('CONNECT parse error'))
+			this.emit(
+				'error',
+				e instanceof Error ? e : new Error('CONNECT parse error'),
+			)
 			return
 		}
 
@@ -426,7 +440,8 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 		// Basic validation
 		const isTunnel =
 			connect.cri &&
-			(connect.cri as any).connectionType === KNX_CONSTANTS.TUNNEL_CONNECTION
+			(connect.cri as any).connectionType ===
+				KNX_CONSTANTS.TUNNEL_CONNECTION
 		if (!isTunnel) {
 			const errResp = new KNXConnectResponse(
 				session.channelId,
@@ -448,7 +463,12 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 			KNXAddressType.TYPE_INDIVIDUAL,
 		)
 		const crd = new CRD(ConnectionType.TUNNEL_CONNECTION, assigned)
-		const resp = new KNXConnectResponse(session.channelId, 0, serverHpai, crd)
+		const resp = new KNXConnectResponse(
+			session.channelId,
+			0,
+			serverHpai,
+			crd,
+		)
 
 		try {
 			this.logger.info(
@@ -474,7 +494,9 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 		} catch (e) {
 			this.emit(
 				'error',
-				e instanceof Error ? e : new Error('CONNECTIONSTATE parse error'),
+				e instanceof Error
+					? e
+					: new Error('CONNECTIONSTATE parse error'),
 			)
 			return
 		}
@@ -485,7 +507,8 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 				? 0
 				: KNX_CONSTANTS.E_KNX_CONNECTION
 		const resp = new KNXConnectionStateResponse(req.channelID, status)
-		if (session) this.sendToClient(session, this.packetToFrame(resp), 'control')
+		if (session)
+			this.sendToClient(session, this.packetToFrame(resp), 'control')
 		else this.sendToRInfo(rinfo, this.packetToFrame(resp))
 	}
 
@@ -495,7 +518,10 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 			const parsed = KNXProtocol.parseMessage(msg)
 			req = parsed.knxMessage as KNXDisconnectRequest
 		} catch (e) {
-			this.emit('error', e instanceof Error ? e : new Error('DISCONNECT parse error'))
+			this.emit(
+				'error',
+				e instanceof Error ? e : new Error('DISCONNECT parse error'),
+			)
 			return
 		}
 
@@ -519,7 +545,12 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 			const parsed = KNXProtocol.parseMessage(msg)
 			req = parsed.knxMessage as KNXTunnelingRequest
 		} catch (e) {
-			this.emit('error', e instanceof Error ? e : new Error('TUNNELING_REQUEST parse error'))
+			this.emit(
+				'error',
+				e instanceof Error
+					? e
+					: new Error('TUNNELING_REQUEST parse error'),
+			)
 			return
 		}
 
@@ -535,21 +566,35 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 		}
 
 		// ACK immediately
-		const ack = KNXProtocol.newKNXTunnelingACK(session.channelId, req.seqCounter, 0)
+		const ack = KNXProtocol.newKNXTunnelingACK(
+			session.channelId,
+			req.seqCounter,
+			0,
+		)
 		this.sendToClient(session, ack.toBuffer(), 'control')
 
 		// Forward to "bus" (bridge decides what to do).
 		try {
-			const routing = this.buildRoutingIndicationFromTunneling(req.cEMIMessage)
+			const routing = this.buildRoutingIndicationFromTunneling(
+				req.cEMIMessage,
+			)
 			if (routing) {
 				const busFrame = routing.toBuffer()
-				this.emit('busFrameOut', busFrame, { channelId: session.channelId })
+				this.emit('busFrameOut', busFrame, {
+					channelId: session.channelId,
+				})
 				this.emit('indication', routing, false)
 				const raw = this.extractRawTelegram(routing, false)
-				if (raw) this.emit('rawTelegram', raw, { channelId: session.channelId })
+				if (raw)
+					this.emit('rawTelegram', raw, {
+						channelId: session.channelId,
+					})
 			}
 		} catch (e) {
-			this.emit('error', e instanceof Error ? e : new Error('busFrameOut error'))
+			this.emit(
+				'error',
+				e instanceof Error ? e : new Error('busFrameOut error'),
+			)
 		}
 	}
 
@@ -568,10 +613,13 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 			if (!event) return null
 
 			const source = datagram.cEMIMessage.srcAddress?.toString?.() || ''
-			const destination = datagram.cEMIMessage.dstAddress?.toString?.() || ''
+			const destination =
+				datagram.cEMIMessage.dstAddress?.toString?.() || ''
 			if (!source || !destination) return null
 
-			const cemiFromDatagram = datagram.cEMIMessage.toBuffer().toString('hex')
+			const cemiFromDatagram = datagram.cEMIMessage
+				.toBuffer()
+				.toString('hex')
 			const cemiEtsHex = echoed
 				? `2900BCD0${cemiFromDatagram.substring(8)}`
 				: cemiFromDatagram
@@ -594,7 +642,11 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 				event,
 				source,
 				destination,
-				apdu: { data: apduData, bitlength: apduBitlength, hex: apduHex },
+				apdu: {
+					data: apduData,
+					bitlength: apduBitlength,
+					hex: apduHex,
+				},
 				cemi: { hex: cemiEtsHex },
 				echoed: !!echoed,
 			}
@@ -655,24 +707,31 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 			return
 		}
 
-		if (parsed.knxHeader.service_type !== KNX_CONSTANTS.ROUTING_INDICATION) return
+		if (parsed.knxHeader.service_type !== KNX_CONSTANTS.ROUTING_INDICATION)
+			return
 		const routing = parsed.knxMessage as any
 		const cemi = routing?.cEMIMessage as CEMIMessage | undefined
 		if (!cemi) return
 
 		const seq = session.nextServerToClientSeq & 0xff
-		session.nextServerToClientSeq = (session.nextServerToClientSeq + 1) & 0xff
+		session.nextServerToClientSeq =
+			(session.nextServerToClientSeq + 1) & 0xff
 
 		this.sendCemiToClient(session, cemi as any, seq)
 	}
 
-	private sendCemiToClient(session: Session, cemi: CEMIMessage, seqOverride?: number) {
+	private sendCemiToClient(
+		session: Session,
+		cemi: CEMIMessage,
+		seqOverride?: number,
+	) {
 		const seq =
 			typeof seqOverride === 'number'
 				? seqOverride & 0xff
 				: session.nextServerToClientSeq & 0xff
 		if (typeof seqOverride !== 'number') {
-			session.nextServerToClientSeq = (session.nextServerToClientSeq + 1) & 0xff
+			session.nextServerToClientSeq =
+				(session.nextServerToClientSeq + 1) & 0xff
 		}
 		const tun = KNXProtocol.newKNXTunnelingRequest(
 			session.channelId,

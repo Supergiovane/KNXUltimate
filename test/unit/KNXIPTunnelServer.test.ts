@@ -10,10 +10,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import * as dgram from 'node:dgram'
-import {
-	KNXIPTunnelServer,
-	KNXProtocol,
-} from '../../src'
+import { KNXIPTunnelServer, KNXProtocol } from '../../src'
 import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
 import HPAI, { KnxProtocol as HPAIProtocol } from '../../src/protocol/HPAI'
 import TunnelCRI from '../../src/protocol/TunnelCRI'
@@ -62,9 +59,9 @@ describe('KNXIPTunnelServer', () => {
 			const addr = server.address
 			assert.ok(addr, 'server address is missing')
 
-			await new Promise<void>((resolve) =>
-				client.bind(0, '127.0.0.1', () => resolve()),
-			)
+			await new Promise<void>((resolve) => {
+				client.bind(0, '127.0.0.1', () => resolve())
+			})
 			const clientAddr = client.address() as dgram.AddressInfo
 
 			const hpai = new HPAI(
@@ -106,12 +103,28 @@ describe('KNXIPTunnelServer', () => {
 				'1.1.1',
 				KNXAddress.TYPE_INDIVIDUAL,
 			)
-			const dst = KNXAddress.createFromString('1/1/1', KNXAddress.TYPE_GROUP)
+			const dst = KNXAddress.createFromString(
+				'1/1/1',
+				KNXAddress.TYPE_GROUP,
+			)
 			const data = new KNXDataBuffer(Buffer.from([0x01]))
-			const cemi = CEMIFactory.newLDataRequestMessage('write', src, dst, data)
+			const cemi = CEMIFactory.newLDataRequestMessage(
+				'write',
+				src,
+				dst,
+				data,
+			)
 
-			const tunnReq = KNXProtocol.newKNXTunnelingRequest(channelId, 1, cemi)
-			const ackP = withTimeout(onceMessage(client), 1000, 'timeout TUNNELING_ACK')
+			const tunnReq = KNXProtocol.newKNXTunnelingRequest(
+				channelId,
+				1,
+				cemi,
+			)
+			const ackP = withTimeout(
+				onceMessage(client),
+				1000,
+				'timeout TUNNELING_ACK',
+			)
 			client.send(tunnReq.toBuffer(), addr.port, addr.host)
 			const ackBuf = await ackP
 
@@ -128,9 +141,14 @@ describe('KNXIPTunnelServer', () => {
 				new Promise<void>((resolve, reject) => {
 					const start = Date.now()
 					const check = () => {
-						if (busFrameOut) return resolve()
-						if (Date.now() - start > 1000)
-							return reject(new Error('timeout busFrameOut'))
+						if (busFrameOut) {
+							resolve()
+							return
+						}
+						if (Date.now() - start > 1000) {
+							reject(new Error('timeout busFrameOut'))
+							return
+						}
 						setTimeout(check, 10)
 					}
 					check()
@@ -145,9 +163,15 @@ describe('KNXIPTunnelServer', () => {
 				KNX_CONSTANTS.ROUTING_INDICATION,
 			)
 			const routing = parsedBus.knxMessage as any
-			assert.strictEqual(routing.cEMIMessage.msgCode, CEMIConstants.L_DATA_IND)
+			assert.strictEqual(
+				routing.cEMIMessage.msgCode,
+				CEMIConstants.L_DATA_IND,
+			)
 			// Server should override source IA for routing injection
-			assert.strictEqual(routing.cEMIMessage.srcAddress.toString(), '1.1.250')
+			assert.strictEqual(
+				routing.cEMIMessage.srcAddress.toString(),
+				'1.1.250',
+			)
 
 			assert.ok(rawTelegram, 'rawTelegram missing')
 			assert.strictEqual(rawTelegram.event, 'GroupValue_Write')
@@ -178,9 +202,9 @@ describe('KNXIPTunnelServer', () => {
 			const addr = server.address
 			assert.ok(addr, 'server address is missing')
 
-			await new Promise<void>((resolve) =>
-				client.bind(0, '127.0.0.1', () => resolve()),
-			)
+			await new Promise<void>((resolve) => {
+				client.bind(0, '127.0.0.1', () => resolve())
+			})
 			const clientAddr = client.address() as dgram.AddressInfo
 
 			const hpai = new HPAI(
@@ -206,7 +230,10 @@ describe('KNXIPTunnelServer', () => {
 				'1.1.10',
 				KNXAddress.TYPE_INDIVIDUAL,
 			)
-			const dst = KNXAddress.createFromString('1/1/2', KNXAddress.TYPE_GROUP)
+			const dst = KNXAddress.createFromString(
+				'1/1/2',
+				KNXAddress.TYPE_GROUP,
+			)
 			const data = new KNXDataBuffer(Buffer.from([0x00]))
 			const cemiInd = CEMIFactory.newLDataIndicationMessage(
 				'write',
@@ -231,7 +258,10 @@ describe('KNXIPTunnelServer', () => {
 			)
 			const tun = parsedTun.knxMessage as any
 			assert.strictEqual(tun.channelID, channelId)
-			assert.strictEqual(tun.cEMIMessage.msgCode, CEMIConstants.L_DATA_IND)
+			assert.strictEqual(
+				tun.cEMIMessage.msgCode,
+				CEMIConstants.L_DATA_IND,
+			)
 		} finally {
 			try {
 				client.close()
