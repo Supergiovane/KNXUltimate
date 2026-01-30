@@ -29,6 +29,7 @@
     "example:secure:tunnel": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCP.ts')\"",
     "example:writeRaw": "node -r esbuild-register -e \"require('./examples/writeRaw.ts')\"",
     "example:respondRaw": "node -r esbuild-register -e \"require('./examples/respondRaw.ts')\"",
+    "example:bridge:noderedmsg": "node -r esbuild-register -e \"require('./examples/bridgeTunnelToNodeRedMsg.ts')\"",
     "realsamples": "node scripts/realsamples.js",
     "lint": "eslint --ext .ts .",
     "lint-fix": "eslint --fix --ext .ts .",

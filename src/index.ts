@@ -13,5 +13,6 @@ import { logStream } from './KnxLog'
 
 export * from './KNXClient'
 export * from './protocol'
+export * from './bridge'
 
 export { KNXClient, dptlib, logStream }
