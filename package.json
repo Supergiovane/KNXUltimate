@@ -77,16 +77,12 @@
   ],
   "dependencies": {
     "binary-parser": "2.2.1",
-    "crypto-js": "4.2.0",
-    "mkdirp": "3.0.1",
-    "node-color-log": "12.0.1",
     "serialport": "^13.0.0",
     "winston": "^3.17.0",
     "xml2js": "0.6.0"
   },
   "devDependencies": {
     "@release-it/conventional-changelog": "^8.0.1",
-    "@types/crypto-js": "^4.2.2",
     "@types/node": "^22.7.4",
     "@types/sinon": "^17.0.3",
     "@types/xml2js": "^0.4.14",

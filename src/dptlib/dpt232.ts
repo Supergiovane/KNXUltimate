@@ -15,12 +15,13 @@
 import { hasProp } from '../utils'
 import type { DatapointConfig } from '.'
 import { module } from '../KnxLog'
-import logger from 'node-color-log'
 
 //
 // DPT232: 3-byte RGB color array
 // MSB: Red, Green, LSB: Blue
 //
+const logger = module('DPT232')
+
 const config: DatapointConfig = {
 	id: 'DPT232',
 	formatAPDU: (value) => {
