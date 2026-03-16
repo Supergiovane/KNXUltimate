@@ -1,5 +1,12 @@
 
 
+## [5.2.9](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.8...v5.2.9) (2026-03-16)
+
+
+### Bug Fixes
+
+* correct DPT251 validity bit parsing ([d3254d4](https://github.com/Supergiovane/KNXUltimate/commit/d3254d4f7da106b8196d4fc9236b2662e7d1a74e))
+
 ## [5.2.8](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.7...v5.2.8) (2026-02-18)
 
 
