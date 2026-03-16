@@ -1,5 +1,12 @@
 
 
+## [5.2.10](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.9...v5.2.10) (2026-03-16)
+
+
+### Bug Fixes
+
+* linter ([fbe670b](https://github.com/Supergiovane/KNXUltimate/commit/fbe670bd69e8b27de2dc2ae31ab7d815a23f3987))
+
 ## [5.2.9](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.8...v5.2.9) (2026-03-16)
 
 
