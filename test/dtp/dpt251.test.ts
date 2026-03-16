@@ -131,6 +131,44 @@ describe('DPT251 (RGBW array)', () => {
 			})
 		})
 
+		test('should preserve validity bit positions when leading zeros are present', () => {
+			assert.deepEqual(DPT251.fromBuffer(Buffer.from([1, 2, 3, 4, 0, 5])), {
+				red: 1,
+				green: 2,
+				blue: 3,
+				white: 4,
+				mR: 0,
+				mG: 1,
+				mB: 0,
+				mW: 1,
+			})
+
+			assert.deepEqual(DPT251.fromBuffer(Buffer.from([5, 6, 7, 8, 0, 1])), {
+				red: 5,
+				green: 6,
+				blue: 7,
+				white: 8,
+				mR: 0,
+				mG: 0,
+				mB: 0,
+				mW: 1,
+			})
+
+			assert.deepEqual(
+				DPT251.fromBuffer(Buffer.from([9, 10, 11, 12, 0, 3])),
+				{
+					red: 9,
+					green: 10,
+					blue: 11,
+					white: 12,
+					mR: 0,
+					mG: 0,
+					mB: 1,
+					mW: 1,
+				},
+			)
+		})
+
 		test('should handle boundary values', () => {
 			const maxBuffer = Buffer.from([255, 255, 255, 255, 0, 15])
 			const maxResult = DPT251.fromBuffer(maxBuffer)

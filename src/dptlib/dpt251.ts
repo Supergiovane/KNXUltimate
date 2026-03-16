@@ -89,19 +89,16 @@ const config: DatapointConfig = {
 			logger.error('Buffer should be 6 bytes long, got', buf.length)
 			return null
 		}
-		const valByte = buf[5].toString(2) // Get validity bits
-		const ret = {
+		return {
 			red: buf[0],
 			green: buf[1],
 			blue: buf[2],
 			white: buf[3],
-			mR: parseInt(valByte[0]) || 0,
-			mG: parseInt(valByte[1]) || 0,
-			mB: parseInt(valByte[2]) || 0,
-			mW: parseInt(valByte[3]) || 0,
+			mR: (buf[5] >> 3) & 0x01,
+			mG: (buf[5] >> 2) & 0x01,
+			mB: (buf[5] >> 1) & 0x01,
+			mW: buf[5] & 0x01,
 		}
-		return ret
-		return null
 	},
 	basetype: {
 		bitlength: 6 * 8,
