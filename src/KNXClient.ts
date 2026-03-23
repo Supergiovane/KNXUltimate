@@ -930,9 +930,41 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.stopDiscovery()
 		this.stopHeartBeat()
 		this.stopGatewayDescription()
+		this.clearSecureTimers()
 		// clear all other timers
 		for (const timer of this.timers.keys()) {
 			this.clearTimer(timer)
+		}
+	}
+
+	private clearSecureTimers() {
+		if (this._secureHandshakeSessionTimer) {
+			clearTimeout(this._secureHandshakeSessionTimer)
+			this._secureHandshakeSessionTimer = undefined
+		}
+		if (this._secureHandshakeAuthTimer) {
+			clearTimeout(this._secureHandshakeAuthTimer)
+			this._secureHandshakeAuthTimer = undefined
+		}
+		if (this._secureHandshakeConnectTimer) {
+			clearTimeout(this._secureHandshakeConnectTimer)
+			this._secureHandshakeConnectTimer = undefined
+		}
+		if (this._secureRoutingSyncTimer) {
+			clearTimeout(this._secureRoutingSyncTimer)
+			this._secureRoutingSyncTimer = undefined
+		}
+		this._secureHandshakeState = undefined
+	}
+
+	private handleSecureHandshakeTimeout(reason: string) {
+		const timeoutError = new Error(reason)
+		this.emit(KNXClientEvents.error, timeoutError)
+		if (
+			this._connectionState !== ConncetionState.DISCONNECTED &&
+			this._connectionState !== ConncetionState.DISCONNECTING
+		) {
+			this.setDisconnected(reason).catch(() => {})
 		}
 	}
 
@@ -1274,21 +1306,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 			} catch {}
 
-			if (
-				item.ACK !== undefined &&
-				this._options.hostProtocol !== 'TunnelTCP'
-			) {
-				this.setTimerWaitingForACK(item.ACK)
-			}
+				if (
+					item.ACK !== undefined &&
+					this._options.hostProtocol !== 'TunnelTCP'
+				) {
+					this.setTimerWaitingForACK(item.ACK)
+				}
 
-			if (!(await this.processKnxPacketQueueItem(item.knxPacket))) {
-				this.sysLogger.error(
-					`KNXClient: handleKNXQueue: returning from processKnxPacketQueueItem ${JSON.stringify(item)}`,
-				)
-				// Clear the queue
-				this.commandQueue = []
-				break
-			}
+				if (!(await this.processKnxPacketQueueItem(item.knxPacket))) {
+					this.sysLogger.error(
+						`KNXClient: handleKNXQueue: returning from processKnxPacketQueueItem ${JSON.stringify(item)}`,
+					)
+					// Drop only the failed item; keep the remaining queue for retry.
+					break
+				}
 
 			await wait(this._options.KNXQueueSendIntervalMilliseconds)
 		}
@@ -2887,32 +2918,43 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private async closeSocket() {
 		this.exitProcessingKNXQueueLoop = true // Exits KNX processing queue loop
+		if (!this._clientSocket) return
+
+		this.socketReady = false
+
+		const client = this._clientSocket
+
+		this._clientSocket = null
+
 		return new Promise<void>((resolve) => {
-			// already closed
-			if (!this._clientSocket) return
-
-			this.socketReady = false
-
-			const client = this._clientSocket
-
-			this._clientSocket = null
-
-			const cb = () => {
+			let settled = false
+			const done = () => {
+				if (settled) return
+				settled = true
 				resolve()
+			}
+
+			const timeout = setTimeout(done, 3000)
+			const finalize = () => {
+				clearTimeout(timeout)
+				done()
 			}
 
 			try {
 				if (client instanceof TCPSocket) {
+					client.once('close', finalize)
+					client.once('error', finalize)
 					// use destroy instead of end here to ensure socket is closed
 					client.destroy()
 				} else {
-					;(client as UDPSocket).close(cb)
+					;(client as UDPSocket).close(finalize)
 				}
 			} catch (error) {
+				clearTimeout(timeout)
 				this.sysLogger.error(
 					`KNXClient: into async closeSocket(): ${error.stack}`,
 				)
-				resolve()
+				done()
 			}
 		})
 	}
@@ -3173,8 +3215,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
 		let sProcessInboundLog = ''
+		let inboundHeader: KNXHeader | undefined
 		try {
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(msg)
+			inboundHeader = knxHeader
 
 			// If we're waiting on a heartbeat reply but receive any frame from the
 			// same peer, consider the connection alive and reset the heartbeat timer.
@@ -3555,8 +3599,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 			}
 		} catch (e) {
+			const error = e instanceof Error ? e : new Error(String(e))
 			this.sysLogger.error(
-				`Received KNX packet: Error processing inbound message: ${e.message} ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}. This means that KNX-Ultimate received a malformed Header or CEMI message from your KNX Gateway.`,
+				`Received KNX packet: Error processing inbound message: ${error.message} ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}. This means that KNX-Ultimate received a malformed Header or CEMI message from your KNX Gateway.`,
+			)
+			this.emit(
+				KNXClientEvents.error,
+				new Error(
+					`Inbound ${this.getKNXConstantName(inboundHeader?.service_type) || 'unknown'} processing failed: ${error.message}`,
+				),
 			)
 		}
 	}
@@ -3749,9 +3800,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.tcpSocket.write(this.secureBuildSessionRequest())
 		// Session timeout
 		this._secureHandshakeSessionTimer = setTimeout(() => {
-			this.emit(
-				KNXClientEvents.error,
-				new Error('Timeout waiting for SESSION_RESPONSE'),
+			this.handleSecureHandshakeTimeout(
+				'Timeout waiting for SESSION_RESPONSE',
 			)
 		}, SECURE_SESSION_TIMEOUT_MS)
 	}
@@ -3806,22 +3856,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					.digest()
 				this._secureSessionKey = sessHash.subarray(0, 16)
 
-				// Send SESSION_AUTHENTICATE (wrapped)
-				const authFrame =
-					this.secureBuildSessionAuthenticate(serverPublicKey)
-				try {
-					this.sysLogger.debug(
-						`[${getTimestamp()}] TX 0953 SECURE_SESSION_AUTHENTICATE (wrapped) sid=${this._secureSessionId}`,
-					)
-				} catch {}
-				this.tcpSocket.write(this.secureWrap(authFrame))
-				this._secureHandshakeState = 'auth'
-				this._secureHandshakeAuthTimer = setTimeout(() => {
-					this.emit(
-						KNXClientEvents.error,
-						new Error('Timeout waiting for SESSION_STATUS'),
-					)
-				}, SECURE_AUTH_TIMEOUT_MS)
+					// Send SESSION_AUTHENTICATE (wrapped)
+					const authFrame =
+						this.secureBuildSessionAuthenticate(serverPublicKey)
+					try {
+						this.sysLogger.debug(
+							`[${getTimestamp()}] TX 0953 SECURE_SESSION_AUTHENTICATE (wrapped) sid=${this._secureSessionId}`,
+						)
+					} catch {}
+					this.tcpSocket.write(this.secureWrap(authFrame))
+					this._secureHandshakeState = 'auth'
+					this._secureHandshakeAuthTimer = setTimeout(() => {
+						this.handleSecureHandshakeTimeout(
+							'Timeout waiting for SESSION_STATUS',
+						)
+					}, SECURE_AUTH_TIMEOUT_MS)
 			} else if (type === KNXIP.SECURE_WRAPPER) {
 				const inner = this.secureDecrypt(frame)
 				const innerType = inner.readUInt16BE(2)
@@ -3865,11 +3914,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this._secureHandshakeState = 'connect'
 						this._secureHandshakeConnectTimer = setTimeout(
 							() =>
-								this.emit(
-									KNXClientEvents.error,
-									new Error(
-										'Timeout waiting for CONNECT_RESPONSE',
-									),
+								this.handleSecureHandshakeTimeout(
+									'Timeout waiting for CONNECT_RESPONSE',
 								),
 							SECURE_CONNECT_TIMEOUT_MS,
 						)
@@ -3898,29 +3944,30 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							)
 						} catch {}
 					}
-					if (status === 0) {
-						// Promote to KNXClient connected state
-						this._channelID = ch
-						// Ensure queue processing is enabled after tunnel established
-						this.exitProcessingKNXQueueLoop = false
-						// Update source IA to the tunnel-assigned IA for Data Secure correctness on bus
-						try {
-							if (this._secureAssignedIa) {
-								this.physAddr = new KNXAddress(
-									this._secureAssignedIa,
-									KNXAddress.TYPE_INDIVIDUAL,
-								)
-							}
-						} catch {}
-						this._connectionState = ConncetionState.CONNECTED
-						this._numFailedTelegramACK = 0
-						this.clearToSend = true
-						this.emit(KNXClientEvents.connected, this._options)
-						// For TunnelTCP, start the first heartbeat quickly to keep
-						// the tunnel alive on gateways with short idle timeouts.
-						try {
-							const keep =
-								this._options.connectionKeepAliveTimeout ||
+						if (status === 0) {
+							// Promote to KNXClient connected state
+							this._channelID = ch
+							// Ensure queue processing is enabled after tunnel established
+							this.exitProcessingKNXQueueLoop = false
+							// Update source IA to the tunnel-assigned IA for Data Secure correctness on bus
+							try {
+								if (this._secureAssignedIa) {
+									this.physAddr = new KNXAddress(
+										this._secureAssignedIa,
+										KNXAddress.TYPE_INDIVIDUAL,
+									)
+								}
+							} catch {}
+							this._secureHandshakeState = undefined
+							this._connectionState = ConncetionState.CONNECTED
+							this._numFailedTelegramACK = 0
+							this.clearToSend = true
+							this.emit(KNXClientEvents.connected, this._options)
+							// For TunnelTCP, start the first heartbeat quickly to keep
+							// the tunnel alive on gateways with short idle timeouts.
+							try {
+								const keep =
+									this._options.connectionKeepAliveTimeout ||
 								KNX_CONSTANTS.CONNECTION_ALIVE_TIME
 							// Schedule first heartbeat at ~keep/10 (min 2s, max 5s)
 							const delayMs = Math.max(
@@ -3958,6 +4005,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				const status = frame[7]
 				if (status === 0) {
 					this._channelID = ch
+					this._secureHandshakeState = undefined
 					this._connectionState = ConncetionState.CONNECTED
 					this._numFailedTelegramACK = 0
 					this.clearToSend = true

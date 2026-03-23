@@ -29,6 +29,9 @@ const config: DatapointConfig = {
 		return apdu_data
 	},
 	fromBuffer(buf) {
+		if (buf.length !== 8) {
+			return null
+		}
 		return buf.readBigInt64BE(0)
 
 		// const bufInt = (buf.readUInt32BE(0) << 8) + buf.readUInt32BE(4)

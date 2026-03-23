@@ -118,5 +118,14 @@ describe('DPT29 (8-byte signed value)', () => {
 			assert.ok(typeof resultMin === 'bigint')
 			assert.equal(resultMin, minVal)
 		})
+
+		test('should return null for invalid buffer lengths', () => {
+			assert.equal(DPT29.fromBuffer(Buffer.from([])), null)
+			assert.equal(DPT29.fromBuffer(Buffer.from([0])), null)
+			assert.equal(
+				DPT29.fromBuffer(Buffer.from([0, 1, 2, 3, 4, 5, 6])),
+				null,
+			)
+		})
 	})
 })

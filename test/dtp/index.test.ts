@@ -121,5 +121,29 @@ describe('KNX DPT Handler', () => {
 			const buf = Buffer.from([255]) // Max value
 			assert.equal(fromBuffer(buf, dpt), 100)
 		})
+
+		it('should return null for generic DPT length mismatches', () => {
+			assert.equal(fromBuffer(Buffer.from([1, 2, 3]), resolve('5.001')), null)
+			assert.equal(fromBuffer(Buffer.from([0]), resolve('13.010')), null)
+			assert.equal(fromBuffer(Buffer.from([]), resolve('17.001')), null)
+		})
+
+		it('should add DPT context when decoding throws', () => {
+			const dpt: DatapointConfig = {
+				id: 'TEST_THROW',
+				basetype: {
+					bitlength: 8,
+					valuetype: 'number',
+				},
+				fromBuffer: () => {
+					throw new Error('boom')
+				},
+			}
+
+			assert.throws(() => fromBuffer(Buffer.from([0x12]), dpt), {
+				message:
+					'TEST_THROW: decode failed for buffer [12]: boom',
+			})
+		})
 	})
 })

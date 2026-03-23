@@ -238,45 +238,62 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
  * --  1) checks if the value adheres to the range set from the DPT's bitlength
  */
 export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
-	// sanity check
-	if (!dpt) throw Error(util.format('DPT %s not found', dpt))
-	let value = 0
-	// get the raw APDU data for the given JS value
-	if (typeof dpt.fromBuffer === 'function') {
-		// nothing to do here, DPT-specific fromBuffer implementation will handle everything
-		value = dpt.fromBuffer(buf)
-	} else {
-		// knxLog.get().debug('%s buflength == %d => %j', typeof buf, buf.length, JSON.stringify(buf) );
-		// get a raw unsigned integer from the buffer
-		if (buf.length > 6) {
-			throw Error(
-				'cannot handle unsigned integers more then 6 bytes in length',
-			)
-		}
-		if (
-			hasProp(dpt.basetype, 'signedness') &&
-			dpt.basetype.signedness === 'signed'
-		) {
-			value = buf.readIntBE(0, buf.length)
+	try {
+		// sanity check
+		if (!dpt) throw Error(util.format('DPT %s not found', dpt))
+		let value = 0
+		// get the raw APDU data for the given JS value
+		if (typeof dpt.fromBuffer === 'function') {
+			// nothing to do here, DPT-specific fromBuffer implementation will handle everything
+			value = dpt.fromBuffer(buf)
 		} else {
-			value = buf.readUIntBE(0, buf.length)
+			const expectedLength = Math.ceil(dpt.basetype.bitlength / 8)
+			if (expectedLength > 6) {
+				throw Error(
+					'cannot handle unsigned integers more then 6 bytes in length',
+				)
+			}
+			if (buf.length !== expectedLength) {
+				logger.warn(
+					'fromBuffer: %s expects %d bytes (got %d bytes)',
+					dpt.id,
+					expectedLength,
+					buf.length,
+				)
+				return null
+			}
+			// knxLog.get().debug('%s buflength == %d => %j', typeof buf, buf.length, JSON.stringify(buf) );
+			// get a raw unsigned integer from the buffer
+			if (
+				hasProp(dpt.basetype, 'signedness') &&
+				dpt.basetype.signedness === 'signed'
+			) {
+				value = buf.readIntBE(0, buf.length)
+			} else {
+				value = buf.readUIntBE(0, buf.length)
+			}
+			// knxLog.get().debug(' ../knx/src/index.js : DPT : ' + JSON.stringify(dpt));   // for exploring dpt and implementing description
+			if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 'scalar_range')) {
+				const range = hasProp(dpt.basetype, 'range')
+					? dpt.basetype.range
+					: [0, 2 ** dpt.basetype.bitlength - 1]
+				const scalar = dpt.subtype.scalar_range
+				// convert value from its scalar representation
+				// e.g. in DPT5.001, 50(%) => 0x7F , 100(%) => 0xFF
+				const a = (scalar[1] - scalar[0]) / (range[1] - range[0])
+				const b = scalar[0] - range[0]
+				value = Math.round(a * value + b)
+				// knxLog.get().debug('fromBuffer scalar a=%j b=%j %j', a,b, value);
+			}
 		}
-		// knxLog.get().debug(' ../knx/src/index.js : DPT : ' + JSON.stringify(dpt));   // for exploring dpt and implementing description
-		if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 'scalar_range')) {
-			const range = hasProp(dpt.basetype, 'range')
-				? dpt.basetype.range
-				: [0, 2 ** dpt.basetype.bitlength - 1]
-			const scalar = dpt.subtype.scalar_range
-			// convert value from its scalar representation
-			// e.g. in DPT5.001, 50(%) => 0x7F , 100(%) => 0xFF
-			const a = (scalar[1] - scalar[0]) / (range[1] - range[0])
-			const b = scalar[0] - range[0]
-			value = Math.round(a * value + b)
-			// knxLog.get().debug('fromBuffer scalar a=%j b=%j %j', a,b, value);
-		}
+		//  knxLog.get().debug('generic fromBuffer buf=%j, value=%j', buf, value);
+		return value
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+		throw new Error(
+			`${dpt?.id || 'unknown DPT'}: decode failed for buffer [${buf?.toString('hex') || ''}]: ${message}`,
+		)
 	}
-	//  knxLog.get().debug('generic fromBuffer buf=%j, value=%j', buf, value);
-	return value
 }
 
 const cloneDpt = (d: DatapointConfig): DatapointConfig => {
