@@ -17,6 +17,41 @@ import KNXClient, {
 
 const clientsToCleanup: KNXClient[] = []
 
+function createQueuedPacket(
+	queueKind: 'groupWrite' | 'groupResponse' | 'groupRead' | 'other' = 'other',
+	groupAddress?: string,
+) {
+	return {
+		type: 0x0420,
+		cEMIMessage: {
+			dstAddress: {
+				toString: () => groupAddress,
+			},
+			npdu: {
+				isGroupWrite: queueKind === 'groupWrite',
+				isGroupResponse: queueKind === 'groupResponse',
+				isGroupRead: queueKind === 'groupRead',
+			},
+		},
+	} as any
+}
+
+function createQueueItem(
+	packet: any,
+	overrides: Partial<Record<string, any>> = {},
+) {
+	return {
+		knxPacket: packet,
+		ACK: undefined as any,
+		expectedSeqNumberForACK: 0,
+		enqueuedAt: Date.now(),
+		queueKind: 'other',
+		groupAddress: undefined,
+		priority: false,
+		...overrides,
+	}
+}
+
 function withTimeout<T>(promise: Promise<T>, ms = 500): Promise<T> {
 	return Promise.race<T>([
 		promise,
@@ -94,14 +129,14 @@ describe('KNXClient regressions', () => {
 		clientsToCleanup.push(client)
 
 		const remaining = {
-			knxPacket: { type: 0x0420 } as any,
-			ACK: undefined as any,
-			expectedSeqNumberForACK: 2,
+			...createQueueItem(createQueuedPacket(), {
+				expectedSeqNumberForACK: 2,
+			}),
 		}
 		const failing = {
-			knxPacket: { type: 0x0420 } as any,
-			ACK: undefined as any,
-			expectedSeqNumberForACK: 1,
+			...createQueueItem(createQueuedPacket(), {
+				expectedSeqNumberForACK: 1,
+			}),
 		}
 
 		client['_clearToSend'] = true
@@ -113,6 +148,84 @@ describe('KNXClient regressions', () => {
 
 		assert.deepEqual(client['commandQueue'], [remaining])
 		assert.equal(client['queueLock'], false)
+	})
+
+	test('send should coalesce queued writes for the same GA', () => {
+		const client = new KNXClient({
+			hostProtocol: 'TunnelUDP',
+			loglevel: 'error',
+		})
+		clientsToCleanup.push(client)
+		client['handleKNXQueue'] = () => Promise.resolve()
+
+		const oldPacket = createQueuedPacket('groupWrite', '1/2/3')
+		const newPacket = createQueuedPacket('groupWrite', '1/2/3')
+
+		client.send(oldPacket, undefined, false, 1)
+		client.send(newPacket, undefined, false, 2)
+
+		assert.equal(client['commandQueue'].length, 1)
+		assert.equal(client['commandQueue'][0].knxPacket, newPacket)
+		assert.equal(client['commandQueue'][0].groupAddress, '1/2/3')
+		assert.equal(client['commandQueue'][0].queueKind, 'groupWrite')
+	})
+
+	test('handleKNXQueue should drop stale queued responses before send', async () => {
+		const client = new KNXClient({
+			hostProtocol: 'TunnelUDP',
+			loglevel: 'error',
+			KNXQueueMaxGroupResponseAgeMilliseconds: 10,
+		})
+		clientsToCleanup.push(client)
+		let sentCount = 0
+
+		client['_clearToSend'] = true
+		client['socketReady'] = true
+		client['commandQueue'] = [
+			createQueueItem(createQueuedPacket('groupResponse', '2/1/10'), {
+				queueKind: 'groupResponse',
+				groupAddress: '2/1/10',
+				enqueuedAt: Date.now() - 50,
+			}),
+		]
+		client['processKnxPacketQueueItem'] = async () => {
+			sentCount += 1
+			return true
+		}
+
+		await (client as any).handleKNXQueue()
+
+		assert.equal(sentCount, 0)
+		assert.deepEqual(client['commandQueue'], [])
+	})
+
+	test('handleKNXQueue should not expire priority telegrams', async () => {
+		const client = new KNXClient({
+			hostProtocol: 'TunnelUDP',
+			loglevel: 'error',
+			KNXQueueMaxTelegramAgeMilliseconds: 1,
+		})
+		clientsToCleanup.push(client)
+		let sentCount = 0
+
+		client['_clearToSend'] = true
+		client['socketReady'] = true
+		client['commandQueue'] = [
+			createQueueItem(createQueuedPacket(), {
+				queueKind: 'priority',
+				priority: true,
+				enqueuedAt: Date.now() - 50,
+			}),
+		]
+		client['processKnxPacketQueueItem'] = async () => {
+			sentCount += 1
+			return true
+		}
+
+		await (client as any).handleKNXQueue()
+
+		assert.equal(sentCount, 1)
+		assert.deepEqual(client['commandQueue'], [])
 	})
 
 	test('secure handshake timeouts should emit error and disconnect', async () => {
@@ -164,7 +277,6 @@ describe('KNXClient regressions', () => {
 		client['_secureRoutingSyncTimer'] = setTimeout(() => {
 			fired = true
 		}, 20)
-
 		;(client as any).clearAllTimers()
 		await new Promise((resolve) => setTimeout(resolve, 60))
 
@@ -203,7 +315,10 @@ describe('KNXClient regressions', () => {
 		)
 
 		const error = await withTimeout(errorPromise)
-		assert.match(error.message, /Inbound TUNNELING_REQUEST processing failed/)
+		assert.match(
+			error.message,
+			/Inbound TUNNELING_REQUEST processing failed/,
+		)
 		assert.match(error.message, /broken secure wrapper/)
 	})
 })

@@ -123,7 +123,10 @@ describe('KNX DPT Handler', () => {
 		})
 
 		it('should return null for generic DPT length mismatches', () => {
-			assert.equal(fromBuffer(Buffer.from([1, 2, 3]), resolve('5.001')), null)
+			assert.equal(
+				fromBuffer(Buffer.from([1, 2, 3]), resolve('5.001')),
+				null,
+			)
 			assert.equal(fromBuffer(Buffer.from([0]), resolve('13.010')), null)
 			assert.equal(fromBuffer(Buffer.from([]), resolve('17.001')), null)
 		})
@@ -141,8 +144,7 @@ describe('KNX DPT Handler', () => {
 			}
 
 			assert.throws(() => fromBuffer(Buffer.from([0x12]), dpt), {
-				message:
-					'TEST_THROW: decode failed for buffer [12]: boom',
+				message: 'TEST_THROW: decode failed for buffer [12]: boom',
 			})
 		})
 	})

@@ -49,24 +49,85 @@ Please subscribe to my channel, to learn how to use it [![Youtube][youtube-image
 
 ## CONNECTION SETUP
 
-These are the properties you can pass to `KNXClient` (see examples for full usage):
+If you are starting out, you usually need only a few properties.
 
-| Property                         | Applies to                         | Description |
-| -------------------------------- | ---------------------------------- | ----------- |
-| `hostProtocol` (string)          | all                                | One of: `"TunnelUDP"` (plain tunnelling via UDP), `"Multicast"` (plain routing via multicast 224.0.23.12), `"TunnelTCP"` (KNX/IP Secure tunnelling over TCP), `"SerialFT12"` (direct TP/FT1.2 serial interface such as `/dev/ttyAMA0`). |
-| `ipAddr` (string)                | all                                | KNX/IP peer address. Use `"224.0.23.12"` for routing (multicast), or the interface/router IP for tunnelling. |
-| `ipPort` (number/string)         | all                                | KNX/IP port. Default `3671`. |
-| `physAddr` (string) Optional             | all                                | Source IA on bus (e.g. `"1.1.200"`). Multicast: required. TunnelUDP: used as cEMI source. TunnelTCP (secure): ignored as bus source — the gateway assigns the tunnel IA; Data Secure uses the interface IA from ETS for authentication. |
-| `loglevel` (string)              | all                                | One of: `disable`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `localIPAddress` (string)        | all                                | Optional. Binds the local UDP/TCP socket to a specific local interface IP. Useful with multiple NICs. |
-| `interface` (string)             | all                                | Optional. Local interface name to select the NIC (alternative to `localIPAddress`). |
-| `serialInterface` (object)       | SerialFT12                         | Serial port settings used when `hostProtocol === 'SerialFT12'`. Supports `path` (default `/dev/ttyAMA0`), `baudRate` (default 19200), `dataBits`, `stopBits`, `parity` (`'even'` by default), `rtscts`, `dtr`, `timeoutMs`, `lock` (forwarded to `serialport`), and `isKBERRY` (default `true`, enable Weinzierl KBerry/BAOS initialisation). |
-| `KNXQueueSendIntervalMilliseconds` (number) | all              | Optional. Inter‑telegram delay in ms. Default ~25ms. Don’t go below 20ms. |
-| `suppress_ack_ldatareq` (bool)   | tunnelling (UDP/TCP)               | Optional. Avoid requesting/handling L_DATA_REQ bus ACK in tunnelling. Leave `false` unless your interface needs it. |
-| `theGatewayIsKNXVirtual` (bool)  | tunnelling                         | Optional. Special handling for ETS KNX Virtual (adds `localIPAddress` to tunnel endpoint). Default `false`. |
-| `isSecureKNXEnabled` (bool)      | IP secure, serial Data Secure      | Enable KNX/IP Secure. With `TunnelTCP`: session handshake + Secure Wrapper. With `Multicast`: secure routing (Secure Wrapper, timer sync). With `SerialFT12`: enable KNX Data Secure on TP (group keys only, no IP wrapper). |
-| `secureTunnelConfig` (object)    | secure tunnelling, routing, serial | KNX Secure configuration. For `TunnelTCP`/routing it drives both tunnel auth and Data Secure; for `SerialFT12` only the keyring fields (`knxkeys_file_path` or `knxkeys_buffer`, plus `knxkeys_password`) are used to load group keys for Data Secure on TP. |
-| `secureRoutingWaitForTimer` (bool)| secure routing (multicast)        | Optional. Wait for first timer sync (0955/0950) before sending. Default `true`. |
+Start from one of these 4 cases:
+
+| Use case | Minimum config |
+| -------- | -------------- |
+| Plain tunnelling over UDP | `hostProtocol: 'TunnelUDP'`, `ipAddr`, `ipPort` |
+| Plain routing over multicast | `hostProtocol: 'Multicast'`, `ipAddr: '224.0.23.12'`, `ipPort: 3671`, `physAddr` |
+| KNX/IP Secure over TCP | `hostProtocol: 'TunnelTCP'`, `ipAddr`, `ipPort`, `isSecureKNXEnabled: true`, `secureTunnelConfig` |
+| Direct KNX TP serial (FT1.2 / KBerry / BAOS) | `hostProtocol: 'SerialFT12'`, `serialInterface`, `physAddr` |
+
+If you're unsure, start with `TunnelUDP`.
+
+Smallest possible starting point:
+
+```ts
+import KNXClient from 'knxultimate'
+
+const client = new KNXClient({
+  hostProtocol: 'TunnelUDP',
+  ipAddr: '192.168.1.117',
+  ipPort: 3671,
+})
+
+client.Connect()
+```
+
+### Core properties
+
+These are the properties most people will touch first:
+
+| Property | Applies to | Description |
+| -------- | ---------- | ----------- |
+| `hostProtocol` (string) | all | One of: `"TunnelUDP"` (plain tunnelling via UDP), `"Multicast"` (plain routing via multicast `224.0.23.12`), `"TunnelTCP"` (KNX/IP Secure tunnelling over TCP), `"SerialFT12"` (direct TP/FT1.2 serial interface such as `/dev/ttyAMA0`). |
+| `ipAddr` (string) | IP transports | KNX/IP peer address. Use `"224.0.23.12"` for routing (multicast), or the interface/router IP for tunnelling. |
+| `ipPort` (number/string) | IP transports | KNX/IP port. Default `3671`. |
+| `physAddr` (string) | multicast, serial, optional elsewhere | Source IA on bus (for example `"1.1.200"`). Multicast: required. TunnelUDP: used as cEMI source. TunnelTCP secure: ignored as bus source, because the gateway assigns the tunnel IA. |
+| `loglevel` (string) | all | One of: `disable`, `error`, `warn`, `info`, `debug`, `trace`. |
+
+### Usually optional
+
+You can ignore this section until you actually need one of these behaviors.
+
+| Property | Applies to | Description |
+| -------- | ---------- | ----------- |
+| `localIPAddress` (string) | all | Bind the local UDP/TCP socket to a specific local interface IP. Useful with multiple NICs. |
+| `interface` (string) | all | Local interface name to select the NIC (alternative to `localIPAddress`). |
+| `suppress_ack_ldatareq` (bool) | tunnelling (UDP/TCP) | Avoid requesting/handling `L_DATA_REQ` bus ACK in tunnelling. Leave `false` unless your interface needs it. |
+| `theGatewayIsKNXVirtual` (bool) | tunnelling | Special handling for ETS KNX Virtual (adds `localIPAddress` to the tunnel endpoint). Default `false`. |
+
+### Queue behavior
+
+You can ignore this unless you want to tune send pacing or stale telegram handling.
+
+| Property | Applies to | Description |
+| -------- | ---------- | ----------- |
+| `KNXQueueSendIntervalMilliseconds` (number) | all | Inter‑telegram delay in ms. Default about `25`. Don’t go below `20`. |
+| `KNXQueueMaxTelegramAgeMilliseconds` (number) | all | Drop queued bus telegrams (`GroupValue_Write` / `GroupValue_Read`) older than this age in ms. Set `<= 0` to disable. Default `1000`. |
+| `KNXQueueMaxGroupResponseAgeMilliseconds` (number) | all | Drop queued bus `GroupValue_Response` telegrams older than this age in ms. Set `<= 0` to disable. Default `250`. |
+| `KNXQueueCoalesceGroupWrites` (bool) | all | Keep only the newest queued `GroupValue_Write` for the same GA. Default `true`. |
+| `KNXQueueCoalesceGroupReads` (bool) | all | Keep only the newest queued `GroupValue_Read` for the same GA. Default `false`. |
+
+### Secure options
+
+Read this only if you are using KNX Secure.
+
+| Property | Applies to | Description |
+| -------- | ---------- | ----------- |
+| `isSecureKNXEnabled` (bool) | IP secure, serial Data Secure | Enable KNX/IP Secure. With `TunnelTCP`: session handshake + Secure Wrapper. With `Multicast`: secure routing (Secure Wrapper, timer sync). With `SerialFT12`: enable KNX Data Secure on TP (group keys only, no IP wrapper). |
+| `secureTunnelConfig` (object) | secure tunnelling, routing, serial | KNX Secure configuration. For `TunnelTCP`/routing it drives both tunnel auth and Data Secure; for `SerialFT12` only the keyring fields (`knxkeys_file_path` or `knxkeys_buffer`, plus `knxkeys_password`) are used to load group keys for Data Secure on TP. |
+| `secureRoutingWaitForTimer` (bool) | secure routing (multicast) | Wait for first timer sync (`0955` / `0950`) before sending. Default `true`. |
+
+### Serial FT1.2 options
+
+Read this only if you are using `hostProtocol: 'SerialFT12'`.
+
+| Property | Applies to | Description |
+| -------- | ---------- | ----------- |
+| `serialInterface` (object) | SerialFT12 | Serial port settings used when `hostProtocol === 'SerialFT12'`. Supports `path` (default `/dev/ttyAMA0`), `baudRate` (default `19200`), `dataBits`, `stopBits`, `parity` (`'even'` by default), `rtscts`, `dtr`, `timeoutMs`, `lock` (forwarded to `serialport`), and `isKBERRY` (default `true`, enable Weinzierl KBerry/BAOS initialisation). |
 
 ### Serial FT1.2 (TP) mode / KBerry (see below how to setup the RPi and KBERRY)
 

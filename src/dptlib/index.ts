@@ -273,7 +273,10 @@ export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
 				value = buf.readUIntBE(0, buf.length)
 			}
 			// knxLog.get().debug(' ../knx/src/index.js : DPT : ' + JSON.stringify(dpt));   // for exploring dpt and implementing description
-			if (hasProp(dpt, 'subtype') && hasProp(dpt.subtype, 'scalar_range')) {
+			if (
+				hasProp(dpt, 'subtype') &&
+				hasProp(dpt.subtype, 'scalar_range')
+			) {
 				const range = hasProp(dpt.basetype, 'range')
 					? dpt.basetype.range
 					: [0, 2 ** dpt.basetype.bitlength - 1]
