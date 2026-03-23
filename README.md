@@ -112,20 +112,16 @@ You can ignore this section until you actually need one of these behaviors.
 | -------- | ---------- | ----------- |
 | `localIPAddress` (string) | all | Bind the local UDP/TCP socket to a specific local interface IP. Useful with multiple NICs. |
 | `interface` (string) | all | Local interface name to select the NIC (alternative to `localIPAddress`). |
-| `suppress_ack_ldatareq` (bool) | tunnelling (UDP/TCP) | Avoid requesting/handling `L_DATA_REQ` bus ACK in tunnelling. Leave `false` unless your interface needs it. |
+| `suppress_ack_ldatareq` (bool) | tunnelling, serial | Controls the cEMI `L_DATA_REQ` bus ACK bit. In plain `TunnelUDP`, when `false` the client also waits for the corresponding tunnelling ACK; set `true` only if your interface needs it. Default `false`. |
 | `theGatewayIsKNXVirtual` (bool) | tunnelling | Special handling for ETS KNX Virtual (adds `localIPAddress` to the tunnel endpoint). Default `false`. |
 
-### Queue behavior
+### Queue pacing
 
-You can ignore this unless you want to tune send pacing or stale telegram handling.
+You can ignore this unless you want to tune send pacing.
 
 | Property | Applies to | Description |
 | -------- | ---------- | ----------- |
 | `KNXQueueSendIntervalMilliseconds` (number) | all | Inter‑telegram delay in ms. Default about `25`. Don’t go below `20`. |
-| `KNXQueueMaxTelegramAgeMilliseconds` (number) | all | Drop queued bus telegrams (`GroupValue_Write` / `GroupValue_Read`) older than this age in ms. Set `<= 0` to disable. Default `1000`. |
-| `KNXQueueMaxGroupResponseAgeMilliseconds` (number) | all | Drop queued bus `GroupValue_Response` telegrams older than this age in ms. Set `<= 0` to disable. Default `250`. |
-| `KNXQueueCoalesceGroupWrites` (bool) | all | Keep only the newest queued `GroupValue_Write` for the same GA. Default `true`. |
-| `KNXQueueCoalesceGroupReads` (bool) | all | Keep only the newest queued `GroupValue_Read` for the same GA. Default `false`. |
 
 ### Secure options
 
@@ -744,7 +740,7 @@ const objects = await KNXClient.discoverInterfaces(5000)
 - TunnelUDP: uses `physAddr` as the source IA on the bus.
 - TunnelTCP (secure): after a successful connect, uses the tunnel-assigned IA as the cEMI source on the bus; the Data Secure authentication, however, uses the interface IA from the ETS keyring (not the dynamic tunnel IA).
 - Tips for UDP tunnelling:
-  - If your interface times out on L_DATA_REQ ACK, try `suppress_ack_ldatareq: true`.
+  - If your interface times out waiting ACKs on plain `TunnelUDP`, try `suppress_ack_ldatareq: true`.
   - With multiple NICs, set `localIPAddress` (or `interface`) to bind the correct local interface.
 
 ### KNX IP Secure (tunnelling & routing) and Data Secure

@@ -5,6 +5,7 @@
 
 ### Bug Fixes
 
+* **core:** restore `KNXClient` transport behavior to `5.2.11` baseline while keeping datapoint fixes from `5.3.x`
 * **lint:** resolve queue cleanup warnings ([3fc4c9b](https://github.com/Supergiovane/KNXUltimate/commit/3fc4c9b048b0facf1d9d8c717ada31527decea5e))
 
 # [5.3.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.11...v5.3.0) (2026-03-23)

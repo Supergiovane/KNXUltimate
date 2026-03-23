@@ -198,14 +198,6 @@ export type KNXClientOptions = {
 	localSocketAddress?: string
 	// ** Local queue interval between each KNX telegram. Default is 1 telegram each 25ms
 	KNXQueueSendIntervalMilliseconds?: number
-	/** Drop queued telegrams older than this age in ms. Set <= 0 to disable. */
-	KNXQueueMaxTelegramAgeMilliseconds?: number
-	/** Drop queued group responses older than this age in ms. Set <= 0 to disable. */
-	KNXQueueMaxGroupResponseAgeMilliseconds?: number
-	/** Keep only the latest queued GroupValue_Write for the same GA. */
-	KNXQueueCoalesceGroupWrites?: boolean
-	/** Keep only the latest queued GroupValue_Read for the same GA. */
-	KNXQueueCoalesceGroupReads?: boolean
 	/** Enables sniffing mode to monitor KNX */
 	sniffingMode?: boolean
 	/** Sets the tunnel_endpoint with the localIPAddress instead of the standard 0.0.0.0 */
@@ -230,10 +222,6 @@ const optionsDefaults: KNXClientOptions = {
 	localIPAddress: '',
 	interface: '',
 	KNXQueueSendIntervalMilliseconds: 25,
-	KNXQueueMaxTelegramAgeMilliseconds: 1000,
-	KNXQueueMaxGroupResponseAgeMilliseconds: 250,
-	KNXQueueCoalesceGroupWrites: true,
-	KNXQueueCoalesceGroupReads: false,
 	theGatewayIsKNXVirtual: false,
 	secureRoutingWaitForTimer: true,
 }
@@ -268,21 +256,10 @@ export type SnifferPacket = {
 	deltaRes?: number
 }
 
-type KNXQueueItemKind =
-	| 'priority'
-	| 'groupWrite'
-	| 'groupResponse'
-	| 'groupRead'
-	| 'other'
-
 interface KNXQueueItem {
 	knxPacket: KNXPacket
-	ACK?: KNXTunnelingRequest
+	ACK: KNXTunnelingRequest
 	expectedSeqNumberForACK: number
-	enqueuedAt: number
-	queueKind: KNXQueueItemKind
-	groupAddress?: string
-	priority: boolean
 }
 
 export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks> {
@@ -465,43 +442,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._options.KNXQueueSendIntervalMilliseconds = 25
 			this.sysLogger.error(
 				`KNXQueueSendIntervalMilliseconds:${error.message}. Defaulting to 25`,
-			)
-		}
-		try {
-			if (
-				!Number.isFinite(
-					Number(this._options.KNXQueueMaxTelegramAgeMilliseconds),
-				) ||
-				Number(this._options.KNXQueueMaxTelegramAgeMilliseconds) < 0
-			) {
-				this._options.KNXQueueMaxTelegramAgeMilliseconds =
-					optionsDefaults.KNXQueueMaxTelegramAgeMilliseconds
-			}
-		} catch (error) {
-			this._options.KNXQueueMaxTelegramAgeMilliseconds =
-				optionsDefaults.KNXQueueMaxTelegramAgeMilliseconds
-			this.sysLogger.error(
-				`KNXQueueMaxTelegramAgeMilliseconds:${(error as Error).message}. Defaulting to ${optionsDefaults.KNXQueueMaxTelegramAgeMilliseconds}`,
-			)
-		}
-		try {
-			if (
-				!Number.isFinite(
-					Number(
-						this._options.KNXQueueMaxGroupResponseAgeMilliseconds,
-					),
-				) ||
-				Number(this._options.KNXQueueMaxGroupResponseAgeMilliseconds) <
-					0
-			) {
-				this._options.KNXQueueMaxGroupResponseAgeMilliseconds =
-					optionsDefaults.KNXQueueMaxGroupResponseAgeMilliseconds
-			}
-		} catch (error) {
-			this._options.KNXQueueMaxGroupResponseAgeMilliseconds =
-				optionsDefaults.KNXQueueMaxGroupResponseAgeMilliseconds
-			this.sysLogger.error(
-				`KNXQueueMaxGroupResponseAgeMilliseconds:${(error as Error).message}. Defaulting to ${optionsDefaults.KNXQueueMaxGroupResponseAgeMilliseconds}`,
 			)
 		}
 
@@ -895,112 +835,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return cemi
 	}
 
-	private classifyQueueItem(
-		packet: KNXPacket,
-		priority: boolean,
-	): KNXQueueItemKind {
-		if (priority || packet instanceof KNXTunnelingAck) {
-			return 'priority'
-		}
-
-		const npdu = (packet as any)?.cEMIMessage?.npdu
-		if (!npdu) {
-			return 'other'
-		}
-		if (npdu.isGroupWrite) {
-			return 'groupWrite'
-		}
-		if (npdu.isGroupResponse) {
-			return 'groupResponse'
-		}
-		if (npdu.isGroupRead) {
-			return 'groupRead'
-		}
-		return 'other'
-	}
-
-	private getQueueItemGroupAddress(
-		packet: KNXPacket,
-		queueKind: KNXQueueItemKind,
-	): string | undefined {
-		if (
-			queueKind !== 'groupWrite' &&
-			queueKind !== 'groupResponse' &&
-			queueKind !== 'groupRead'
-		) {
-			return undefined
-		}
-
-		return (packet as any)?.cEMIMessage?.dstAddress?.toString?.()
-	}
-
-	private shouldCoalesceQueueItem(item: KNXQueueItem): boolean {
-		if (item.priority || !item.groupAddress) {
-			return false
-		}
-
-		if (item.queueKind === 'groupWrite') {
-			return this._options.KNXQueueCoalesceGroupWrites !== false
-		}
-		if (item.queueKind === 'groupRead') {
-			return this._options.KNXQueueCoalesceGroupReads === true
-		}
-		return false
-	}
-
-	private coalesceQueuedItems(item: KNXQueueItem): number {
-		if (!this.shouldCoalesceQueueItem(item)) {
-			return 0
-		}
-
-		const beforeLength = this.commandQueue.length
-		this.commandQueue = this.commandQueue.filter(
-			(queuedItem) =>
-				queuedItem.priority ||
-				queuedItem.queueKind !== item.queueKind ||
-				queuedItem.groupAddress !== item.groupAddress,
-		)
-		return beforeLength - this.commandQueue.length
-	}
-
-	private getQueueItemMaxAgeMilliseconds(
-		item: KNXQueueItem,
-	): number | undefined {
-		if (
-			item.priority ||
-			item.queueKind === 'priority' ||
-			item.queueKind === 'other'
-		) {
-			return undefined
-		}
-
-		const configuredMaxAge =
-			item.queueKind === 'groupResponse'
-				? this._options.KNXQueueMaxGroupResponseAgeMilliseconds
-				: this._options.KNXQueueMaxTelegramAgeMilliseconds
-
-		return configuredMaxAge && configuredMaxAge > 0
-			? configuredMaxAge
-			: undefined
-	}
-
-	private getQueueItemDescription(item: KNXQueueItem): string {
-		const packetType = this.getKNXConstantName(item.knxPacket.type)
-		return `type:${packetType} kind:${item.queueKind} ga:${item.groupAddress || 'n/a'}`
-	}
-
-	private isQueueItemExpired(
-		item: KNXQueueItem,
-		now: number = Date.now(),
-	): boolean {
-		const maxAgeMilliseconds = this.getQueueItemMaxAgeMilliseconds(item)
-		if (maxAgeMilliseconds === undefined) {
-			return false
-		}
-
-		return now - item.enqueuedAt > maxAgeMilliseconds
-	}
-
 	/**
 	 * The channel ID of the connection. Only defined after a successful connection
 	 */
@@ -1096,41 +930,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.stopDiscovery()
 		this.stopHeartBeat()
 		this.stopGatewayDescription()
-		this.clearSecureTimers()
 		// clear all other timers
 		for (const timer of this.timers.keys()) {
 			this.clearTimer(timer)
-		}
-	}
-
-	private clearSecureTimers() {
-		if (this._secureHandshakeSessionTimer) {
-			clearTimeout(this._secureHandshakeSessionTimer)
-			this._secureHandshakeSessionTimer = undefined
-		}
-		if (this._secureHandshakeAuthTimer) {
-			clearTimeout(this._secureHandshakeAuthTimer)
-			this._secureHandshakeAuthTimer = undefined
-		}
-		if (this._secureHandshakeConnectTimer) {
-			clearTimeout(this._secureHandshakeConnectTimer)
-			this._secureHandshakeConnectTimer = undefined
-		}
-		if (this._secureRoutingSyncTimer) {
-			clearTimeout(this._secureRoutingSyncTimer)
-			this._secureRoutingSyncTimer = undefined
-		}
-		this._secureHandshakeState = undefined
-	}
-
-	private handleSecureHandshakeTimeout(reason: string) {
-		const timeoutError = new Error(reason)
-		this.emit(KNXClientEvents.error, timeoutError)
-		if (
-			this._connectionState !== ConncetionState.DISCONNECTED &&
-			this._connectionState !== ConncetionState.DISCONNECTING
-		) {
-			this.setDisconnected(reason).catch(() => {})
 		}
 	}
 
@@ -1432,18 +1234,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			}
 
 			const item = this.commandQueue.pop()
-			const itemMaxAgeMilliseconds =
-				this.getQueueItemMaxAgeMilliseconds(item)
-			const itemAgeMilliseconds = Date.now() - item.enqueuedAt
-			if (
-				itemMaxAgeMilliseconds !== undefined &&
-				this.isQueueItemExpired(item)
-			) {
-				this.sysLogger.warn(
-					`[${getTimestamp()}] KNXClient: handleKNXQueue: dropping stale queued telegram ${this.getQueueItemDescription(item)} ageMs:${itemAgeMilliseconds} maxAgeMs:${itemMaxAgeMilliseconds}`,
-				)
-				continue
-			}
 
 			// Secure multicast gating: wait for timer authentication before sending RoutingIndication
 			if (
@@ -1495,7 +1285,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.sysLogger.error(
 					`KNXClient: handleKNXQueue: returning from processKnxPacketQueueItem ${JSON.stringify(item)}`,
 				)
-				// Drop only the failed item; keep the remaining queue for retry.
+				// Clear the queue
+				this.commandQueue = []
 				break
 			}
 
@@ -1515,19 +1306,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	send(
 		_knxPacket: KNXPacket,
-		_ACK: KNXTunnelingRequest | undefined,
+		_ACK: KNXTunnelingRequest,
 		_priority: boolean,
 		_expectedSeqNumberForACK: number,
 	): void {
-		const queueKind = this.classifyQueueItem(_knxPacket, _priority)
 		const toBeAdded: KNXQueueItem = {
 			knxPacket: _knxPacket,
 			ACK: _ACK,
 			expectedSeqNumberForACK: _expectedSeqNumberForACK,
-			enqueuedAt: Date.now(),
-			queueKind,
-			groupAddress: this.getQueueItemGroupAddress(_knxPacket, queueKind),
-			priority: _priority,
 		}
 
 		if (this._options.sniffingMode) {
@@ -1541,13 +1327,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			})
 
 			this.lastSnifferRequest = Date.now()
-		}
-
-		const coalescedItems = this.coalesceQueuedItems(toBeAdded)
-		if (coalescedItems > 0) {
-			this.sysLogger.debug(
-				`[${getTimestamp()}] KNXClient: coalesced ${coalescedItems} queued telegram(s) for ${this.getQueueItemDescription(toBeAdded)}`,
-			)
 		}
 
 		if (_priority) {
@@ -3108,43 +2887,32 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private async closeSocket() {
 		this.exitProcessingKNXQueueLoop = true // Exits KNX processing queue loop
-		if (!this._clientSocket) return
+		return new Promise<void>((resolve) => {
+			// already closed
+			if (!this._clientSocket) return
 
-		this.socketReady = false
+			this.socketReady = false
 
-		const client = this._clientSocket
+			const client = this._clientSocket
 
-		this._clientSocket = null
+			this._clientSocket = null
 
-		await new Promise<void>((resolve) => {
-			let settled = false
-			const done = () => {
-				if (settled) return
-				settled = true
+			const cb = () => {
 				resolve()
-			}
-
-			const timeout = setTimeout(done, 3000)
-			const finalize = () => {
-				clearTimeout(timeout)
-				done()
 			}
 
 			try {
 				if (client instanceof TCPSocket) {
-					client.once('close', finalize)
-					client.once('error', finalize)
 					// use destroy instead of end here to ensure socket is closed
 					client.destroy()
 				} else {
-					;(client as UDPSocket).close(finalize)
+					;(client as UDPSocket).close(cb)
 				}
 			} catch (error) {
-				clearTimeout(timeout)
 				this.sysLogger.error(
 					`KNXClient: into async closeSocket(): ${error.stack}`,
 				)
-				done()
+				resolve()
 			}
 		})
 	}
@@ -3405,10 +3173,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
 		let sProcessInboundLog = ''
-		let inboundHeader: KNXHeader | undefined
 		try {
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(msg)
-			inboundHeader = knxHeader
 
 			// If we're waiting on a heartbeat reply but receive any frame from the
 			// same peer, consider the connection alive and reset the heartbeat timer.
@@ -3789,15 +3555,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				)
 			}
 		} catch (e) {
-			const error = e instanceof Error ? e : new Error(String(e))
 			this.sysLogger.error(
-				`Received KNX packet: Error processing inbound message: ${error.message} ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}. This means that KNX-Ultimate received a malformed Header or CEMI message from your KNX Gateway.`,
-			)
-			this.emit(
-				KNXClientEvents.error,
-				new Error(
-					`Inbound ${this.getKNXConstantName(inboundHeader?.service_type) || 'unknown'} processing failed: ${error.message}`,
-				),
+				`Received KNX packet: Error processing inbound message: ${e.message} ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}. This means that KNX-Ultimate received a malformed Header or CEMI message from your KNX Gateway.`,
 			)
 		}
 	}
@@ -3990,8 +3749,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.tcpSocket.write(this.secureBuildSessionRequest())
 		// Session timeout
 		this._secureHandshakeSessionTimer = setTimeout(() => {
-			this.handleSecureHandshakeTimeout(
-				'Timeout waiting for SESSION_RESPONSE',
+			this.emit(
+				KNXClientEvents.error,
+				new Error('Timeout waiting for SESSION_RESPONSE'),
 			)
 		}, SECURE_SESSION_TIMEOUT_MS)
 	}
@@ -4057,8 +3817,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.tcpSocket.write(this.secureWrap(authFrame))
 				this._secureHandshakeState = 'auth'
 				this._secureHandshakeAuthTimer = setTimeout(() => {
-					this.handleSecureHandshakeTimeout(
-						'Timeout waiting for SESSION_STATUS',
+					this.emit(
+						KNXClientEvents.error,
+						new Error('Timeout waiting for SESSION_STATUS'),
 					)
 				}, SECURE_AUTH_TIMEOUT_MS)
 			} else if (type === KNXIP.SECURE_WRAPPER) {
@@ -4104,8 +3865,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this._secureHandshakeState = 'connect'
 						this._secureHandshakeConnectTimer = setTimeout(
 							() =>
-								this.handleSecureHandshakeTimeout(
-									'Timeout waiting for CONNECT_RESPONSE',
+								this.emit(
+									KNXClientEvents.error,
+									new Error(
+										'Timeout waiting for CONNECT_RESPONSE',
+									),
 								),
 							SECURE_CONNECT_TIMEOUT_MS,
 						)
@@ -4148,7 +3912,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 								)
 							}
 						} catch {}
-						this._secureHandshakeState = undefined
 						this._connectionState = ConncetionState.CONNECTED
 						this._numFailedTelegramACK = 0
 						this.clearToSend = true
@@ -4195,7 +3958,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				const status = frame[7]
 				if (status === 0) {
 					this._channelID = ch
-					this._secureHandshakeState = undefined
 					this._connectionState = ConncetionState.CONNECTED
 					this._numFailedTelegramACK = 0
 					this.clearToSend = true
