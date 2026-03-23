@@ -278,7 +278,9 @@ describe('KNXClient regressions', () => {
 			fired = true
 		}, 20)
 		;(client as any).clearAllTimers()
-		await new Promise((resolve) => setTimeout(resolve, 60))
+		await new Promise((resolve) => {
+			setTimeout(resolve, 60)
+		})
 
 		assert.equal(fired, false)
 		assert.equal(client['_secureHandshakeSessionTimer'], undefined)

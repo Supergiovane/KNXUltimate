@@ -491,7 +491,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this._options.KNXQueueMaxGroupResponseAgeMilliseconds,
 					),
 				) ||
-				Number(this._options.KNXQueueMaxGroupResponseAgeMilliseconds) < 0
+				Number(this._options.KNXQueueMaxGroupResponseAgeMilliseconds) <
+					0
 			) {
 				this._options.KNXQueueMaxGroupResponseAgeMilliseconds =
 					optionsDefaults.KNXQueueMaxGroupResponseAgeMilliseconds
@@ -3115,7 +3116,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		this._clientSocket = null
 
-		return new Promise<void>((resolve) => {
+		await new Promise<void>((resolve) => {
 			let settled = false
 			const done = () => {
 				if (settled) return
