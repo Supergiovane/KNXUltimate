@@ -1,5 +1,12 @@
 
 
+# [5.4.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.3.1...v5.4.0) (2026-03-23)
+
+
+### Bug Fixes
+
+* **core:** restore 5.2.11 transport baseline ([de4c952](https://github.com/Supergiovane/KNXUltimate/commit/de4c9522ec315742b9606162032a7e889418c356))
+
 ## [5.3.1](https://github.com/Supergiovane/KNXUltimate/compare/v5.3.0...v5.3.1) (2026-03-23)
 
 
