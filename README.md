@@ -45,7 +45,23 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 
 Please subscribe to my channel, to learn how to use it [![Youtube][youtube-image]][youtube-url]  
 
+## SUPPORT THIS PROJECT
+
+> KNXUltimate is developed and maintained in my free time, and I also cover infrastructure, devices, test setup, and development costs to keep it available for everyone.
+>
+> If this project saves you time, helps your work, or is part of your installation, please consider supporting it with a PayPal donation.
+>
+> **Even a small donation makes a real difference and helps keep the project alive, maintained, and free for the whole community.**
+
  [![Donate via PayPal](https://raw.githubusercontent.com/Supergiovane/node-red-contrib-knx-ultimate/master/img/CodiceQR.png)](https://www.paypal.com/donate/?hosted_button_id=S8SKPUBSPK758)
+
+  
+<br/> 
+<br/>   
+<br/> 
+<br/> 
+<br/>   
+<br/> 
 
 ## CONNECTION SETUP
 
@@ -660,14 +676,6 @@ All examples live in the [examples](./examples/) folder. You can run them direct
   - `npm run example:secure:tunnel` (secure tunnelling TCP)
   - `npm run example:secure:multicast` (secure routing multicast)
 
-### KNX/IP Tunnelling Server (UDP)
-
-Besides the `KNXClient`, this package also includes a small KNXnet/IP **tunnelling server** implementation, useful to accept connections from third-party KNX/IP tunnelling clients and bridge them via Node-RED (or your own glue code).
-
-- API: `KNXIPTunnelServer` (exported from the main entrypoint).
-- Output: emits `rawTelegram` events formatted like the Node-RED `knxUltimateMultiRouting` RAW messages (`payload.knx.*`), so you can reuse existing Filter logic.
-- Example: `examples/bridgeTunnelToNodeRedMsg.ts` (prints JSON to stdout).
-
 Examples overview:
 
 - **Recommended starting point → [template](./examples/template.ts):** well-commented skeleton showing how to configure plain vs secure connections, wire up core events, and encode/decode datapoint payloads. Use this file as a base for new scripts.
@@ -699,8 +707,6 @@ Examples overview:
   - Run: `npm run example:secure:multicast` or `node -r esbuild-register -e "require('./examples/sampleSecureMulticast.ts')"`
 - [dumpKeyringCredentials](./examples/dumpKeyringCredentials.ts): Loads a `.knxkeys` file, decrypts all stored tunnel passwords, authentication codes, device credentials, group keys, and backbone keys, and prints them to the console. Safe.
   - Run: `node -r esbuild-register -e "require('./examples/dumpKeyringCredentials.ts')" [path/to/keyring.knxkeys] [ets-password]`
-- [bridgeTunnelToNodeRedMsg](./examples/bridgeTunnelToNodeRedMsg.ts): Starts a KNX/IP tunnelling (UDP) server and prints **Node-RED MultiRouting RAW** messages to stdout (ready to be fed into the existing Filter/MultiRouting nodes).
-  - Run: `npm run example:bridge:noderedmsg` (then point a tunnelling client to this host:3671)
 
 ### Discovery details
 
