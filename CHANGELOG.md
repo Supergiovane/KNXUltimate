@@ -1,5 +1,13 @@
 
 
+# [5.3.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.11...v5.3.0) (2026-03-23)
+
+
+### Bug Fixes
+
+* **core:** add queue aging and coalescing ([0e6976b](https://github.com/Supergiovane/KNXUltimate/commit/0e6976b62f9e799fb84a5acfa7e6203488284320))
+* **core:** harden disconnect flow and DPT decoding ([b56b226](https://github.com/Supergiovane/KNXUltimate/commit/b56b2269622dd9bc777ee05ca2dff9c7d08eaceb))
+
 ## [5.2.11](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.10...v5.2.11) (2026-03-16)
 
 ## [5.2.10](https://github.com/Supergiovane/KNXUltimate/compare/v5.2.9...v5.2.10) (2026-03-16)
