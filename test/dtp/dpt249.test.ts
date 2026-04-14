@@ -23,7 +23,7 @@ describe('DPT249 (Brightness Colour Temperature Transition)', () => {
 				isAbsoluteBrightnessValid: true,
 			}
 
-			const result = DPT249.formatAPDU(validInput)
+			const result = DPT249.formatAPDU!(validInput)
 
 			assert.ok(Buffer.isBuffer(result), 'Expected result to be a Buffer')
 			assert.equal(result.length, 6)
@@ -55,7 +55,7 @@ describe('DPT249 (Brightness Colour Temperature Transition)', () => {
 				isAbsoluteBrightnessValid: false,
 			}
 
-			const maxResult = DPT249.formatAPDU(maxValues)
+			const maxResult = DPT249.formatAPDU!(maxValues)
 			assert.ok(
 				Buffer.isBuffer(maxResult),
 				'Expected maxResult to be a Buffer',
@@ -69,7 +69,7 @@ describe('DPT249 (Brightness Colour Temperature Transition)', () => {
 			assert.equal(maxResult[4], 100) // absoluteBrightness
 			assert.equal(maxResult[5], 0b00000111) // validityFlags
 
-			const minResult = DPT249.formatAPDU(minValues)
+			const minResult = DPT249.formatAPDU!(minValues)
 			assert.ok(
 				Buffer.isBuffer(minResult),
 				'Expected minResult to be a Buffer',
@@ -93,7 +93,7 @@ describe('DPT249 (Brightness Colour Temperature Transition)', () => {
 			buffer.writeUInt8(80, 4) // absoluteBrightness
 			buffer.writeUInt8(0b00000111, 5) // validity flags
 
-			const result = DPT249.fromBuffer(buffer)
+			const result = DPT249.fromBuffer!(buffer)
 			assert.ok(result !== null, 'Expected result to not be null')
 
 			assert.deepStrictEqual(result, {
@@ -114,7 +114,7 @@ describe('DPT249 (Brightness Colour Temperature Transition)', () => {
 
 			// Test all false
 			buffer.writeUInt8(0b00000000, 5)
-			const resultAllFalse = DPT249.fromBuffer(buffer)
+			const resultAllFalse = DPT249.fromBuffer!(buffer)
 			assert.ok(resultAllFalse !== null)
 			assert.equal(resultAllFalse.isTimePeriodValid, false)
 			assert.equal(resultAllFalse.isAbsoluteColourTemperatureValid, false)
@@ -122,7 +122,7 @@ describe('DPT249 (Brightness Colour Temperature Transition)', () => {
 
 			// Test mixed flags
 			buffer.writeUInt8(0b00000101, 5) // First and third true
-			const resultMixed = DPT249.fromBuffer(buffer)
+			const resultMixed = DPT249.fromBuffer!(buffer)
 			assert.ok(resultMixed !== null)
 			assert.equal(resultMixed.isTimePeriodValid, true)
 			assert.equal(resultMixed.isAbsoluteColourTemperatureValid, false)
@@ -130,9 +130,9 @@ describe('DPT249 (Brightness Colour Temperature Transition)', () => {
 		})
 
 		test('should handle invalid buffer lengths', () => {
-			assert.strictEqual(DPT249.fromBuffer(Buffer.alloc(0)), null)
-			assert.strictEqual(DPT249.fromBuffer(Buffer.alloc(5)), null)
-			assert.strictEqual(DPT249.fromBuffer(Buffer.alloc(7)), null)
+			assert.strictEqual(DPT249.fromBuffer!(Buffer.alloc(0)), null)
+			assert.strictEqual(DPT249.fromBuffer!(Buffer.alloc(5)), null)
+			assert.strictEqual(DPT249.fromBuffer!(Buffer.alloc(7)), null)
 		})
 	})
 })

@@ -14,7 +14,7 @@ import DPT235 from '../../src/dptlib/dpt235'
 describe('DPT235 (Tariff Active Energy)', () => {
 	describe('formatAPDU', () => {
 		test('should correctly format valid input objects', () => {
-			const result = DPT235.formatAPDU({
+			const result = DPT235.formatAPDU!({
 				activeElectricalEnergy: 1540,
 				tariff: 20,
 				validityTariff: true,
@@ -38,7 +38,7 @@ describe('DPT235 (Tariff Active Energy)', () => {
 		})
 
 		test('should handle negative energy values', () => {
-			const result = DPT235.formatAPDU({
+			const result = DPT235.formatAPDU!({
 				activeElectricalEnergy: -1540,
 				tariff: 20,
 				validityTariff: true,
@@ -95,7 +95,7 @@ describe('DPT235 (Tariff Active Energy)', () => {
 			]
 
 			testCases.forEach((testCase) => {
-				const result = DPT235.formatAPDU(testCase.input)
+				const result = DPT235.formatAPDU!(testCase.input)
 				assert.equal(result[5], testCase.expectedValidity)
 			})
 		})
@@ -113,7 +113,7 @@ describe('DPT235 (Tariff Active Energy)', () => {
 			]
 
 			invalidInputs.forEach((input) => {
-				const result = DPT235.formatAPDU(input)
+				const result = DPT235.formatAPDU!(input)
 				assert.equal(result, null)
 			})
 		})
@@ -127,7 +127,7 @@ describe('DPT235 (Tariff Active Energy)', () => {
 			buffer[4] = 20 // tariff
 			buffer[5] = 0b00000011 // validityTariff and validityEnergy both true
 
-			const result = DPT235.fromBuffer(buffer)
+			const result = DPT235.fromBuffer!(buffer)
 
 			assert.deepEqual(result, {
 				activeElectricalEnergy: 1540,
@@ -143,7 +143,7 @@ describe('DPT235 (Tariff Active Energy)', () => {
 			buffer[4] = 20
 			buffer[5] = 0b00000011
 
-			const result = DPT235.fromBuffer(buffer)
+			const result = DPT235.fromBuffer!(buffer)
 
 			assert.deepEqual(result, {
 				activeElectricalEnergy: -1540,
@@ -179,7 +179,7 @@ describe('DPT235 (Tariff Active Energy)', () => {
 				buffer[4] = 1
 				buffer[5] = testCase.validity
 
-				const result = DPT235.fromBuffer(buffer)
+				const result = DPT235.fromBuffer!(buffer)
 				assert.equal(
 					result.validityTariff,
 					testCase.expected.validityTariff,

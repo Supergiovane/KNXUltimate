@@ -20,13 +20,13 @@ describe('DPT60001 (Griesser Object)', () => {
 				sectors: [159],
 			}
 
-			const result = DPT60001.formatAPDU(input)
+			const result = DPT60001.formatAPDU!(input)
 
 			assert.ok(Buffer.isBuffer(result))
 			assert.equal(result.length, 6)
 			// Instead of checking specific byte values, we can verify that
 			// the buffer is correctly formatted by using fromBuffer
-			const decoded = DPT60001.fromBuffer(result)
+			const decoded = DPT60001.fromBuffer!(result)
 			assert.ok(decoded)
 			assert.equal(decoded.command, 'operation code')
 			assert.deepEqual(decoded.sectors, [159])
@@ -37,14 +37,14 @@ describe('DPT60001 (Griesser Object)', () => {
 
 		test('should handle invalid inputs', () => {
 			// Null value
-			assert.equal(DPT60001.formatAPDU(null), null)
+			assert.equal(DPT60001.formatAPDU!(null), null)
 
 			// Missing required properties
-			assert.equal(DPT60001.formatAPDU({} as any), null)
+			assert.equal(DPT60001.formatAPDU!({} as any), null)
 
 			// Invalid data array
 			assert.equal(
-				DPT60001.formatAPDU({
+				DPT60001.formatAPDU!({
 					command: 'operation code',
 					data: ['invalid', 'long up'],
 					sectors: [159],
@@ -54,7 +54,7 @@ describe('DPT60001 (Griesser Object)', () => {
 
 			// Missing sectors
 			assert.equal(
-				DPT60001.formatAPDU({
+				DPT60001.formatAPDU!({
 					command: 'operation code',
 					data: ['localoperation', 'long up'],
 				} as any),
@@ -71,10 +71,10 @@ describe('DPT60001 (Griesser Object)', () => {
 				data: ['localoperation', 'long up'],
 				sectors: [42],
 			}
-			const buffer = DPT60001.formatAPDU(input)
+			const buffer = DPT60001.formatAPDU!(input)
 			assert.ok(buffer)
 
-			const result = DPT60001.fromBuffer(buffer)
+			const result = DPT60001.fromBuffer!(buffer)
 			assert.ok(result)
 			assert.equal(result.command, 'operation code')
 			assert.deepEqual(result.sectors, [42])
@@ -83,11 +83,11 @@ describe('DPT60001 (Griesser Object)', () => {
 
 		test('should handle invalid buffer length', () => {
 			// Test buffer too short
-			assert.equal(DPT60001.fromBuffer(Buffer.from([1, 2, 3])), null)
+			assert.equal(DPT60001.fromBuffer!(Buffer.from([1, 2, 3])), null)
 
 			// Test buffer too long
 			assert.equal(
-				DPT60001.fromBuffer(Buffer.from([1, 2, 3, 4, 5, 6, 7])),
+				DPT60001.fromBuffer!(Buffer.from([1, 2, 3, 4, 5, 6, 7])),
 				null,
 			)
 		})
@@ -115,9 +115,9 @@ describe('DPT60001 (Griesser Object)', () => {
 			]
 
 			for (const testCase of testCases) {
-				const buffer = DPT60001.formatAPDU(testCase.input)
+				const buffer = DPT60001.formatAPDU!(testCase.input)
 				assert.ok(buffer)
-				const result = DPT60001.fromBuffer(buffer)
+				const result = DPT60001.fromBuffer!(buffer)
 				assert.ok(result)
 				assert.equal(result.command, testCase.expectedCommand)
 			}
@@ -132,9 +132,9 @@ describe('DPT60001 (Griesser Object)', () => {
 				sectors: [42],
 			}
 
-			const buffer = DPT60001.formatAPDU(original)
+			const buffer = DPT60001.formatAPDU!(original)
 			assert.ok(buffer)
-			const decoded = DPT60001.fromBuffer(buffer)
+			const decoded = DPT60001.fromBuffer!(buffer)
 			assert.ok(decoded)
 
 			assert.equal(decoded.command, original.command)

@@ -23,7 +23,7 @@ describe('DPT237 (DALI Control Gear Diagnostic)', () => {
 				convertorError: false,
 			}
 
-			const result = DPT237.formatAPDU(value)
+			const result = DPT237.formatAPDU!(value)
 			assert.ok(Buffer.isBuffer(result))
 			assert.equal(result.length, 2)
 			assert.deepEqual(result, Buffer.from([0b00000000, 0b00001000]))
@@ -39,7 +39,7 @@ describe('DPT237 (DALI Control Gear Diagnostic)', () => {
 				convertorError: true,
 			}
 
-			const result = DPT237.formatAPDU(value)
+			const result = DPT237.formatAPDU!(value)
 			assert.ok(Buffer.isBuffer(result))
 			assert.equal(result.length, 2)
 			assert.deepEqual(result, Buffer.from([0b00000111, 0b11111111]))
@@ -55,7 +55,7 @@ describe('DPT237 (DALI Control Gear Diagnostic)', () => {
 				ballastFailure: false,
 				convertorError: false,
 			}
-			const minResult = DPT237.formatAPDU(minValue)
+			const minResult = DPT237.formatAPDU!(minValue)
 			assert.deepEqual(minResult, Buffer.from([0b00000000, 0b00000000]))
 
 			// Test maximum dali address
@@ -67,7 +67,7 @@ describe('DPT237 (DALI Control Gear Diagnostic)', () => {
 				ballastFailure: false,
 				convertorError: false,
 			}
-			const maxResult = DPT237.formatAPDU(maxValue)
+			const maxResult = DPT237.formatAPDU!(maxValue)
 			assert.ok(Buffer.isBuffer(maxResult))
 			assert.equal(maxResult.length, 2)
 		})
@@ -76,7 +76,7 @@ describe('DPT237 (DALI Control Gear Diagnostic)', () => {
 	describe('fromBuffer', () => {
 		test('should correctly parse valid buffers', () => {
 			// Test all flags false, address 8
-			const result1 = DPT237.fromBuffer(
+			const result1 = DPT237.fromBuffer!(
 				Buffer.from([0b00000000, 0b00001000]),
 			)
 			assert.deepEqual(result1, {
@@ -89,7 +89,7 @@ describe('DPT237 (DALI Control Gear Diagnostic)', () => {
 			})
 
 			// Test all flags true, max address
-			const result2 = DPT237.fromBuffer(
+			const result2 = DPT237.fromBuffer!(
 				Buffer.from([0b00000111, 0b11111111]),
 			)
 			assert.deepEqual(result2, {
@@ -103,7 +103,7 @@ describe('DPT237 (DALI Control Gear Diagnostic)', () => {
 		})
 
 		test('should handle mixed flag states', () => {
-			const result = DPT237.fromBuffer(
+			const result = DPT237.fromBuffer!(
 				Buffer.from([0b00000101, 0b10100110]),
 			)
 			assert.deepEqual(result, {
@@ -118,23 +118,23 @@ describe('DPT237 (DALI Control Gear Diagnostic)', () => {
 
 		test('should handle invalid buffer lengths', () => {
 			// Test buffer too short
-			assert.strictEqual(DPT237.fromBuffer(Buffer.from([0x00])), null)
+			assert.strictEqual(DPT237.fromBuffer!(Buffer.from([0x00])), null)
 
 			// Test buffer too long
 			assert.strictEqual(
-				DPT237.fromBuffer(Buffer.from([0x00, 0x00, 0x00])),
+				DPT237.fromBuffer!(Buffer.from([0x00, 0x00, 0x00])),
 				null,
 			)
 
 			// Test empty buffer
-			assert.strictEqual(DPT237.fromBuffer(Buffer.from([])), null)
+			assert.strictEqual(DPT237.fromBuffer!(Buffer.from([])), null)
 		})
 	})
 
 	describe('Helper functions behavior', () => {
 		test('should correctly convert between binary representations', () => {
 			// Test hex2bin function through fromBuffer
-			const hexResult = DPT237.fromBuffer(Buffer.from([0xff, 0xff]))
+			const hexResult = DPT237.fromBuffer!(Buffer.from([0xff, 0xff]))
 			assert.equal(hexResult.lampFailure, true)
 			assert.equal(hexResult.ballastFailure, true)
 			assert.equal(hexResult.convertorError, true)
@@ -148,7 +148,7 @@ describe('DPT237 (DALI Control Gear Diagnostic)', () => {
 				ballastFailure: false,
 				convertorError: false,
 			}
-			const decResult = DPT237.formatAPDU(testValue)
+			const decResult = DPT237.formatAPDU!(testValue)
 			assert.deepEqual(decResult, Buffer.from([0b00000000, 0b00101010]))
 		})
 	})

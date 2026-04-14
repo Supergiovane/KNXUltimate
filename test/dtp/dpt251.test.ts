@@ -25,7 +25,7 @@ describe('DPT251 (RGBW array)', () => {
 				mW: 1,
 			}
 
-			const result = DPT251.formatAPDU(testValue)
+			const result = DPT251.formatAPDU!(testValue)
 			assert.ok(Buffer.isBuffer(result))
 			assert.equal(result.length, 6)
 			assert.deepEqual(result, Buffer.from([90, 200, 30, 120, 0, 15])) // 15 = 0b00001111 for all valid bits
@@ -54,13 +54,13 @@ describe('DPT251 (RGBW array)', () => {
 				mW: 0,
 			}
 
-			const maxResult = DPT251.formatAPDU(maxValue)
+			const maxResult = DPT251.formatAPDU!(maxValue)
 			assert.deepEqual(
 				maxResult,
 				Buffer.from([255, 255, 255, 255, 0, 15]),
 			)
 
-			const minResult = DPT251.formatAPDU(minValue)
+			const minResult = DPT251.formatAPDU!(minValue)
 			assert.deepEqual(minResult, Buffer.from([0, 0, 0, 0, 0, 0]))
 		})
 
@@ -76,7 +76,7 @@ describe('DPT251 (RGBW array)', () => {
 				mW: 0,
 			}
 
-			const result = DPT251.formatAPDU(partialValid)
+			const result = DPT251.formatAPDU!(partialValid)
 			assert.deepEqual(result, Buffer.from([100, 150, 200, 250, 0, 10])) // 10 = 0b00001010 for R and B valid
 		})
 
@@ -92,7 +92,7 @@ describe('DPT251 (RGBW array)', () => {
 				mW: 1,
 			}
 
-			const result = DPT251.formatAPDU(decimalValues)
+			const result = DPT251.formatAPDU!(decimalValues)
 			assert.deepEqual(result, Buffer.from([100, 150, 200, 250, 0, 15]))
 		})
 	})
@@ -100,7 +100,7 @@ describe('DPT251 (RGBW array)', () => {
 	describe('fromBuffer', () => {
 		test('should correctly parse valid buffers', () => {
 			const buffer = Buffer.from([90, 200, 30, 120, 0, 15]) // All valid bits set
-			const result = DPT251.fromBuffer(buffer)
+			const result = DPT251.fromBuffer!(buffer)
 
 			assert.deepEqual(result, {
 				red: 90,
@@ -117,7 +117,7 @@ describe('DPT251 (RGBW array)', () => {
 		test('should handle different validity combinations', () => {
 			// Only R and B valid (0b00001010 = 10)
 			const buffer = Buffer.from([100, 150, 200, 250, 0, 10])
-			const result = DPT251.fromBuffer(buffer)
+			const result = DPT251.fromBuffer!(buffer)
 
 			assert.deepEqual(result, {
 				red: 100,
@@ -133,7 +133,7 @@ describe('DPT251 (RGBW array)', () => {
 
 		test('should preserve validity bit positions when leading zeros are present', () => {
 			assert.deepEqual(
-				DPT251.fromBuffer(Buffer.from([1, 2, 3, 4, 0, 5])),
+				DPT251.fromBuffer!(Buffer.from([1, 2, 3, 4, 0, 5])),
 				{
 					red: 1,
 					green: 2,
@@ -147,7 +147,7 @@ describe('DPT251 (RGBW array)', () => {
 			)
 
 			assert.deepEqual(
-				DPT251.fromBuffer(Buffer.from([5, 6, 7, 8, 0, 1])),
+				DPT251.fromBuffer!(Buffer.from([5, 6, 7, 8, 0, 1])),
 				{
 					red: 5,
 					green: 6,
@@ -161,7 +161,7 @@ describe('DPT251 (RGBW array)', () => {
 			)
 
 			assert.deepEqual(
-				DPT251.fromBuffer(Buffer.from([9, 10, 11, 12, 0, 3])),
+				DPT251.fromBuffer!(Buffer.from([9, 10, 11, 12, 0, 3])),
 				{
 					red: 9,
 					green: 10,
@@ -177,7 +177,7 @@ describe('DPT251 (RGBW array)', () => {
 
 		test('should handle boundary values', () => {
 			const maxBuffer = Buffer.from([255, 255, 255, 255, 0, 15])
-			const maxResult = DPT251.fromBuffer(maxBuffer)
+			const maxResult = DPT251.fromBuffer!(maxBuffer)
 
 			assert.deepEqual(maxResult, {
 				red: 255,
@@ -191,7 +191,7 @@ describe('DPT251 (RGBW array)', () => {
 			})
 
 			const minBuffer = Buffer.from([0, 0, 0, 0, 0, 0])
-			const minResult = DPT251.fromBuffer(minBuffer)
+			const minResult = DPT251.fromBuffer!(minBuffer)
 
 			assert.deepEqual(minResult, {
 				red: 0,
@@ -207,16 +207,16 @@ describe('DPT251 (RGBW array)', () => {
 
 		test('should handle invalid buffer lengths', () => {
 			// Too short
-			assert.equal(DPT251.fromBuffer(Buffer.from([1, 2, 3, 4, 5])), null)
+			assert.equal(DPT251.fromBuffer!(Buffer.from([1, 2, 3, 4, 5])), null)
 
 			// Too long
 			assert.equal(
-				DPT251.fromBuffer(Buffer.from([1, 2, 3, 4, 5, 6, 7])),
+				DPT251.fromBuffer!(Buffer.from([1, 2, 3, 4, 5, 6, 7])),
 				null,
 			)
 
 			// Empty buffer
-			assert.equal(DPT251.fromBuffer(Buffer.from([])), null)
+			assert.equal(DPT251.fromBuffer!(Buffer.from([])), null)
 		})
 	})
 })

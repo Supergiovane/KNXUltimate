@@ -32,7 +32,7 @@ describe('DPT22 (2-byte RHCC status)', () => {
 				OverheatAlarm: false,
 				reserved: false,
 			}
-			const result = DPT22.formatAPDU(value)
+			const result = DPT22.formatAPDU!(value)
 			assert.deepEqual(result, Buffer.from([0x00, 0x00]))
 		})
 
@@ -55,7 +55,7 @@ describe('DPT22 (2-byte RHCC status)', () => {
 				OverheatAlarm: true,
 				reserved: true,
 			}
-			const result = DPT22.formatAPDU(value)
+			const result = DPT22.formatAPDU!(value)
 			assert.deepEqual(result, Buffer.from([0xff, 0xff]))
 		})
 
@@ -78,7 +78,7 @@ describe('DPT22 (2-byte RHCC status)', () => {
 				OverheatAlarm: true,
 				reserved: false,
 			}
-			const result = DPT22.formatAPDU(value)
+			const result = DPT22.formatAPDU!(value)
 			assert.deepEqual(result, Buffer.from([0x55, 0x55]))
 		})
 
@@ -88,7 +88,7 @@ describe('DPT22 (2-byte RHCC status)', () => {
 				HeatingDisabled: true,
 				// All other properties missing
 			}
-			const result = DPT22.formatAPDU(partialValue)
+			const result = DPT22.formatAPDU!(partialValue)
 			// Missing properties should default to false, except reserved which defaults to true
 			assert.deepEqual(result, Buffer.from([0x80, 0x81]))
 		})
@@ -96,7 +96,7 @@ describe('DPT22 (2-byte RHCC status)', () => {
 
 	describe('fromBuffer', () => {
 		test('should correctly parse buffer with all flags false', () => {
-			const result = DPT22.fromBuffer(Buffer.from([0x00, 0x00]))
+			const result = DPT22.fromBuffer!(Buffer.from([0x00, 0x00]))
 			const expected = {
 				Fault: false,
 				StatusEcoH: false,
@@ -119,7 +119,7 @@ describe('DPT22 (2-byte RHCC status)', () => {
 		})
 
 		test('should correctly parse buffer with all flags true', () => {
-			const result = DPT22.fromBuffer(Buffer.from([0xff, 0xff]))
+			const result = DPT22.fromBuffer!(Buffer.from([0xff, 0xff]))
 			const expected = {
 				Fault: true,
 				StatusEcoH: true,
@@ -142,7 +142,7 @@ describe('DPT22 (2-byte RHCC status)', () => {
 		})
 
 		test('should correctly parse buffer with alternating flags', () => {
-			const result = DPT22.fromBuffer(Buffer.from([0x55, 0x55]))
+			const result = DPT22.fromBuffer!(Buffer.from([0x55, 0x55]))
 			const expected = {
 				Fault: true,
 				StatusEcoH: false,
@@ -165,10 +165,10 @@ describe('DPT22 (2-byte RHCC status)', () => {
 		})
 
 		test('should handle invalid buffer lengths', () => {
-			assert.equal(DPT22.fromBuffer(Buffer.from([])), null)
-			assert.equal(DPT22.fromBuffer(Buffer.from([0x00])), null)
+			assert.equal(DPT22.fromBuffer!(Buffer.from([])), null)
+			assert.equal(DPT22.fromBuffer!(Buffer.from([0x00])), null)
 			assert.equal(
-				DPT22.fromBuffer(Buffer.from([0x00, 0x00, 0x00])),
+				DPT22.fromBuffer!(Buffer.from([0x00, 0x00, 0x00])),
 				null,
 			)
 		})

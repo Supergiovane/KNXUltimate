@@ -21,7 +21,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				buildingProtection: 15,
 			}
 
-			const result = DPT275.formatAPDU(value)
+			const result = DPT275.formatAPDU!(value)
 			assert.ok(Buffer.isBuffer(result))
 			assert.equal(result.length, 8) // 4 values * 2 bytes each
 		})
@@ -33,7 +33,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				standby: 21.5,
 				economy: 21,
 			}
-			assert.equal(DPT275.formatAPDU(value1), null)
+			assert.equal(DPT275.formatAPDU!(value1), null)
 
 			// Missing comfort
 			const value2 = {
@@ -41,7 +41,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				economy: 21,
 				buildingProtection: 15,
 			}
-			assert.equal(DPT275.formatAPDU(value2), null)
+			assert.equal(DPT275.formatAPDU!(value2), null)
 
 			// Missing economy
 			const value3 = {
@@ -49,7 +49,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				standby: 21.5,
 				buildingProtection: 15,
 			}
-			assert.equal(DPT275.formatAPDU(value3), null)
+			assert.equal(DPT275.formatAPDU!(value3), null)
 
 			// Missing standby
 			const value4 = {
@@ -57,7 +57,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				economy: 21,
 				buildingProtection: 15,
 			}
-			assert.equal(DPT275.formatAPDU(value4), null)
+			assert.equal(DPT275.formatAPDU!(value4), null)
 		})
 	})
 
@@ -75,7 +75,7 @@ describe('DPT275 (Quadruple setpoints)', () => {
 				0x70, // buildingProtection: 15°C
 			])
 
-			const result = DPT275.fromBuffer(buffer)
+			const result = DPT275.fromBuffer!(buffer)
 			assert.ok(result)
 			assert.ok(typeof result === 'object')
 			assert.ok('comfort' in result)
@@ -86,13 +86,13 @@ describe('DPT275 (Quadruple setpoints)', () => {
 
 		test('should return null for invalid buffer lengths', () => {
 			// Empty buffer
-			assert.equal(DPT275.fromBuffer(Buffer.from([])), null)
+			assert.equal(DPT275.fromBuffer!(Buffer.from([])), null)
 
 			// Buffer too short (7 bytes)
-			assert.equal(DPT275.fromBuffer(Buffer.alloc(7)), null)
+			assert.equal(DPT275.fromBuffer!(Buffer.alloc(7)), null)
 
 			// Buffer too long (9 bytes)
-			assert.equal(DPT275.fromBuffer(Buffer.alloc(9)), null)
+			assert.equal(DPT275.fromBuffer!(Buffer.alloc(9)), null)
 		})
 
 		test('should parse a complete cycle of values', () => {
@@ -104,11 +104,11 @@ describe('DPT275 (Quadruple setpoints)', () => {
 			}
 
 			// First format to buffer
-			const buffer = DPT275.formatAPDU(originalValues)
+			const buffer = DPT275.formatAPDU!(originalValues)
 			assert.ok(buffer)
 
 			// Then parse back
-			const result = DPT275.fromBuffer(buffer)
+			const result = DPT275.fromBuffer!(buffer)
 			assert.ok(result)
 
 			// Check if values are approximately equal (floating point comparison)

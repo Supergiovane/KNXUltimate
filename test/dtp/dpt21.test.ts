@@ -16,7 +16,7 @@ describe('DPT21 (General Status)', () => {
 		test('should correctly format valid status objects', () => {
 			// All flags false
 			assert.deepEqual(
-				DPT21.formatAPDU({
+				DPT21.formatAPDU!({
 					outOfService: false,
 					fault: false,
 					overridden: false,
@@ -28,7 +28,7 @@ describe('DPT21 (General Status)', () => {
 
 			// All flags true
 			assert.deepEqual(
-				DPT21.formatAPDU({
+				DPT21.formatAPDU!({
 					outOfService: true,
 					fault: true,
 					overridden: true,
@@ -40,7 +40,7 @@ describe('DPT21 (General Status)', () => {
 
 			// Mixed flags
 			assert.deepEqual(
-				DPT21.formatAPDU({
+				DPT21.formatAPDU!({
 					outOfService: true,
 					fault: false,
 					overridden: true,
@@ -55,7 +55,7 @@ describe('DPT21 (General Status)', () => {
 	describe('fromBuffer', () => {
 		test('should correctly parse valid buffers', () => {
 			// All bits 0
-			assert.deepEqual(DPT21.fromBuffer(Buffer.from([0b00000000])), {
+			assert.deepEqual(DPT21.fromBuffer!(Buffer.from([0b00000000])), {
 				outOfService: false,
 				fault: false,
 				overridden: false,
@@ -64,7 +64,7 @@ describe('DPT21 (General Status)', () => {
 			})
 
 			// All relevant bits 1
-			assert.deepEqual(DPT21.fromBuffer(Buffer.from([0b00011111])), {
+			assert.deepEqual(DPT21.fromBuffer!(Buffer.from([0b00011111])), {
 				outOfService: true,
 				fault: true,
 				overridden: true,
@@ -73,7 +73,7 @@ describe('DPT21 (General Status)', () => {
 			})
 
 			// Mixed bits
-			assert.deepEqual(DPT21.fromBuffer(Buffer.from([0b00010101])), {
+			assert.deepEqual(DPT21.fromBuffer!(Buffer.from([0b00010101])), {
 				outOfService: true,
 				fault: false,
 				overridden: true,
@@ -82,7 +82,7 @@ describe('DPT21 (General Status)', () => {
 			})
 
 			// Reserved bits should be ignored (bits 5-7)
-			assert.deepEqual(DPT21.fromBuffer(Buffer.from([0b11110101])), {
+			assert.deepEqual(DPT21.fromBuffer!(Buffer.from([0b11110101])), {
 				outOfService: true,
 				fault: false,
 				overridden: true,
@@ -93,10 +93,10 @@ describe('DPT21 (General Status)', () => {
 
 		test('should handle invalid buffer lengths', () => {
 			// Empty buffer
-			assert.strictEqual(DPT21.fromBuffer(Buffer.from([])), null)
+			assert.strictEqual(DPT21.fromBuffer!(Buffer.from([])), null)
 
 			// Buffer too long
-			assert.strictEqual(DPT21.fromBuffer(Buffer.from([0, 1])), null)
+			assert.strictEqual(DPT21.fromBuffer!(Buffer.from([0, 1])), null)
 		})
 	})
 })

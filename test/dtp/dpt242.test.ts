@@ -22,7 +22,7 @@ describe('DPT242 (RGB xyY)', () => {
 				isBrightnessValid: true,
 			}
 
-			const result = DPT242.formatAPDU(validValue)
+			const result = DPT242.formatAPDU!(validValue)
 			assert.ok(Buffer.isBuffer(result))
 			assert.equal(result.length, 6)
 
@@ -48,7 +48,7 @@ describe('DPT242 (RGB xyY)', () => {
 				isBrightnessValid: true,
 			}
 
-			const result = DPT242.formatAPDU(maxValue)
+			const result = DPT242.formatAPDU!(maxValue)
 			assert.equal((result[0] << 8) | result[1], 65535) // x
 			assert.equal((result[2] << 8) | result[3], 65535) // y
 			assert.equal(result[4], 100) // brightness
@@ -62,7 +62,7 @@ describe('DPT242 (RGB xyY)', () => {
 				isBrightnessValid: false,
 			}
 
-			const resultMin = DPT242.formatAPDU(minValue)
+			const resultMin = DPT242.formatAPDU!(minValue)
 			assert.equal((resultMin[0] << 8) | resultMin[1], 0) // x
 			assert.equal((resultMin[2] << 8) | resultMin[3], 0) // y
 			assert.equal(resultMin[4], 0) // brightness
@@ -78,7 +78,7 @@ describe('DPT242 (RGB xyY)', () => {
 				isBrightnessValid: false,
 			}
 
-			const result1 = DPT242.formatAPDU(colorValidOnly)
+			const result1 = DPT242.formatAPDU!(colorValidOnly)
 			assert.equal(result1[5], 0b00000010)
 
 			const brightnessValidOnly = {
@@ -89,7 +89,7 @@ describe('DPT242 (RGB xyY)', () => {
 				isBrightnessValid: true,
 			}
 
-			const result2 = DPT242.formatAPDU(brightnessValidOnly)
+			const result2 = DPT242.formatAPDU!(brightnessValidOnly)
 			assert.equal(result2[5], 0b00000001)
 		})
 	})
@@ -106,7 +106,7 @@ describe('DPT242 (RGB xyY)', () => {
 				0x03, // both flags set
 			])
 
-			const result = DPT242.fromBuffer(buffer)
+			const result = DPT242.fromBuffer!(buffer)
 			assert.deepStrictEqual(result, {
 				x: 1000,
 				y: 2000,
@@ -126,7 +126,7 @@ describe('DPT242 (RGB xyY)', () => {
 				0x03, // both flags
 			])
 
-			const maxResult = DPT242.fromBuffer(maxBuffer)
+			const maxResult = DPT242.fromBuffer!(maxBuffer)
 			assert.deepStrictEqual(maxResult, {
 				x: 65535,
 				y: 65535,
@@ -136,7 +136,7 @@ describe('DPT242 (RGB xyY)', () => {
 			})
 
 			const minBuffer = Buffer.alloc(6) // All zeros
-			const minResult = DPT242.fromBuffer(minBuffer)
+			const minResult = DPT242.fromBuffer!(minBuffer)
 			assert.deepStrictEqual(minResult, {
 				x: 0,
 				y: 0,
@@ -156,7 +156,7 @@ describe('DPT242 (RGB xyY)', () => {
 				0x02, // only color valid
 			])
 
-			const result1 = DPT242.fromBuffer(buffer1)
+			const result1 = DPT242.fromBuffer!(buffer1)
 			assert.strictEqual(result1.isColorValid, true)
 			assert.strictEqual(result1.isBrightnessValid, false)
 
@@ -169,15 +169,15 @@ describe('DPT242 (RGB xyY)', () => {
 				0x01, // only brightness valid
 			])
 
-			const result2 = DPT242.fromBuffer(buffer2)
+			const result2 = DPT242.fromBuffer!(buffer2)
 			assert.strictEqual(result2.isColorValid, false)
 			assert.strictEqual(result2.isBrightnessValid, true)
 		})
 
 		test('should return null for invalid buffer length', () => {
-			assert.strictEqual(DPT242.fromBuffer(Buffer.alloc(0)), null)
-			assert.strictEqual(DPT242.fromBuffer(Buffer.alloc(5)), null)
-			assert.strictEqual(DPT242.fromBuffer(Buffer.alloc(7)), null)
+			assert.strictEqual(DPT242.fromBuffer!(Buffer.alloc(0)), null)
+			assert.strictEqual(DPT242.fromBuffer!(Buffer.alloc(5)), null)
+			assert.strictEqual(DPT242.fromBuffer!(Buffer.alloc(7)), null)
 		})
 	})
 })

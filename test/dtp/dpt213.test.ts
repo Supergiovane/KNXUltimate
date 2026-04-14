@@ -21,7 +21,7 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				BuildingProtection: -1,
 			}
 
-			const result = DPT213.formatAPDU(validTemp)
+			const result = DPT213.formatAPDU!(validTemp)
 			assert.ok(Buffer.isBuffer(result))
 			assert.equal(result?.length, 8)
 		})
@@ -34,7 +34,7 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				BuildingProtection: 500,
 			}
 
-			const result = DPT213.formatAPDU(boundaryValues)
+			const result = DPT213.formatAPDU!(boundaryValues)
 			assert.ok(Buffer.isBuffer(result))
 			assert.equal(result?.length, 8)
 		})
@@ -47,7 +47,7 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				BuildingProtection: -1,
 			}
 
-			const result = DPT213.formatAPDU(invalidTemp)
+			const result = DPT213.formatAPDU!(invalidTemp)
 			assert.equal(result, null)
 
 			const invalidTemp2 = {
@@ -57,13 +57,13 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				BuildingProtection: -1,
 			}
 
-			const result2 = DPT213.formatAPDU(invalidTemp2)
+			const result2 = DPT213.formatAPDU!(invalidTemp2)
 			assert.equal(result2, null)
 		})
 
 		test('should return undefined for invalid object structure', () => {
 			// Test missing properties
-			const result1 = DPT213.formatAPDU({
+			const result1 = DPT213.formatAPDU!({
 				Comfort: 21.4,
 				Standby: 20,
 				Economy: 18.2,
@@ -72,7 +72,7 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 			assert.equal(result1, null)
 
 			// Test wrong property names
-			const result2 = DPT213.formatAPDU({
+			const result2 = DPT213.formatAPDU!({
 				comfort: 21.4,
 				standby: 20,
 				economy: 18.2,
@@ -91,10 +91,10 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				BuildingProtection: -1,
 			}
 
-			const buffer = DPT213.formatAPDU(validTemp)
+			const buffer = DPT213.formatAPDU!(validTemp)
 			assert.ok(buffer)
 
-			const result = DPT213.fromBuffer(buffer)
+			const result = DPT213.fromBuffer!(buffer)
 			assert.ok(result)
 
 			// Check properties existence and type
@@ -123,10 +123,10 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				BuildingProtection: 500,
 			}
 
-			const buffer = DPT213.formatAPDU(boundaryValues)
+			const buffer = DPT213.formatAPDU!(boundaryValues)
 			assert.ok(buffer)
 
-			const result = DPT213.fromBuffer(buffer)
+			const result = DPT213.fromBuffer!(buffer)
 			assert.ok(result)
 
 			// Check properties existence and type
@@ -157,9 +157,9 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 		})
 
 		test('should return null for invalid buffer length', () => {
-			assert.equal(DPT213.fromBuffer(Buffer.alloc(6)), null)
-			assert.equal(DPT213.fromBuffer(Buffer.alloc(10)), null)
-			assert.equal(DPT213.fromBuffer(Buffer.alloc(0)), null)
+			assert.equal(DPT213.fromBuffer!(Buffer.alloc(6)), null)
+			assert.equal(DPT213.fromBuffer!(Buffer.alloc(10)), null)
+			assert.equal(DPT213.fromBuffer!(Buffer.alloc(0)), null)
 		})
 
 		test('should maintain precision for decimal values', () => {
@@ -170,10 +170,10 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				BuildingProtection: -1.08,
 			}
 
-			const apdu = DPT213.formatAPDU(testValues)
+			const apdu = DPT213.formatAPDU!(testValues)
 			assert.ok(Buffer.isBuffer(apdu))
 
-			const result = DPT213.fromBuffer(apdu)
+			const result = DPT213.fromBuffer!(apdu)
 			assert.ok(result)
 
 			const delta = 0.03
@@ -197,10 +197,10 @@ describe('DPT213 (4x 16-Bit Signed Value)', () => {
 				BuildingProtection: -1,
 			}
 
-			const encoded = DPT213.formatAPDU(originalValues)
+			const encoded = DPT213.formatAPDU!(originalValues)
 			assert.ok(Buffer.isBuffer(encoded))
 
-			const decoded = DPT213.fromBuffer(encoded)
+			const decoded = DPT213.fromBuffer!(encoded)
 			assert.ok(decoded)
 
 			const delta = 0.03
