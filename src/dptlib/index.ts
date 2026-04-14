@@ -655,7 +655,9 @@ const cloneDpt = (d: DatapointConfig): DatapointConfig => {
 						'error',
 						'datapoint fromBuffer failed: dpt=%s buf=%s error=%s%s',
 						dptLabel,
-						Buffer.isBuffer(buf) ? buf.toString('hex') : logValue(buf),
+						Buffer.isBuffer(buf)
+							? buf.toString('hex')
+							: logValue(buf),
 						message,
 						context?.logSuffix || '',
 					)

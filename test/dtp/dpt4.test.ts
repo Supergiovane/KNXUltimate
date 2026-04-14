@@ -61,7 +61,10 @@ describe('DPT4 (8-bit character)', () => {
 
 			// Buffer too long
 			assert.strictEqual(DPT4.fromBuffer!(Buffer.from([65, 66])), null)
-			assert.strictEqual(DPT4.fromBuffer!(Buffer.from([65, 66, 67])), null)
+			assert.strictEqual(
+				DPT4.fromBuffer!(Buffer.from([65, 66, 67])),
+				null,
+			)
 		})
 	})
 })

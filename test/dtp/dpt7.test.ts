@@ -35,7 +35,10 @@ describe('DPT7 (16-bit unsigned value)', () => {
 			// Test values above maximum (should be clamped to 65535)
 			assert.deepEqual(DPT7.formatAPDU!(65536), Buffer.from([0xff, 0xff]))
 
-			assert.deepEqual(DPT7.formatAPDU!(100000), Buffer.from([0xff, 0xff]))
+			assert.deepEqual(
+				DPT7.formatAPDU!(100000),
+				Buffer.from([0xff, 0xff]),
+			)
 		})
 
 		test('should handle invalid inputs', () => {
@@ -61,7 +64,10 @@ describe('DPT7 (16-bit unsigned value)', () => {
 
 		test('should handle numeric strings', () => {
 			// Test valid numeric strings
-			assert.deepEqual(DPT7.formatAPDU!('1000'), Buffer.from([0x03, 0xe8]))
+			assert.deepEqual(
+				DPT7.formatAPDU!('1000'),
+				Buffer.from([0x03, 0xe8]),
+			)
 
 			assert.deepEqual(
 				DPT7.formatAPDU!('65535'),
