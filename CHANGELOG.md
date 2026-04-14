@@ -1,5 +1,12 @@
 
 
+## [5.5.2](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.1...v5.5.2) (2026-04-14)
+
+
+### Bug Fixes
+
+* **dptlib:** preserve DPT method context in clone wrappers ([aa9d00e](https://github.com/Supergiovane/KNXUltimate/commit/aa9d00e5d7eee99ccab62b4edf6359b06b9db1d2))
+
 ## [5.5.1](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.0...v5.5.1) (2026-04-14)
 
 # [5.5.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.4.0...v5.5.0) (2026-04-14)
