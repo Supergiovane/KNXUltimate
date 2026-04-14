@@ -195,7 +195,10 @@ describe('KNX DPT Handler', () => {
 				}),
 			)
 			assert.equal(apdu.data.length, 14)
-			assert.equal(apdu.data.toString('latin1').startsWith('Out 13.9 °C'), true)
+			assert.equal(
+				apdu.data.toString('latin1').startsWith('Out 13.9 °C'),
+				true,
+			)
 		})
 	})
 })
