@@ -1,5 +1,17 @@
 
 
+# [5.5.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.4.0...v5.5.0) (2026-04-14)
+
+
+### Bug Fixes
+
+* **dptlib:** harden datapoint error paths and input guards ([388d862](https://github.com/Supergiovane/KNXUltimate/commit/388d8626fbd950f4eb1585934df8017ae6446dee))
+
+
+### Features
+
+* **logging:** improve DPT diagnostics and trim raw telegram noise ([d244f95](https://github.com/Supergiovane/KNXUltimate/commit/d244f95e7325ed527ca7682a54f4d7a9b605ba79))
+
 # [5.4.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.3.1...v5.4.0) (2026-03-23)
 
 
