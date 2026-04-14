@@ -211,6 +211,15 @@ function getDptLabel(dpt: DatapointConfig, dptid?: number | string): string {
 	return `${dpt.id}${dpt.subtypeid ? `.${dpt.subtypeid}` : ''}`
 }
 
+function getDptLabelSafe(
+	dpt: DatapointConfig | null | undefined,
+	dptid?: number | string,
+): string {
+	if (dptid !== undefined) return dptid.toString()
+	if (!dpt) return 'unknown DPT'
+	return getDptLabel(dpt, dptid)
+}
+
 function getErrorMessage(error: unknown): string {
 	if (error instanceof Error) return error.message
 	return String(error)
@@ -300,9 +309,13 @@ export function resetDptErrorStats(): void {
 
 function markErrorLogged(error: unknown): void {
 	if (error && typeof error === 'object') {
-		;(error as { [DPT_ERROR_ALREADY_LOGGED]?: boolean })[
-			DPT_ERROR_ALREADY_LOGGED
-		] = true
+		try {
+			;(error as { [DPT_ERROR_ALREADY_LOGGED]?: boolean })[
+				DPT_ERROR_ALREADY_LOGGED
+			] = true
+		} catch {
+			// Best-effort marker only; ignore non-extensible/frozen error objects.
+		}
 	}
 }
 
@@ -571,7 +584,7 @@ export function fromBuffer(
 		return value
 	} catch (error) {
 		const message = getErrorMessage(error)
-		const dptLabel = getDptLabel(dpt, context?.dptid)
+		const dptLabel = getDptLabelSafe(dpt, context?.dptid)
 		const logSuffix =
 			context?.logSuffix || buildAPDULogSuffix(dptLabel, context)
 		if (!isErrorLogged(error)) {

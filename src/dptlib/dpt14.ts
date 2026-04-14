@@ -88,6 +88,10 @@ const config: DatapointConfig = {
 	},
 
 	fromBuffer: (buf) => {
+		if (!Buffer.isBuffer(buf)) {
+			warnDebugOnly(`Buffer expected, got type=${typeof buf}`)
+			return null
+		}
 		if (buf.length !== 4) {
 			warnDebugOnly(
 				`Buffer should be 4 bytes long, got ${buf.length}. buf=${buf.toString('hex')}`,

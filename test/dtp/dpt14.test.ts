@@ -127,6 +127,7 @@ describe('DPT14 (32-bit floating point value)', () => {
 		test('should handle invalid buffer lengths', () => {
 			// Empty buffer
 			assert.strictEqual(fromBuffer(Buffer.alloc(0)), null)
+			assert.strictEqual(fromBuffer('invalid' as any), null)
 
 			// Buffer too short
 			assert.strictEqual(fromBuffer(Buffer.alloc(3)), null)

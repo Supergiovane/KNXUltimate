@@ -37,6 +37,11 @@ function warnDebugOnly(message: string, ...args: unknown[]): void {
 	if (isDebugEnabled()) logger.warn(message, ...args)
 }
 
+function getErrorMessage(error: unknown): string {
+	if (error instanceof Error) return error.message
+	return String(error)
+}
+
 const config: DatapointConfig = {
 	id: 'DPT12',
 	formatAPDU: (value, context) => {
@@ -45,8 +50,23 @@ const config: DatapointConfig = {
 		let normalizedValue = value
 
 		if (inputType !== 'number' || !Number.isFinite(value)) {
-			const coercedValue = Number(value)
-			if (Number.isFinite(coercedValue)) {
+			let coercedValue: number | null = null
+			try {
+				coercedValue = Number(value)
+			} catch (error) {
+				errorDebugOnly(
+					`Must supply a finite number value. Will emit 0${logSuffix}`,
+				)
+				logger.debug(
+					`formatAPDU coercion failed: input=%j inputType=%s error=%s${logSuffix}`,
+					value,
+					inputType,
+					getErrorMessage(error),
+				)
+				normalizedValue = 0
+			}
+
+			if (coercedValue !== null && Number.isFinite(coercedValue)) {
 				errorDebugOnly(
 					`Must supply a number value. Input was coerced to ${coercedValue}${logSuffix}`,
 				)
@@ -57,6 +77,8 @@ const config: DatapointConfig = {
 					coercedValue,
 				)
 				normalizedValue = coercedValue
+			} else if (coercedValue === null) {
+				// Already handled in coercion catch: keep normalizedValue at safe fallback.
 			} else {
 				errorDebugOnly(
 					`Must supply a finite number value. Will emit 0${logSuffix}`,
@@ -106,6 +128,10 @@ const config: DatapointConfig = {
 	},
 
 	fromBuffer: (buf) => {
+		if (!Buffer.isBuffer(buf)) {
+			warnDebugOnly(`Buffer expected, got type=${typeof buf}`)
+			return null
+		}
 		if (buf.length !== 4) {
 			warnDebugOnly(
 				`Buffer should be 4 bytes long, got ${buf.length}. buf=${buf.toString('hex')}`,

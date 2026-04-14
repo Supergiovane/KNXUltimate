@@ -56,6 +56,10 @@ describe('DPT12 (4-byte unsigned value)', () => {
 				DPT12.formatAPDU!('abc' as any),
 				Buffer.from([0, 0, 0, 0]),
 			)
+			assert.deepEqual(
+				DPT12.formatAPDU!(Symbol('bad-input') as any),
+				Buffer.from([0, 0, 0, 0]),
+			)
 
 			// Out-of-range values fall back to 0
 			assert.deepEqual(DPT12.formatAPDU!(-1), Buffer.from([0, 0, 0, 0]))
@@ -84,6 +88,7 @@ describe('DPT12 (4-byte unsigned value)', () => {
 		test('should handle invalid buffer lengths', () => {
 			// Empty buffer
 			assert.strictEqual(DPT12.fromBuffer!(Buffer.from([])), null)
+			assert.strictEqual(DPT12.fromBuffer!('invalid' as any), null)
 
 			// Buffer too short
 			assert.strictEqual(DPT12.fromBuffer!(Buffer.from([0, 0, 0])), null)
