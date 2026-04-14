@@ -185,5 +185,17 @@ describe('KNX DPT Handler', () => {
 				delete dpts[dptKey]
 			}
 		})
+
+		it('should encode DPT16.001 strings without losing subtype binding', () => {
+			const apdu = {} as APDU
+			assert.doesNotThrow(() =>
+				populateAPDU('Out 13.9 °C', apdu, '16.001', {
+					groupAddress: '2/2/10',
+					sourceAddress: '1.1.1',
+				}),
+			)
+			assert.equal(apdu.data.length, 14)
+			assert.equal(apdu.data.toString('latin1').startsWith('Out 13.9 °C'), true)
+		})
 	})
 })

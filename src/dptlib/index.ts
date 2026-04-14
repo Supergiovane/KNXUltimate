@@ -616,7 +616,7 @@ const cloneDpt = (d: DatapointConfig): DatapointConfig => {
 	if (typeof fa === 'function') {
 		clonedDpt.formatAPDU = (value: any, context?: FormatAPDUContext) => {
 			try {
-				return fa(value, context)
+				return fa.call(clonedDpt, value, context)
 			} catch (error) {
 				if (!isErrorLogged(error)) {
 					const dptLabel = getDptLabel(clonedDpt, context?.dptid)
@@ -646,7 +646,7 @@ const cloneDpt = (d: DatapointConfig): DatapointConfig => {
 	if (typeof fb === 'function') {
 		clonedDpt.fromBuffer = (buf: Buffer, context?: FromBufferContext) => {
 			try {
-				return fb(buf, context)
+				return fb.call(clonedDpt, buf, context)
 			} catch (error) {
 				if (!isErrorLogged(error)) {
 					const dptLabel = getDptLabel(clonedDpt, context?.dptid)
