@@ -23,6 +23,7 @@
     "url": "git+https://github.com/Supergiovane/KNXUltimate.git"
   },
   "scripts": {
+    "prebuild": "npm run lint-fix",
     "build": "npm run clean && node -e \"setTimeout(()=>{},5000)\" && tsc -p tsconfig.build.json",
     "prepack": "npm run build && node scripts/cleanupPackArtifacts.js",
     "example:secure:multicast": "node -r esbuild-register -e \"require('./examples/sampleSecureMulticast.ts')\"",
