@@ -24,33 +24,88 @@ import { module } from '../KnxLog'
  */
 
 const logger = module('DPT14')
+const MAX_FLOAT32 = 3.4028234663852886e38
+
+function isDebugEnabled(): boolean {
+	if (typeof logger.isLevelEnabled === 'function') {
+		return logger.isLevelEnabled('debug')
+	}
+	return logger.level === 'debug'
+}
+
+function errorDebugOnly(message: string, ...args: unknown[]): void {
+	if (isDebugEnabled()) logger.error(message, ...args)
+}
+
+function warnDebugOnly(message: string, ...args: unknown[]): void {
+	if (isDebugEnabled()) logger.warn(message, ...args)
+}
 
 const config: DatapointConfig = {
 	id: 'DPT14',
-	formatAPDU: (value) => {
-		if (!value || typeof value !== 'number') {
-			logger.error('Must supply a number value. Will emit 0')
-			value = 0
+	formatAPDU: (value, context) => {
+		const logSuffix = context?.logSuffix || ''
+		const inputType = typeof value
+		let normalizedValue = value
+
+		if (inputType !== 'number' || !Number.isFinite(value)) {
+			errorDebugOnly(
+				`Must supply a finite number value. Will emit 0${logSuffix}`,
+			)
+			logger.debug(
+				`formatAPDU invalid input: input=%j inputType=%s finite=%s${logSuffix}`,
+				value,
+				inputType,
+				Number.isFinite(value),
+			)
+			normalizedValue = 0
+		}
+
+		if (normalizedValue > MAX_FLOAT32 || normalizedValue < -MAX_FLOAT32) {
+			const clampedValue =
+				normalizedValue > 0 ? MAX_FLOAT32 : -MAX_FLOAT32
+			errorDebugOnly(
+				`Value out of float32 range (${normalizedValue}). Clamping to ${clampedValue}${logSuffix}`,
+			)
+			logger.debug(
+				`formatAPDU range clamp: input=%j normalized=%d clamped=%d max=%d${logSuffix}`,
+				value,
+				normalizedValue,
+				clampedValue,
+				MAX_FLOAT32,
+			)
+			normalizedValue = clampedValue
 		}
 
 		const apdu_data = Buffer.alloc(4)
-		apdu_data.writeFloatBE(value, 0)
+		apdu_data.writeFloatBE(normalizedValue, 0)
+		logger.debug(
+			`formatAPDU encoded: input=%j normalized=%d apdu=${apdu_data.toString('hex')}${logSuffix}`,
+			value,
+			normalizedValue,
+		)
 		return apdu_data
 	},
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 4) {
-			logger.warn('Buffer should be 4 bytes long, got', buf.length)
+			warnDebugOnly(
+				`Buffer should be 4 bytes long, got ${buf.length}. buf=${buf.toString('hex')}`,
+			)
 			return null
 		}
-		return buf.readFloatBE(0)
+		const decodedValue = buf.readFloatBE(0)
+		logger.debug(
+			`fromBuffer decoded: value=${decodedValue} buf=${buf.toString('hex')}`,
+		)
+		return decodedValue
 	},
 
 	// DPT14 base type info
 	basetype: {
 		bitlength: 32,
 		valuetype: 'basic',
-		range: [0, 2 ** 32],
+		range: [-MAX_FLOAT32, MAX_FLOAT32],
 		desc: '32-bit floating point value',
 		help: `// Send 32-bit floating point value.
 msg.payload = 42;

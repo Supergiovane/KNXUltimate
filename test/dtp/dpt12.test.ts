@@ -43,6 +43,27 @@ describe('DPT12 (4-byte unsigned value)', () => {
 			assert.ok(Buffer.isBuffer(maxResult))
 			assert.equal(maxResult.length, 4)
 		})
+
+		test('should handle invalid and out-of-range inputs safely', () => {
+			// Coercible non-number input
+			assert.deepEqual(
+				DPT12.formatAPDU('42' as any),
+				Buffer.from([0, 0, 0, 42]),
+			)
+
+			// Non-coercible input falls back to 0
+			assert.deepEqual(
+				DPT12.formatAPDU('abc' as any),
+				Buffer.from([0, 0, 0, 0]),
+			)
+
+			// Out-of-range values fall back to 0
+			assert.deepEqual(DPT12.formatAPDU(-1), Buffer.from([0, 0, 0, 0]))
+			assert.deepEqual(
+				DPT12.formatAPDU(4294967296),
+				Buffer.from([0, 0, 0, 0]),
+			)
+		})
 	})
 
 	describe('fromBuffer', () => {

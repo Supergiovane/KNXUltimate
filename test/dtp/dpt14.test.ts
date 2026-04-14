@@ -77,6 +77,12 @@ describe('DPT14 (32-bit floating point value)', () => {
 			assert.ok(buffer)
 			assert.equal(buffer.length, 4)
 			assert.equal(buffer.readFloatBE(0), 0)
+
+			// Non-finite numeric values
+			buffer = DPT14.formatAPDU(Infinity)
+			assert.ok(buffer)
+			assert.equal(buffer.length, 4)
+			assert.equal(buffer.readFloatBE(0), 0)
 		})
 	})
 

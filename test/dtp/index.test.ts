@@ -147,5 +147,43 @@ describe('KNX DPT Handler', () => {
 				message: 'TEST_THROW: decode failed for buffer [12]: boom',
 			})
 		})
+
+		it('should pass telegram context to custom formatAPDU', () => {
+			const dptKey = 'DPT777'
+			let capturedContext: any = null
+			dpts[dptKey] = {
+				id: dptKey,
+				basetype: {
+					bitlength: 8,
+					valuetype: 'basic',
+				},
+				subtypes: {
+					'001': {
+						name: 'test',
+					},
+				},
+				formatAPDU: (_value, context) => {
+					capturedContext = context
+					return Buffer.from([0x01])
+				},
+			}
+
+			const apdu = {} as APDU
+			try {
+				populateAPDU(1, apdu, '777.001', {
+					groupAddress: '1/2/3',
+					sourceAddress: '1.1.15',
+				})
+				assert.equal(capturedContext?.groupAddress, '1/2/3')
+				assert.equal(capturedContext?.sourceAddress, '1.1.15')
+				assert.equal(capturedContext?.dptid, '777.001')
+				assert.equal(
+					capturedContext?.logSuffix,
+					' [ga=1/2/3 src=1.1.15 dpt=777.001]',
+				)
+			} finally {
+				delete dpts[dptKey]
+			}
+		})
 	})
 })

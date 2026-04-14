@@ -55,7 +55,6 @@ export type KNXRawTelegram = {
 	destination: string
 	apdu: { data: Buffer | null; bitlength: number; hex: string }
 	cemi: { hex: string }
-	echoed: boolean
 }
 
 type TunnelServerEvents = {
@@ -648,7 +647,6 @@ export class KNXIPTunnelServer extends TypedEventEmitter<TunnelServerEvents> {
 					hex: apduHex,
 				},
 				cemi: { hex: cemiEtsHex },
-				echoed: !!echoed,
 			}
 		} catch {
 			return null

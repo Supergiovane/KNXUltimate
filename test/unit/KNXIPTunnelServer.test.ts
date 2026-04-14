@@ -179,6 +179,7 @@ describe('KNXIPTunnelServer', () => {
 			assert.strictEqual(rawTelegram.destination, '1/1/1')
 			assert.ok(Buffer.isBuffer(rawTelegram.apdu.data))
 			assert.strictEqual(rawTelegram.apdu.bitlength, 6)
+			assert.ok(!('echoed' in rawTelegram))
 		} finally {
 			try {
 				client.close()

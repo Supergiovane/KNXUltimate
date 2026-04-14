@@ -20,24 +20,103 @@ import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
 
 const logger = module('DPT12')
+const MAX_UINT32 = 0xffffffff
+
+function isDebugEnabled(): boolean {
+	if (typeof logger.isLevelEnabled === 'function') {
+		return logger.isLevelEnabled('debug')
+	}
+	return logger.level === 'debug'
+}
+
+function errorDebugOnly(message: string, ...args: unknown[]): void {
+	if (isDebugEnabled()) logger.error(message, ...args)
+}
+
+function warnDebugOnly(message: string, ...args: unknown[]): void {
+	if (isDebugEnabled()) logger.warn(message, ...args)
+}
 
 const config: DatapointConfig = {
 	id: 'DPT12',
-	formatAPDU: (value) => {
-		if (!value || typeof value !== 'number') {
-			logger.error('Must supply a number value')
+	formatAPDU: (value, context) => {
+		const logSuffix = context?.logSuffix || ''
+		const inputType = typeof value
+		let normalizedValue = value
+
+		if (inputType !== 'number' || !Number.isFinite(value)) {
+			const coercedValue = Number(value)
+			if (Number.isFinite(coercedValue)) {
+				errorDebugOnly(
+					`Must supply a number value. Input was coerced to ${coercedValue}${logSuffix}`,
+				)
+				logger.debug(
+					`formatAPDU coercion: input=%j inputType=%s coerced=%d${logSuffix}`,
+					value,
+					inputType,
+					coercedValue,
+				)
+				normalizedValue = coercedValue
+			} else {
+				errorDebugOnly(
+					`Must supply a finite number value. Will emit 0${logSuffix}`,
+				)
+				logger.debug(
+					`formatAPDU invalid input: input=%j inputType=%s finite=%s${logSuffix}`,
+					value,
+					inputType,
+					Number.isFinite(value),
+				)
+				normalizedValue = 0
+			}
 		}
+
+		if (!Number.isInteger(normalizedValue)) {
+			const truncatedValue = Math.trunc(normalizedValue)
+			logger.debug(
+				`formatAPDU non-integer value: input=%j normalized=%d truncated=%d${logSuffix}`,
+				value,
+				normalizedValue,
+				truncatedValue,
+			)
+			normalizedValue = truncatedValue
+		}
+
+		if (normalizedValue < 0 || normalizedValue > MAX_UINT32) {
+			errorDebugOnly(
+				`Value out of range for DPT12 (${normalizedValue}). Will emit 0${logSuffix}`,
+			)
+			logger.debug(
+				`formatAPDU range check failed: input=%j normalized=%d min=0 max=%d${logSuffix}`,
+				value,
+				normalizedValue,
+				MAX_UINT32,
+			)
+			normalizedValue = 0
+		}
+
 		const apdu_data = Buffer.alloc(4)
-		apdu_data.writeUIntBE(value, 0, 4)
+		apdu_data.writeUIntBE(normalizedValue, 0, 4)
+		logger.debug(
+			`formatAPDU encoded: input=%j normalized=%d apdu=${apdu_data.toString('hex')}${logSuffix}`,
+			value,
+			normalizedValue,
+		)
 		return apdu_data
 	},
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 4) {
-			logger.warn('Buffer should be 4 bytes long, got', buf.length)
+			warnDebugOnly(
+				`Buffer should be 4 bytes long, got ${buf.length}. buf=${buf.toString('hex')}`,
+			)
 			return null
 		}
-		return buf.readUIntBE(0, 4)
+		const decodedValue = buf.readUIntBE(0, 4)
+		logger.debug(
+			`fromBuffer decoded: value=${decodedValue} buf=${buf.toString('hex')}`,
+		)
+		return decodedValue
 	},
 
 	// DPT12 base type info

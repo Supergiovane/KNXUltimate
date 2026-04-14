@@ -856,13 +856,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 	}
 
-	private getKNXDataBuffer(data: Buffer, dptid: string | number) {
+	private getKNXDataBuffer(
+		data: Buffer,
+		dptid: string | number,
+		context?: DPTLib.APDUTelegramContext,
+	) {
 		if (typeof dptid === 'number') {
 			dptid = dptid.toString()
 		}
 
 		const adpu = {} as DPTLib.APDU
-		DPTLib.populateAPDU(data, adpu, dptid)
+		DPTLib.populateAPDU(data, adpu, dptid, context)
 		const iDatapointType: number = parseInt(
 			dptid.substring(0, dptid.indexOf('.')),
 		)
@@ -1359,15 +1363,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				'The socket is not connected. Unable to access the KNX BUS',
 			)
 
-		// Get the Data Buffer from the plain value
-		const knxBuffer = this.getKNXDataBuffer(data, dptid)
-
 		if (typeof dstAddress === 'string')
 			dstAddress = KNXAddress.createFromString(
 				dstAddress,
 				KNXAddress.TYPE_GROUP,
 			)
 		const srcAddress = this.physAddr
+		// Get the Data Buffer from the plain value
+		const knxBuffer = this.getKNXDataBuffer(data, dptid, {
+			groupAddress: dstAddress.toString(),
+			sourceAddress: srcAddress.toString(),
+		})
 
 		if (this._options.hostProtocol === 'Multicast') {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND
@@ -1466,15 +1472,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				'The socket is not connected. Unable to access the KNX BUS',
 			)
 
-		// Get the Data Buffer from the plain value
-		const knxBuffer = this.getKNXDataBuffer(data, dptid)
-
 		if (typeof dstAddress === 'string')
 			dstAddress = KNXAddress.createFromString(
 				dstAddress,
 				KNXAddress.TYPE_GROUP,
 			)
 		const srcAddress = this.physAddr
+		// Get the Data Buffer from the plain value
+		const knxBuffer = this.getKNXDataBuffer(data, dptid, {
+			groupAddress: dstAddress.toString(),
+			sourceAddress: srcAddress.toString(),
+		})
 
 		if (this._options.hostProtocol === 'Multicast') {
 			// Multicast: per KNX Routing spec, inject as L_DATA_IND

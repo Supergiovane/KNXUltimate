@@ -58,6 +58,21 @@ type Range = [number, number] | [undefined]
 
 const logger = module('DPTLib')
 
+export interface APDUTelegramContext {
+	groupAddress?: string
+	sourceAddress?: string
+}
+
+export interface FormatAPDUContext extends APDUTelegramContext {
+	dptid?: number | string
+	logSuffix?: string
+}
+
+export interface FromBufferContext extends APDUTelegramContext {
+	dptid?: number | string
+	logSuffix?: string
+}
+
 interface DatapointSubtype {
 	scalar_range?: Range
 	name: string
@@ -83,8 +98,8 @@ export interface DatapointConfig {
 	}
 	subtype?: DatapointSubtype
 	subtypes?: Record<string, DatapointSubtype>
-	formatAPDU?: (value: any) => Buffer | void
-	fromBuffer?: (buf: Buffer) => any
+	formatAPDU?: (value: any, context?: FormatAPDUContext) => Buffer | void
+	fromBuffer?: (buf: Buffer, context?: FromBufferContext) => any
 }
 
 export const dpts: Record<string, DatapointConfig> = {
@@ -162,22 +177,226 @@ export type APDU = {
 	data: Buffer
 }
 
-export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
+function buildAPDULogSuffix(
+	dptid?: number | string,
+	context?: APDUTelegramContext,
+): string {
+	const chunks: string[] = []
+	if (context?.groupAddress) chunks.push(`ga=${context.groupAddress}`)
+	if (context?.sourceAddress) chunks.push(`src=${context.sourceAddress}`)
+	if (dptid !== undefined) chunks.push(`dpt=${dptid}`)
+	return chunks.length > 0 ? ` [${chunks.join(' ')}]` : ''
+}
+
+function logValue(value: any): string {
+	try {
+		const serialized = util.inspect(value, {
+			depth: 4,
+			maxArrayLength: 20,
+			maxStringLength: 300,
+			breakLength: 120,
+		})
+		if (serialized.length > 600) {
+			return `${serialized.slice(0, 597)}...`
+		}
+		return serialized
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+		return `[unserializable: ${message}]`
+	}
+}
+
+function getDptLabel(dpt: DatapointConfig, dptid?: number | string): string {
+	if (dptid !== undefined) return dptid.toString()
+	return `${dpt.id}${dpt.subtypeid ? `.${dpt.subtypeid}` : ''}`
+}
+
+function getErrorMessage(error: unknown): string {
+	if (error instanceof Error) return error.message
+	return String(error)
+}
+
+const DPT_ERROR_ALREADY_LOGGED = Symbol('dpt-error-already-logged')
+const DPT_ERROR_STATS_LOG_EVERY = 25
+
+export interface DptErrorStat {
+	encodeErrors: number
+	decodeErrors: number
+	totalErrors: number
+	lastError: string
+	lastUpdate: string
+}
+
+const dptErrorStats = new Map<string, DptErrorStat>()
+
+function isDebugEnabled(): boolean {
+	if (typeof logger.isLevelEnabled === 'function') {
+		return logger.isLevelEnabled('debug')
+	}
+	return logger.level === 'debug'
+}
+
+function logIfDebug(
+	level: 'debug' | 'warn' | 'error',
+	message: string,
+	...args: unknown[]
+): void {
+	if (!isDebugEnabled()) return
+	if (level === 'debug') logger.debug(message, ...args)
+	if (level === 'warn') logger.warn(message, ...args)
+	if (level === 'error') logger.error(message, ...args)
+}
+
+function recordDptError(
+	dptLabel: string,
+	phase: 'encode' | 'decode',
+	errorMessage: string,
+	logSuffix = '',
+): void {
+	const now = new Date().toISOString()
+	const stats = dptErrorStats.get(dptLabel) || {
+		encodeErrors: 0,
+		decodeErrors: 0,
+		totalErrors: 0,
+		lastError: '',
+		lastUpdate: now,
+	}
+
+	if (phase === 'encode') stats.encodeErrors += 1
+	if (phase === 'decode') stats.decodeErrors += 1
+	stats.totalErrors += 1
+	stats.lastError = errorMessage
+	stats.lastUpdate = now
+	dptErrorStats.set(dptLabel, stats)
+
+	if (
+		isDebugEnabled() &&
+		(stats.totalErrors <= 3 ||
+			stats.totalErrors % DPT_ERROR_STATS_LOG_EVERY === 0)
+	) {
+		logger.debug(
+			'dpt error stats: dpt=%s total=%d encode=%d decode=%d lastError=%s%s',
+			dptLabel,
+			stats.totalErrors,
+			stats.encodeErrors,
+			stats.decodeErrors,
+			errorMessage,
+			logSuffix,
+		)
+	}
+}
+
+export function getDptErrorStats(): Record<string, DptErrorStat> {
+	const out: Record<string, DptErrorStat> = {}
+	for (const [dpt, stat] of dptErrorStats.entries()) {
+		out[dpt] = { ...stat }
+	}
+	return out
+}
+
+export function resetDptErrorStats(): void {
+	dptErrorStats.clear()
+}
+
+function markErrorLogged(error: unknown): void {
+	if (error && typeof error === 'object') {
+		;(error as { [DPT_ERROR_ALREADY_LOGGED]?: boolean })[
+			DPT_ERROR_ALREADY_LOGGED
+		] = true
+	}
+}
+
+function isErrorLogged(error: unknown): boolean {
+	return Boolean(
+		error &&
+			typeof error === 'object' &&
+			(error as { [DPT_ERROR_ALREADY_LOGGED]?: boolean })[
+				DPT_ERROR_ALREADY_LOGGED
+			],
+	)
+}
+
+export function populateAPDU(
+	value: any,
+	apdu: APDU,
+	dptid?: number | string,
+	context?: APDUTelegramContext,
+) {
 	const dpt = resolve(dptid || 'DPT1')
+	const dptLabel = getDptLabel(dpt, dptid)
+	const logSuffix = buildAPDULogSuffix(dptLabel, context)
 	const nbytes = Math.ceil(dpt.basetype.bitlength / 8)
 	// apdu.data = new Buffer(nbytes); // 14/09/2020 Supregiovane: Deprecated. Replaced with below.
 	apdu.data = Buffer.alloc(nbytes)
 	apdu.bitlength = (dpt.basetype && dpt.basetype.bitlength) || 1
 	let tgtvalue = value
+	logger.debug(
+		'populateAPDU start: dpt=%s inputType=%s input=%s expectedBytes=%d%s',
+		dptLabel,
+		typeof value,
+		logValue(value),
+		nbytes,
+		logSuffix,
+	)
 	// get the raw APDU data for the given JS value
 	if (typeof dpt.formatAPDU === 'function') {
 		// nothing to do here, DPT-specific formatAPDU implementation will handle everything
 		// knxLog.get().debug('>>> custom formatAPDU(%s): %j', dptid, value);
 		// TODO: this could return void, what to do in that case?
-		apdu.data = dpt.formatAPDU(value) as Buffer
+		try {
+			apdu.data = dpt.formatAPDU(value, {
+				dptid,
+				groupAddress: context?.groupAddress,
+				sourceAddress: context?.sourceAddress,
+				logSuffix,
+			}) as Buffer
+		} catch (error) {
+			const message = getErrorMessage(error)
+			if (!isErrorLogged(error)) {
+				logIfDebug(
+					'error',
+					'populateAPDU custom encoder failed: dpt=%s input=%s error=%s%s',
+					dptLabel,
+					logValue(value),
+					message,
+					logSuffix,
+				)
+				recordDptError(dptLabel, 'encode', message, logSuffix)
+				markErrorLogged(error)
+			}
+			throw new Error(
+				`${dptLabel}: encode failed for value ${logValue(value)}: ${message}`,
+			)
+		}
+		if (Buffer.isBuffer(apdu.data)) {
+			logger.debug(
+				'populateAPDU custom encoded: dpt=%s apdu=%s len=%d%s',
+				dptLabel,
+				apdu.data.toString('hex'),
+				apdu.data.length,
+				logSuffix,
+			)
+		} else {
+			logIfDebug(
+				'error',
+				'populateAPDU custom returned non-buffer: dpt=%s outputType=%s output=%s%s',
+				dptLabel,
+				typeof apdu.data,
+				logValue(apdu.data),
+				logSuffix,
+			)
+		}
 		// knxLog.get().debug('<<< custom formatAPDU(%s): %j', dptid, apdu.data);
 	} else {
 		if (!isFinite(value)) {
+			logIfDebug(
+				'error',
+				'populateAPDU generic invalid value: dpt=%s inputType=%s input=%s%s',
+				dptLabel,
+				typeof value,
+				logValue(value),
+				logSuffix,
+			)
 			throw new Error(
 				util.format('Invalid value, expected a %s', dpt.basetype?.desc),
 			)
@@ -219,14 +438,38 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
 			}
 		}
 		// generic APDU is assumed to convey an unsigned integer of arbitrary bitlength
-		if (
-			hasProp(dpt.basetype, 'signedness') &&
-			dpt.basetype.signedness === 'signed'
-		) {
-			apdu.data.writeIntBE(tgtvalue, 0, nbytes)
-		} else {
-			apdu.data.writeUIntBE(tgtvalue, 0, nbytes)
+		try {
+			if (
+				hasProp(dpt.basetype, 'signedness') &&
+				dpt.basetype.signedness === 'signed'
+			) {
+				apdu.data.writeIntBE(tgtvalue, 0, nbytes)
+			} else {
+				apdu.data.writeUIntBE(tgtvalue, 0, nbytes)
+			}
+		} catch (error) {
+			const message = getErrorMessage(error)
+			logIfDebug(
+				'error',
+				'populateAPDU generic encode failed: dpt=%s targetValue=%s expectedBytes=%d error=%s%s',
+				dptLabel,
+				logValue(tgtvalue),
+				nbytes,
+				message,
+				logSuffix,
+			)
+			recordDptError(dptLabel, 'encode', message, logSuffix)
+			markErrorLogged(error)
+			throw error
 		}
+		logger.debug(
+			'populateAPDU generic encoded: dpt=%s targetValue=%s apdu=%s len=%d%s',
+			dptLabel,
+			logValue(tgtvalue),
+			apdu.data.toString('hex'),
+			apdu.data.length,
+			logSuffix,
+		)
 	}
 	// knxLog.get().debug('generic populateAPDU tgtvalue=%j(%s) nbytes=%d => apdu=%j', tgtvalue, typeof tgtvalue, nbytes, apdu);
 	return apdu
@@ -237,15 +480,43 @@ export function populateAPDU(value: any, apdu: APDU, dptid?: number | string) {
  * - or by this generic version, which:
  * --  1) checks if the value adheres to the range set from the DPT's bitlength
  */
-export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
+export function fromBuffer(
+	buf: Buffer,
+	dpt: DatapointConfig,
+	context?: FromBufferContext,
+) {
 	try {
 		// sanity check
 		if (!dpt) throw Error(util.format('DPT %s not found', dpt))
+		const dptLabel = getDptLabel(dpt, context?.dptid)
+		const logSuffix =
+			context?.logSuffix || buildAPDULogSuffix(dptLabel, context)
+		const bufferHex = Buffer.isBuffer(buf)
+			? buf.toString('hex')
+			: logValue(buf)
+		logger.debug(
+			'fromBuffer start: dpt=%s bufLen=%d buf=%s%s',
+			dptLabel,
+			Buffer.isBuffer(buf) ? buf.length : -1,
+			bufferHex,
+			logSuffix,
+		)
 		let value = 0
 		// get the raw APDU data for the given JS value
 		if (typeof dpt.fromBuffer === 'function') {
 			// nothing to do here, DPT-specific fromBuffer implementation will handle everything
-			value = dpt.fromBuffer(buf)
+			value = dpt.fromBuffer(buf, {
+				dptid: context?.dptid || dptLabel,
+				groupAddress: context?.groupAddress,
+				sourceAddress: context?.sourceAddress,
+				logSuffix,
+			})
+			logger.debug(
+				'fromBuffer custom decoded: dpt=%s value=%s%s',
+				dptLabel,
+				logValue(value),
+				logSuffix,
+			)
 		} else {
 			const expectedLength = Math.ceil(dpt.basetype.bitlength / 8)
 			if (expectedLength > 6) {
@@ -254,7 +525,8 @@ export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
 				)
 			}
 			if (buf.length !== expectedLength) {
-				logger.warn(
+				logIfDebug(
+					'warn',
 					'fromBuffer: %s expects %d bytes (got %d bytes)',
 					dpt.id,
 					expectedLength,
@@ -288,11 +560,32 @@ export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
 				value = Math.round(a * value + b)
 				// knxLog.get().debug('fromBuffer scalar a=%j b=%j %j', a,b, value);
 			}
+			logger.debug(
+				'fromBuffer generic decoded: dpt=%s value=%s%s',
+				dptLabel,
+				logValue(value),
+				logSuffix,
+			)
 		}
 		//  knxLog.get().debug('generic fromBuffer buf=%j, value=%j', buf, value);
 		return value
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error)
+		const message = getErrorMessage(error)
+		const dptLabel = getDptLabel(dpt, context?.dptid)
+		const logSuffix =
+			context?.logSuffix || buildAPDULogSuffix(dptLabel, context)
+		if (!isErrorLogged(error)) {
+			logIfDebug(
+				'error',
+				'fromBuffer failed: dpt=%s buf=%s error=%s%s',
+				dptLabel,
+				buf?.toString('hex') || '',
+				message,
+				logSuffix,
+			)
+			recordDptError(dptLabel, 'decode', message, logSuffix)
+			markErrorLogged(error)
+		}
 		throw new Error(
 			`${dpt?.id || 'unknown DPT'}: decode failed for buffer [${buf?.toString('hex') || ''}]: ${message}`,
 		)
@@ -301,5 +594,70 @@ export function fromBuffer(buf: Buffer, dpt: DatapointConfig) {
 
 const cloneDpt = (d: DatapointConfig): DatapointConfig => {
 	const { fromBuffer: fb, formatAPDU: fa } = d
-	return { ...JSON.parse(JSON.stringify(d)), fromBuffer: fb, formatAPDU: fa }
+	const clonedDpt = {
+		...JSON.parse(JSON.stringify(d)),
+		fromBuffer: fb,
+		formatAPDU: fa,
+	} as DatapointConfig
+
+	if (typeof fa === 'function') {
+		clonedDpt.formatAPDU = (value: any, context?: FormatAPDUContext) => {
+			try {
+				return fa(value, context)
+			} catch (error) {
+				if (!isErrorLogged(error)) {
+					const dptLabel = getDptLabel(clonedDpt, context?.dptid)
+					const message = getErrorMessage(error)
+					logIfDebug(
+						'error',
+						'datapoint formatAPDU failed: dpt=%s inputType=%s input=%s error=%s%s',
+						dptLabel,
+						typeof value,
+						logValue(value),
+						message,
+						context?.logSuffix || '',
+					)
+					recordDptError(
+						dptLabel,
+						'encode',
+						message,
+						context?.logSuffix || '',
+					)
+					markErrorLogged(error)
+				}
+				throw error
+			}
+		}
+	}
+
+	if (typeof fb === 'function') {
+		clonedDpt.fromBuffer = (buf: Buffer, context?: FromBufferContext) => {
+			try {
+				return fb(buf, context)
+			} catch (error) {
+				if (!isErrorLogged(error)) {
+					const dptLabel = getDptLabel(clonedDpt, context?.dptid)
+					const message = getErrorMessage(error)
+					logIfDebug(
+						'error',
+						'datapoint fromBuffer failed: dpt=%s buf=%s error=%s%s',
+						dptLabel,
+						Buffer.isBuffer(buf) ? buf.toString('hex') : logValue(buf),
+						message,
+						context?.logSuffix || '',
+					)
+					recordDptError(
+						dptLabel,
+						'decode',
+						message,
+						context?.logSuffix || '',
+					)
+					markErrorLogged(error)
+				}
+				throw error
+			}
+		}
+	}
+
+	return clonedDpt
 }

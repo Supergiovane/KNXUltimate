@@ -108,7 +108,7 @@ knxUltimateClient = new KNXClient(knxUltimateClientProperties);
 // ######################################
 // Note: datagram.cEMIMessage is ensured to be plain (decrypted)
 // if the telegram was Data Secure and keys are available.
-knxUltimateClient.on(KNXClientEvents.indication, (datagram, echoed) => {
+knxUltimateClient.on(KNXClientEvents.indication, (datagram) => {
 
     // This function is called whenever a KNX telegram arrives from BUS
 
