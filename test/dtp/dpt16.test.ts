@@ -37,6 +37,14 @@ describe('DPT16 (14-character string)', () => {
 			assert.ok(Buffer.isBuffer(result3))
 			assert.equal(Buffer.byteLength(result3), 14)
 			assert.deepEqual(result3, Buffer.alloc(14))
+
+			// Test extended characters commonly sent by KNX devices
+			const result4 = dpt.formatAPDU!('Dämmerung')
+			assert.ok(Buffer.isBuffer(result4))
+			assert.equal(Buffer.byteLength(result4), 14)
+			const expected4 = Buffer.alloc(14)
+			expected4.write('Dämmerung', 'latin1')
+			assert.deepEqual(result4, expected4)
 		})
 
 		test('should correctly format ISO-8859-1 strings (subtype 001)', () => {
@@ -103,15 +111,17 @@ describe('DPT16 (14-character string)', () => {
 			// Test basic ASCII string
 			const buf1 = Buffer.alloc(14)
 			buf1.write('Hello', 'ascii')
-			assert.equal(dpt.fromBuffer!(buf1)?.replace(/\0+$/, ''), 'Hello')
+			assert.equal(dpt.fromBuffer!(buf1), 'Hello')
 
 			// Test full buffer
 			const buf2 = Buffer.alloc(14)
 			buf2.write('Hello World 12', 'ascii')
-			assert.equal(
-				dpt.fromBuffer!(buf2)?.replace(/\0+$/, ''),
-				'Hello World 12',
-			)
+			assert.equal(dpt.fromBuffer!(buf2), 'Hello World 12')
+
+			// Test extended characters and null padding removal
+			const buf3 = Buffer.alloc(14)
+			buf3.write('Dämmerung', 'latin1')
+			assert.equal(dpt.fromBuffer!(buf3), 'Dämmerung')
 		})
 
 		test('should correctly parse ISO-8859-1 buffers (subtype 001)', () => {
@@ -120,15 +130,12 @@ describe('DPT16 (14-character string)', () => {
 			// Test string with special characters
 			const buf1 = Buffer.alloc(14)
 			buf1.write('Café', 'latin1')
-			assert.equal(dpt.fromBuffer!(buf1)?.replace(/\0+$/, ''), 'Café')
+			assert.equal(dpt.fromBuffer!(buf1), 'Café')
 
 			// Test full buffer with special characters
 			const buf2 = Buffer.alloc(14)
 			buf2.write('Crème Brûlée!!', 'latin1')
-			assert.equal(
-				dpt.fromBuffer!(buf2)?.replace(/\0+$/, ''),
-				'Crème Brûlée!!',
-			)
+			assert.equal(dpt.fromBuffer!(buf2), 'Crème Brûlée!!')
 		})
 
 		test('should handle invalid buffer lengths', () => {

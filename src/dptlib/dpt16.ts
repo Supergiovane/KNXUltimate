@@ -35,8 +35,9 @@ const config: DatapointConfig = {
 		}
 
 		const buf = Buffer.alloc(14)
-		if (this.subtypeid === '001') buf.write(value, 'latin1')
-		if (this.subtypeid === '000') buf.write(value, 'ascii')
+		if (this.subtypeid === '001' || this.subtypeid === '000') {
+			buf.write(value, 'latin1')
+		}
 		return buf
 	},
 
@@ -46,8 +47,9 @@ const config: DatapointConfig = {
 			logger.error('Buffer should be 14 byte long, got', buf.length)
 			return null
 		}
-		if (this.subtypeid === '001') return buf.toString('latin1')
-		if (this.subtypeid === '000') return buf.toString('ascii')
+		if (this.subtypeid === '001' || this.subtypeid === '000') {
+			return buf.toString('latin1').replace(/\0+$/, '')
+		}
 		return null
 	},
 
