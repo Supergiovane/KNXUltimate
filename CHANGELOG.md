@@ -1,5 +1,12 @@
 
 
+## [5.5.3](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.2...v5.5.3) (2026-04-28)
+
+
+### Bug Fixes
+
+* **dptlib:** preserve DPT16 umlauts and trim null padding ([d4afd64](https://github.com/Supergiovane/KNXUltimate/commit/d4afd64ffca091ffd4cdb9cdb8594e710693326c))
+
 ## [5.5.2](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.1...v5.5.2) (2026-04-14)
 
 
