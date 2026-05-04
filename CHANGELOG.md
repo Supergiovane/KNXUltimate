@@ -1,5 +1,12 @@
 
 
+## [5.5.4](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.3...v5.5.4) (2026-05-04)
+
+
+### Bug Fixes
+
+* **dpt:** make resolve() tolerant to missing/unknown subtypes ([b9b9434](https://github.com/Supergiovane/KNXUltimate/commit/b9b9434980c6e0ab5fd3ae80a0e6d0c99810d441))
+
 ## [5.5.3](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.2...v5.5.3) (2026-04-28)
 
 
