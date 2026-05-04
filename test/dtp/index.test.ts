@@ -40,6 +40,18 @@ describe('KNX DPT Handler', () => {
 			assert.equal(dpt.subtypeid, '001')
 		})
 
+		it('should resolve base DPT without forcing subtype 001', () => {
+			const dpt = resolve('DPT14')
+			assert.equal(dpt.id, 'DPT14')
+			assert.equal(dpt.subtypeid, undefined)
+		})
+
+		it('should not throw on unknown subtype and should keep base DPT', () => {
+			const dpt = resolve('DPT14.005')
+			assert.equal(dpt.id, 'DPT14')
+			assert.equal(dpt.subtypeid, undefined)
+		})
+
 		it('should throw error for invalid DPT format', () => {
 			assert.throws(() => resolve('invalid'), {
 				message: 'Invalid DPT format: invalid',
