@@ -47,7 +47,7 @@ describe('KNX DPT Handler', () => {
 		})
 
 		it('should not throw on unknown subtype and should keep base DPT', () => {
-			const dpt = resolve('DPT14.005')
+			const dpt = resolve('DPT14.999')
 			assert.equal(dpt.id, 'DPT14')
 			assert.equal(dpt.subtypeid, undefined)
 		})
