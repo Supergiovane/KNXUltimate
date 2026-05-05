@@ -1,5 +1,12 @@
 
 
+## [5.5.5](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.4...v5.5.5) (2026-05-05)
+
+
+### Bug Fixes
+
+* Update DPT 14 and 20 Metadata ([#89](https://github.com/Supergiovane/KNXUltimate/issues/89)) ([e1ce3ea](https://github.com/Supergiovane/KNXUltimate/commit/e1ce3ea91b9f50d86f223162387821eb2e210a1d))
+
 ## [5.5.4](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.3...v5.5.4) (2026-05-04)
 
 
