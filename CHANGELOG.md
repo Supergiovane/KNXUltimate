@@ -1,5 +1,12 @@
 
 
+## [5.5.6](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.5...v5.5.6) (2026-05-05)
+
+
+### Features
+
+* **dptlib:** complete KNX datapoints and add DPT23-27 ([3d55846](https://github.com/Supergiovane/KNXUltimate/commit/3d5584630d8f00e54f9e76ec6c57cdb51f4041b2))
+
 ## [5.5.5](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.4...v5.5.5) (2026-05-05)
 
 
