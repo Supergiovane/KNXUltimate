@@ -69,7 +69,11 @@ return msg;`,
 			name: 'Building Mode',
 			desc: 'DPT_BuildingMode',
 			unit: '',
-			enc: { 0: 'Building in use', 1: 'Building not used', 2: 'Building protection' },
+			enc: {
+				0: 'Building in use',
+				1: 'Building not used',
+				2: 'Building protection',
+			},
 		},
 
 		// 20.003 Occupancy Mode
@@ -335,7 +339,11 @@ return msg;`,
 			name: 'Load Priority',
 			desc: 'DPT_LoadPriority',
 			unit: '',
-			enc: { 0: 'None', 1: 'Shift load priority', 2: 'Absolute load priority' },
+			enc: {
+				0: 'None',
+				1: 'Shift load priority',
+				2: 'Absolute load priority',
+			},
 		},
 
 		// 20.105 HVAC Control Mode
@@ -433,7 +441,11 @@ return msg;`,
 			name: 'Fan Mode',
 			desc: 'DPT_FanMode',
 			unit: '',
-			enc: { 0: 'Not running', 1: 'Permanently running', 2: 'Running in intervals' },
+			enc: {
+				0: 'Not running',
+				1: 'Permanently running',
+				2: 'Running in intervals',
+			},
 		},
 
 		// 20.112 Master/Slave Mode
@@ -512,7 +524,11 @@ return msg;`,
 			name: 'Start Synchronization',
 			desc: 'DPT_StartSynchronization',
 			unit: '',
-			enc: { 0: 'Position unchanged', 1: 'Single close', 2: 'Single open' },
+			enc: {
+				0: 'Position unchanged',
+				1: 'Single close',
+				2: 'Single open',
+			},
 		},
 
 		// ===== Lighting =====
@@ -577,7 +593,11 @@ return msg;`,
 			name: 'Blinking Mode',
 			desc: 'DPT_BlinkingMode',
 			unit: '',
-			enc: { 0: 'Disabled', 1: 'Without acknowledge', 2: 'With acknowledge' },
+			enc: {
+				0: 'Disabled',
+				1: 'Without acknowledge',
+				2: 'With acknowledge',
+			},
 		},
 
 		// 20.604 Light Control Mode
@@ -639,7 +659,11 @@ return msg;`,
 			name: 'Load Type Set',
 			desc: 'DPT_LoadTypeSet',
 			unit: '',
-			enc: { 0: 'Automatic', 1: 'Leading edge (inductive)', 2: 'Trailing edge (capacitive)' },
+			enc: {
+				0: 'Automatic',
+				1: 'Leading edge (inductive)',
+				2: 'Trailing edge (capacitive)',
+			},
 		},
 
 		// 20.610 Load Type Detected
