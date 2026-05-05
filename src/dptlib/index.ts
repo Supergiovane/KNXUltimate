@@ -38,6 +38,11 @@ import DPT19 from './dpt19'
 import DPT20 from './dpt20'
 import DPT21 from './dpt21'
 import DPT22 from './dpt22'
+import DPT23 from './dpt23'
+import DPT24 from './dpt24'
+import DPT25 from './dpt25'
+import DPT26 from './dpt26'
+import DPT27 from './dpt27'
 import DPT28 from './dpt28'
 import DPT29 from './dpt29'
 import DPT213 from './dpt213'
@@ -98,7 +103,10 @@ export interface DatapointConfig {
 	}
 	subtype?: DatapointSubtype
 	subtypes?: Record<string, DatapointSubtype>
-	formatAPDU?: (value: any, context?: FormatAPDUContext) => Buffer | void
+	formatAPDU?: (
+		value: any,
+		context?: FormatAPDUContext,
+	) => Buffer | void | null
 	fromBuffer?: (buf: Buffer, context?: FromBufferContext) => any
 }
 
@@ -125,6 +133,11 @@ export const dpts: Record<string, DatapointConfig> = {
 	[DPT20.id]: DPT20,
 	[DPT21.id]: DPT21,
 	[DPT22.id]: DPT22,
+	[DPT23.id]: DPT23,
+	[DPT24.id]: DPT24,
+	[DPT25.id]: DPT25,
+	[DPT26.id]: DPT26,
+	[DPT27.id]: DPT27,
 	[DPT28.id]: DPT28,
 	[DPT29.id]: DPT29,
 	[DPT213.id]: DPT213,

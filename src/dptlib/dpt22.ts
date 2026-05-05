@@ -182,10 +182,37 @@ const config: DatapointConfig = {
 		helplink: '',
 	},
 	subtypes: {
+		// 22.100 DPT_StatusDHWC
+		100: {
+			name: 'DHW Controller Status',
+			desc: 'DPT_StatusDHWC',
+			unit: '',
+			scalar_range: [,],
+			range: [,],
+		},
+
 		// 22.101 DPT_StatusRHCC
 		101: {
 			name: 'RHCC Status',
-			desc: 'RHCC Status',
+			desc: 'DPT_StatusRHCC',
+			unit: '',
+			scalar_range: [,],
+			range: [,],
+		},
+
+		// 22.1000 DPT_Media
+		1000: {
+			name: 'Media',
+			desc: 'DPT_Media',
+			unit: '',
+			scalar_range: [,],
+			range: [,],
+		},
+
+		// 22.1010 DPT_Channel_Activation_16
+		1010: {
+			name: 'Channel Activation for 16 channels',
+			desc: 'DPT_Channel_Activation_16',
 			unit: '',
 			scalar_range: [,],
 			range: [,],

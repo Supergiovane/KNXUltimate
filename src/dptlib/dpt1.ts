@@ -248,6 +248,22 @@ return msg;`,
 			desc: 'heat/cool',
 			enc: { 0: '???', 1: '???' },
 		},
+
+		//  1.1200 consumer/producer
+		1200: {
+			use: 'Metering',
+			name: 'Consumer/Producer',
+			desc: 'DPT_ConsumerProducer',
+			enc: { 0: 'Consumer', 1: 'Producer' },
+		},
+
+		//  1.1201 energy direction
+		1201: {
+			use: 'Metering',
+			name: 'Energy Direction',
+			desc: 'DPT_EnergyDirection',
+			enc: { 0: 'Positive', 1: 'Negative' },
+		},
 	},
 }
 

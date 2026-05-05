@@ -518,10 +518,20 @@ return msg;`,
 			name: 'Work',
 			unit: 'J',
 		},
+		'080': {
+			desc: 'DPT_Value_ApparentPower',
+			name: 'Apparent power',
+			unit: 'VA',
+		},
 		'1200': {
 			desc: 'DPT_Value_Volume_m3_h',
 			name: 'Flow rate',
 			unit: 'm³/h',
+		},
+		'1201': {
+			desc: 'DPT_Value_Volume_Flux_ls',
+			name: 'Flow rate',
+			unit: 'l/s',
 		},
 	},
 }

@@ -842,6 +842,71 @@ return msg;`,
 			enc: { 0: 'KNX TP1', 1: 'KNX PL110', 2: 'KNX RF', 5: 'KNX IP' },
 		},
 
+		// 20.1005 Pushbutton Function
+		1005: {
+			name: 'Pushbutton Function',
+			desc: 'DPT_PB_Function',
+			unit: '',
+			enc: {
+				0: 'Reserved',
+				1: 'Default function',
+				2: 'On',
+				3: 'Off',
+				4: 'Toggle',
+				5: 'Dimming Up Down',
+				6: 'Dimming Up',
+				7: 'Dimming Down',
+				8: 'On / Off',
+				9: 'Timed On Off',
+				10: 'Forced On',
+				11: 'Forced Off',
+				12: 'Shutter Up (for PB)',
+				13: 'Shutter Down (for PB)',
+				14: 'Shutter Up Down (for PB)',
+				15: 'Reserved',
+				16: 'Forced Up',
+				17: 'Forced Down',
+				18: 'Wind Alarm',
+				19: 'Rain Alarm',
+				20: 'HVAC Mode Comfort / Economy',
+				21: 'HVAC Mode Comfort / -',
+				22: 'HVAC Mode Economy / -',
+				23: 'HVAC Mode Building protection / HVAC mode auto',
+				24: 'Shutter Stop',
+				25: 'Timed Comfort Standby',
+				26: 'Forced Comfort',
+				27: 'Forced Building protection',
+				28: 'Scene 1',
+				29: 'Scene 2',
+				30: 'Scene 3',
+				31: 'Scene 4',
+				32: 'Scene 5',
+				33: 'Scene 6',
+				34: 'Scene 7',
+				35: 'Scene 8',
+				36: 'Absolute dimming 25%',
+				37: 'Absolute dimming 50%',
+				38: 'Absolute dimming 75%',
+				39: 'Absolute dimming 100%',
+				40: 'Shutter Up / - (for switch)',
+				41: 'Shutter Down / - (for switch)',
+				42: 'Shutter Up / Down (for switch)',
+				43: 'Shutter Down / Up (for switch)',
+				44: 'Light sensor',
+				45: 'System clock',
+				46: 'Battery status',
+				47: 'HVAC Mode Standby / -',
+				48: 'HVAC Mode Auto / -',
+				49: 'HVAC Mode Comfort / Standby',
+				50: 'HVAC Mode Building protection / -',
+				51: 'Timed toggle',
+				52: 'Dimming Absolute switch',
+				53: 'Scene switch',
+				54: 'Smoke alarm',
+				55: 'Sub detector',
+			},
+		},
+
 		// ===== Metering =====
 
 		// 20.1200 M-Bus Breaker/Valve State
@@ -862,6 +927,94 @@ return msg;`,
 				1: 'Temperature converted',
 				2: 'At base condition',
 				3: 'At measurement condition',
+			},
+		},
+
+		// 20.1203 Breaker Status
+		1203: {
+			name: 'Breaker Status',
+			desc: 'DPT_Breaker_Status',
+			unit: '',
+			enc: {
+				0: 'Closed',
+				1: 'Open on overload',
+				2: 'Open on overvoltage',
+				3: 'Open on load shedding',
+				4: 'Open on PLC or Euridis command',
+				5: 'Open on overheat with current over max switching current',
+				6: 'Open on overheat with current under max switching current',
+			},
+		},
+
+		// 20.1204 Euridis Communication Interface Status
+		1204: {
+			name: 'Euridis Communication Interface Status',
+			desc: 'DPT_Euridis_Communication_Interface_Status',
+			unit: '',
+			enc: {
+				0: 'Deactivated',
+				1: 'Activated without security',
+				2: 'Activated with security',
+			},
+		},
+
+		// 20.1205 PLC Status
+		1205: {
+			name: 'PLC Status',
+			desc: 'DPT_PLC_Status',
+			unit: '',
+			enc: {
+				0: 'New / Unlock (S-SFK) - Not associated (G3-PLC)',
+				1: 'New / Lock (S-FSK) - Associated (G3-PLC)',
+				2: 'Registered (S-FSK) - Reserved (G3-PLC)',
+			},
+		},
+
+		// 20.1206 Peak Event Notice
+		1206: {
+			name: 'Peak Event Notice',
+			desc: 'DPT_Peak_Event_Notice',
+			unit: '',
+			enc: {
+				0: 'No notice in progress',
+				1: 'Notice PE1 in progress',
+				2: 'Notice PE2 in progress',
+				3: 'Notice PE3 in progress',
+			},
+		},
+
+		// 20.1207 Peak Event
+		1207: {
+			name: 'Peak Event',
+			desc: 'DPT_Peak_Event',
+			unit: '',
+			enc: {
+				0: 'No peak event',
+				1: 'PE1 in progress',
+				2: 'PE2 in progress',
+				3: 'PE3 in progress',
+			},
+		},
+
+		// 20.1208 TIC Type
+		1208: {
+			name: 'TIC Type',
+			desc: 'DPT_TIC_Type',
+			unit: '',
+			enc: { 0: 'Historical', 1: 'Standard' },
+		},
+
+		// 20.1209 TIC Channel Type
+		1209: {
+			name: 'TIC Channel Type',
+			desc: 'DPT_Type_TIC_Channel',
+			unit: '',
+			enc: {
+				0: 'None',
+				1: 'Historical single-phase',
+				2: 'Historical three-phase',
+				3: 'Standard single-phase',
+				4: 'Standard three-phase',
 			},
 		},
 	},
