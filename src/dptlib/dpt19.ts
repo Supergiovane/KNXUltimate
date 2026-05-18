@@ -94,8 +94,9 @@ const config: DatapointConfig = {
 		valuetype: 'composite',
 		desc: '8-byte Date+Time',
 		help: `// Setting date/time using DPT 19.001
-// This sends both date and time to the KNX BUS
-msg.payload = new Date();
+// Accepted payload types: Date, ISO string, or timestamp (ms)
+// Valid year range: 1900..2155
+msg.payload = '2026-05-18T12:30:00';
 return msg;`,
 		helplink:
 			'https://github.com/Supergiovane/node-red-contrib-knx-ultimate/wiki/-Sample---DateTime-to-BUS',
