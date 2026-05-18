@@ -26,14 +26,47 @@ const logger = module('DPT19')
 const config: DatapointConfig = {
 	id: 'DPT19',
 	formatAPDU: (value) => {
-		if (typeof value !== 'object' || value.constructor.name !== 'Date') {
-			logger.error('Must supply a Date object')
+		if (value == null) {
+			logger.error('cannot write null value for DPT19')
+			return null
+		}
+		switch (typeof value) {
+			case 'string':
+			case 'number':
+				value = new Date(value)
+				break
+			case 'object':
+				if (!(value instanceof Date)) {
+					logger.error(
+						'Must supply a numeric timestamp, Date or String object for DPT19 DateTime',
+					)
+					return null
+				}
+				break
+			default:
+				logger.error(
+					'Must supply a numeric timestamp, Date or String object for DPT19 DateTime',
+				)
+				return null
+		}
+		if (isNaN(value.getTime())) {
+			logger.error(
+				'Must supply a numeric timestamp, Date or String object for DPT19 DateTime',
+			)
+			return null
+		}
+		const year = value.getFullYear()
+		if (year < 1900 || year > 2155) {
+			logger.error(
+				'Year %d is out of DPT19 range (1900-2155)',
+				year,
+			)
 			return null
 		}
 		// Sunday is 0 in Javascript, but 7 in KNX.
 		const day = value.getDay() === 0 ? 7 : value.getDay()
 		const apdu_data = Buffer.alloc(8)
-		apdu_data[0] = value.getFullYear() - 1900
+		apdu_data[0] = year - 1900
 		apdu_data[1] = value.getMonth() + 1
 		apdu_data[2] = value.getDate()
 		apdu_data[3] = (day << 5) + value.getHours()
@@ -42,8 +75,6 @@ const config: DatapointConfig = {
 		apdu_data[6] = 0
 		apdu_data[7] = 0
 		return apdu_data
-
-		return null
 	},
 
 	fromBuffer: (buf) => {
@@ -51,7 +82,7 @@ const config: DatapointConfig = {
 			logger.warn('Buffer should be 8 bytes long, got', buf.length)
 			return null
 		}
-		const d = new Date(
+		return new Date(
 			buf[0] + 1900,
 			buf[1] - 1,
 			buf[2],
@@ -59,8 +90,6 @@ const config: DatapointConfig = {
 			buf[4],
 			buf[5],
 		)
-		return d
-		return null
 	},
 
 	basetype: {
