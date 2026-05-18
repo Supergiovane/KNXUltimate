@@ -1,5 +1,12 @@
 
 
+## [5.5.7](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.6...v5.5.7) (2026-05-18)
+
+
+### Bug Fixes
+
+* Allow timestamps as Date Input ([#90](https://github.com/Supergiovane/KNXUltimate/issues/90)) ([282d6dc](https://github.com/Supergiovane/KNXUltimate/commit/282d6dc1fe300d8f875c9a8f04be01b2ac3a5c72))
+
 ## [5.5.6](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.5...v5.5.6) (2026-05-05)
 
 
