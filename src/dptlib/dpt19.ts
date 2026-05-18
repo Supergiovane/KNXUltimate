@@ -57,10 +57,7 @@ const config: DatapointConfig = {
 		}
 		const year = value.getFullYear()
 		if (year < 1900 || year > 2155) {
-			logger.error(
-				'Year %d is out of DPT19 range (1900-2155)',
-				year,
-			)
+			logger.error('Year %d is out of DPT19 range (1900-2155)', year)
 			return null
 		}
 		// Sunday is 0 in Javascript, but 7 in KNX.
