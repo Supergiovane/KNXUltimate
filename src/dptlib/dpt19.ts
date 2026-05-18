@@ -26,8 +26,27 @@ const logger = module('DPT19')
 const config: DatapointConfig = {
 	id: 'DPT19',
 	formatAPDU: (value) => {
-		if (typeof value !== 'object' || value.constructor.name !== 'Date') {
-			logger.error('Must supply a Date object')
+		if (value == null) {
+			logger.error('cannot write null value for DPT19')
+			return null
+		}
+		switch (typeof value) {
+			case 'string':
+			case 'number':
+				value = new Date(value)
+				break
+			case 'object':
+				if (value.constructor.name !== 'Date') {
+					logger.error(
+						'Must supply a numeric timestamp, Date or String object for DPT19 DateTime',
+					)
+					return null
+				}
+		}
+		if (isNaN(value.getTime())) {
+			logger.error(
+				'Must supply a numeric timestamp, Date or String object for DPT19 DateTime',
+			)
 			return null
 		}
 		// Sunday is 0 in Javascript, but 7 in KNX.
