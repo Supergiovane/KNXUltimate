@@ -1,5 +1,5 @@
 /**
- * Internal example validating KNX datetime handling.
+ * Internal example validating KNX datetime handling (DPT 19.001).
  *
  * Written in Italy with love, sun and passion, by Massimo Saccani.
  *
@@ -7,25 +7,27 @@
  * Use at your own risk; the author assumes no liability for damages.
  */
 
-import { KNXClientOptions } from "../src/KNXClient";
-import { KNXClientEvents, KNXClient, dptlib } from "../src";
-import { resolve, fromBuffer } from "../src/dptlib";
-
-
+import { dptlib } from '../src'
 
 async function main() {
-    // Simulate receiving a KNX telegram encoded as DPT 10.001 (time of day)
-    const config = resolve("10.001");
-    let rawArray = new Uint8Array([16, 58, 11]);
-    let _Rawvalue = Buffer.from(rawArray);
-    let jsValue = fromBuffer(_Rawvalue, config);
-    console.log(jsValue);
+  const dpt = dptlib.resolve('19.001')
 
-    // Simulate encoding the current time back to a KNX payload
-    const dpt = resolve("10.001");
-    let d = new Date().toString();
-    let toKnxBuff = dpt.formatAPDU(d)
-    console.log(toKnxBuff);
+  // Simulate receiving a KNX telegram encoded as DPT 19.001 (date + time)
+  const incomingPayload = Buffer.from([126, 5, 18, 44, 30, 45, 0, 0]) // 2026-05-18 12:30:45
+  const decoded = dptlib.fromBuffer(incomingPayload, dpt)
+  console.log('Decoded 19.001 ->', decoded)
+
+  // Simulate encoding date/time values to KNX payload
+  const values: Array<Date | string | number> = [
+    new Date('2026-05-18T12:30:00'),
+    '2026-05-18T12:30:00',
+    Date.now(),
+  ]
+
+  values.forEach((value) => {
+    const apdu = dpt.formatAPDU?.(value)
+    console.log('Encoded 19.001 from', value, '->', apdu)
+  })
 }
 
-main().catch(console.error);
+main().catch(console.error)
