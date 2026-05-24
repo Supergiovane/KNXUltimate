@@ -61,15 +61,23 @@ describe('Custom error classes', () => {
 		})
 
 		test('is an instance of DuplicateRequestError', () => {
-			assert.ok(new DuplicateRequestError() instanceof DuplicateRequestError)
+			assert.ok(
+				new DuplicateRequestError() instanceof DuplicateRequestError,
+			)
 		})
 
 		test('has correct name', () => {
-			assert.equal(new DuplicateRequestError().name, 'DuplicateRequestError')
+			assert.equal(
+				new DuplicateRequestError().name,
+				'DuplicateRequestError',
+			)
 		})
 
 		test('has correct message', () => {
-			assert.equal(new DuplicateRequestError().message, 'Duplicate request')
+			assert.equal(
+				new DuplicateRequestError().message,
+				'Duplicate request',
+			)
 		})
 	})
 
@@ -156,7 +164,10 @@ describe('Custom error classes', () => {
 				try {
 					throw err
 				} catch (e) {
-					assert.ok(e instanceof Error, `${err.name} should be catchable as Error`)
+					assert.ok(
+						e instanceof Error,
+						`${err.name} should be catchable as Error`,
+					)
 				}
 			}
 		})

@@ -31,7 +31,8 @@ describe('ipAddressHelper', () => {
 		afterEach(() => {
 			if (origCI === undefined) delete process.env.CI
 			else process.env.CI = origCI
-			if (origFakeIface === undefined) delete process.env.KNX_USE_FAKE_IFACE
+			if (origFakeIface === undefined)
+				delete process.env.KNX_USE_FAKE_IFACE
 			else process.env.KNX_USE_FAKE_IFACE = origFakeIface
 		})
 
@@ -71,7 +72,8 @@ describe('ipAddressHelper', () => {
 		afterEach(() => {
 			if (origCI === undefined) delete process.env.CI
 			else process.env.CI = origCI
-			if (origFakeIface === undefined) delete process.env.KNX_USE_FAKE_IFACE
+			if (origFakeIface === undefined)
+				delete process.env.KNX_USE_FAKE_IFACE
 			else process.env.KNX_USE_FAKE_IFACE = origFakeIface
 		})
 

@@ -31,7 +31,7 @@ describe('DPT6 (8-bit signed value)', () => {
 			assert.deepEqual(encode(127), Buffer.from([0x7f]))
 		})
 
-		test('should encode -1 to 0xFF (two\'s complement)', () => {
+		test("should encode -1 to 0xFF (two's complement)", () => {
 			assert.deepEqual(encode(-1), Buffer.from([0xff]))
 		})
 
@@ -70,7 +70,10 @@ describe('DPT6 (8-bit signed value)', () => {
 		})
 
 		test('should return null for oversized buffer', () => {
-			assert.equal(fromBuffer(Buffer.from([0x00, 0x01]), resolve('6')), null)
+			assert.equal(
+				fromBuffer(Buffer.from([0x00, 0x01]), resolve('6')),
+				null,
+			)
 		})
 	})
 

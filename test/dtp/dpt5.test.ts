@@ -34,7 +34,11 @@ describe('DPT5 (8-bit unsigned value)', () => {
 		test('round-trip encode/decode', () => {
 			for (const v of [0, 1, 64, 128, 200, 255]) {
 				const buf = encode(v, '5.004')
-				assert.equal(fromBuffer(buf, resolve('5.004')), v, `failed for ${v}`)
+				assert.equal(
+					fromBuffer(buf, resolve('5.004')),
+					v,
+					`failed for ${v}`,
+				)
 			}
 		})
 	})
@@ -50,7 +54,10 @@ describe('DPT5 (8-bit unsigned value)', () => {
 
 		test('round-trip boundaries', () => {
 			assert.equal(fromBuffer(encode(0, '5.001'), resolve('5.001')), 0)
-			assert.equal(fromBuffer(encode(100, '5.001'), resolve('5.001')), 100)
+			assert.equal(
+				fromBuffer(encode(100, '5.001'), resolve('5.001')),
+				100,
+			)
 		})
 
 		test('round-trip 50%', () => {
@@ -78,7 +85,10 @@ describe('DPT5 (8-bit unsigned value)', () => {
 
 		test('round-trip boundaries', () => {
 			assert.equal(fromBuffer(encode(0, '5.003'), resolve('5.003')), 0)
-			assert.equal(fromBuffer(encode(360, '5.003'), resolve('5.003')), 360)
+			assert.equal(
+				fromBuffer(encode(360, '5.003'), resolve('5.003')),
+				360,
+			)
 		})
 	})
 
@@ -88,7 +98,10 @@ describe('DPT5 (8-bit unsigned value)', () => {
 		})
 
 		test('should return null for oversized buffer', () => {
-			assert.equal(fromBuffer(Buffer.from([0x00, 0x00]), resolve('5')), null)
+			assert.equal(
+				fromBuffer(Buffer.from([0x00, 0x00]), resolve('5')),
+				null,
+			)
 		})
 
 		test('should decode raw byte value correctly', () => {

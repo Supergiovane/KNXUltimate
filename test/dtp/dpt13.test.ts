@@ -35,10 +35,7 @@ describe('DPT13 (4-byte signed value)', () => {
 		})
 
 		test('should encode -1 to 0xFFFFFFFF', () => {
-			assert.deepEqual(
-				encode(-1),
-				Buffer.from([0xff, 0xff, 0xff, 0xff]),
-			)
+			assert.deepEqual(encode(-1), Buffer.from([0xff, 0xff, 0xff, 0xff]))
 		})
 
 		test('should encode min negative (-2^31) to 0x80000000', () => {
@@ -63,37 +60,55 @@ describe('DPT13 (4-byte signed value)', () => {
 	describe('fromBuffer (generic)', () => {
 		test('should decode 0x00000000 to 0', () => {
 			assert.equal(
-				fromBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00]), resolve('13')),
+				fromBuffer(
+					Buffer.from([0x00, 0x00, 0x00, 0x00]),
+					resolve('13'),
+				),
 				0,
 			)
 		})
 
 		test('should decode 0x7FFFFFFF to 2147483647', () => {
 			assert.equal(
-				fromBuffer(Buffer.from([0x7f, 0xff, 0xff, 0xff]), resolve('13')),
+				fromBuffer(
+					Buffer.from([0x7f, 0xff, 0xff, 0xff]),
+					resolve('13'),
+				),
 				2147483647,
 			)
 		})
 
 		test('should decode 0xFFFFFFFF to -1', () => {
 			assert.equal(
-				fromBuffer(Buffer.from([0xff, 0xff, 0xff, 0xff]), resolve('13')),
+				fromBuffer(
+					Buffer.from([0xff, 0xff, 0xff, 0xff]),
+					resolve('13'),
+				),
 				-1,
 			)
 		})
 
 		test('should decode 0x80000000 to -2147483648', () => {
 			assert.equal(
-				fromBuffer(Buffer.from([0x80, 0x00, 0x00, 0x00]), resolve('13')),
+				fromBuffer(
+					Buffer.from([0x80, 0x00, 0x00, 0x00]),
+					resolve('13'),
+				),
 				-2147483648,
 			)
 		})
 
 		test('should return null for wrong buffer length', () => {
 			assert.equal(fromBuffer(Buffer.from([]), resolve('13')), null)
-			assert.equal(fromBuffer(Buffer.from([0x00, 0x00, 0x00]), resolve('13')), null)
 			assert.equal(
-				fromBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]), resolve('13')),
+				fromBuffer(Buffer.from([0x00, 0x00, 0x00]), resolve('13')),
+				null,
+			)
+			assert.equal(
+				fromBuffer(
+					Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]),
+					resolve('13'),
+				),
 				null,
 			)
 		})

@@ -31,7 +31,7 @@ describe('DPT8 (16-bit signed value)', () => {
 			assert.deepEqual(encode(32767), Buffer.from([0x7f, 0xff]))
 		})
 
-		test('should encode -1 to 0xFFFF (two\'s complement)', () => {
+		test("should encode -1 to 0xFFFF (two's complement)", () => {
 			assert.deepEqual(encode(-1), Buffer.from([0xff, 0xff]))
 		})
 
