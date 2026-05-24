@@ -18,8 +18,6 @@ import type { DatapointConfig } from '.'
 //  DPT15.*: Access data
 //
 
-// TODO: implement fromBuffer, formatAPDU
-
 //  DPT15 base type info
 const config: DatapointConfig = {
 	id: 'DPT15',

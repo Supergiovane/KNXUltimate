@@ -18,8 +18,6 @@ import type { DatapointConfig } from '.'
 // DPT17: Scene number
 //
 
-// TODO: implement fromBuffxer, formatAPDU
-
 const config: DatapointConfig = {
 	id: 'DPT17',
 	// DPT17 basetype info

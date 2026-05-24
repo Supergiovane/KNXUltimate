@@ -32,7 +32,6 @@ import type { DatapointConfig } from '.'
     end
 */
 
-// TODO: implement fromBuffer, formatAPDU
 import { module } from '../KnxLog'
 
 const logger = module('DPT18')

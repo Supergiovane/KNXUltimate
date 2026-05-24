@@ -124,6 +124,9 @@ export enum ConncetionState {
 	DISCONNECTED = 'DISCONNECTED',
 }
 
+// Correct spelling alias — ConncetionState kept for backward compatibility.
+export { ConncetionState as ConnectionState }
+
 export enum SocketEvents {
 	error = 'error',
 	message = 'message',

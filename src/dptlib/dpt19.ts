@@ -15,8 +15,6 @@
 import type { DatapointConfig } from '.'
 import { module } from '../KnxLog'
 
-// TODO: implement fromBuffer, formatAPDU
-
 //
 // DPT19: 8-byte Date and Time
 //
