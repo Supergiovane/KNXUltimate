@@ -1,4 +1,13 @@
+# Changelog
 
+## [5.5.8](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.7...v5.5.8) (2026-05-24)
+
+
+### Bug Fixes
+
+* **deps:** resolve npm audit vulnerabilities and update devDependencies ([d7c415f](https://github.com/Supergiovane/KNXUltimate/commit/d7c415fbd8367ada6bc351dee9e28d7a4d053452))
+* **KNXClient:** export ConnectionState alias to correct ConncetionState typo ([9c12762](https://github.com/Supergiovane/KNXUltimate/commit/9c12762315607bfb89602dde6e9050ba383cb8f2))
+* linter ([cb1b308](https://github.com/Supergiovane/KNXUltimate/commit/cb1b308b1074c0467c9550b7e2e5f1585aa85fb2))
 
 ## [5.5.7](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.6...v5.5.7) (2026-05-18)
 
