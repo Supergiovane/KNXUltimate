@@ -32,4 +32,34 @@ describe('DPT1 (1-bit value)', () => {
 			assert.deepEqual(DPT1.formatAPDU!('false'), Buffer.from([0]))
 		})
 	})
+
+	describe('fromBuffer', () => {
+		test('should decode 0x01 to true', () => {
+			assert.equal(DPT1.fromBuffer!(Buffer.from([1])), true)
+		})
+
+		test('should decode 0x00 to false', () => {
+			assert.equal(DPT1.fromBuffer!(Buffer.from([0])), false)
+		})
+
+		test('should decode any non-zero byte to true', () => {
+			assert.equal(DPT1.fromBuffer!(Buffer.from([0xff])), true)
+			assert.equal(DPT1.fromBuffer!(Buffer.from([0x42])), true)
+		})
+
+		test('should return null for wrong buffer length', () => {
+			assert.equal(DPT1.fromBuffer!(Buffer.from([])), null)
+			assert.equal(DPT1.fromBuffer!(Buffer.from([0, 0])), null)
+		})
+
+		test('round-trip encode/decode true', () => {
+			const buf = DPT1.formatAPDU!(true)!
+			assert.equal(DPT1.fromBuffer!(buf), true)
+		})
+
+		test('round-trip encode/decode false', () => {
+			const buf = DPT1.formatAPDU!(false)!
+			assert.equal(DPT1.fromBuffer!(buf), false)
+		})
+	})
 })
