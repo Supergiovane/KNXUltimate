@@ -2900,7 +2900,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.exitProcessingKNXQueueLoop = true // Exits KNX processing queue loop
 		return new Promise<void>((resolve) => {
 			if (!this._clientSocket) {
-				return resolve()
+				resolve()
+				return
 			}
 
 			this.socketReady = false
