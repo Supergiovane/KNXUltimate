@@ -2898,7 +2898,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private async closeSocket() {
 		this.exitProcessingKNXQueueLoop = true // Exits KNX processing queue loop
-		return new Promise<void>((resolve) => {
+		let closeTimeoutRef: NodeJS.Timeout = null
+		const closePromise = new Promise<void>((resolve) => {
 			if (!this._clientSocket) {
 				return resolve()
 			}
@@ -2926,6 +2927,25 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					`KNXClient: into async closeSocket(): ${error.stack}`,
 				)
 				resolve()
+			}
+		})
+
+		// Belt-and-suspenders: cap closeSocket at 2 s so it can never hang
+		// indefinitely regardless of transport state (e.g. when 'close' fired
+		// before we attached the listener, or the socket was already destroyed).
+		return Promise.race<void>([
+			closePromise,
+			new Promise<void>((resolve) => {
+				closeTimeoutRef = setTimeout(() => {
+					this.sysLogger.warn(
+						`KNXClient: closeSocket timeout after 2000 ms`,
+					)
+					resolve()
+				}, 2000)
+			}),
+		]).finally(() => {
+			if (closeTimeoutRef) {
+				clearTimeout(closeTimeoutRef)
 			}
 		})
 	}
