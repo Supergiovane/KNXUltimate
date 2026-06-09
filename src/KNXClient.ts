@@ -2899,8 +2899,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private async closeSocket() {
 		this.exitProcessingKNXQueueLoop = true // Exits KNX processing queue loop
 		return new Promise<void>((resolve) => {
-			// already closed
-			if (!this._clientSocket) return
+			if (!this._clientSocket) {
+				return resolve()
+			}
 
 			this.socketReady = false
 
@@ -2915,6 +2916,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			try {
 				if (client instanceof TCPSocket) {
 					// use destroy instead of end here to ensure socket is closed
+					client.once('close', cb)
 					client.destroy()
 				} else {
 					;(client as UDPSocket).close(cb)
