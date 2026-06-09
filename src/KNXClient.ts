@@ -2898,8 +2898,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private async closeSocket() {
 		this.exitProcessingKNXQueueLoop = true // Exits KNX processing queue loop
-		let closeTimeoutRef: NodeJS.Timeout = null
-		const closePromise = new Promise<void>((resolve) => {
+		return new Promise<void>((resolve) => {
 			if (!this._clientSocket) {
 				return resolve()
 			}
@@ -2927,25 +2926,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					`KNXClient: into async closeSocket(): ${error.stack}`,
 				)
 				resolve()
-			}
-		})
-
-		// Belt-and-suspenders: cap closeSocket at 2 s so it can never hang
-		// indefinitely regardless of transport state (e.g. when 'close' fired
-		// before we attached the listener, or the socket was already destroyed).
-		return Promise.race<void>([
-			closePromise,
-			new Promise<void>((resolve) => {
-				closeTimeoutRef = setTimeout(() => {
-					this.sysLogger.warn(
-						`KNXClient: closeSocket timeout after 2000 ms`,
-					)
-					resolve()
-				}, 2000)
-			}),
-		]).finally(() => {
-			if (closeTimeoutRef) {
-				clearTimeout(closeTimeoutRef)
 			}
 		})
 	}
@@ -3034,16 +3014,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._clientTunnelSeqNumber = -1
 		this._channelID = null
 
+		// Emit `disconnected` BEFORE awaiting socket teardown so consumers always
+		// learn about the disconnect even if closeSocket() hangs (defensive — the
+		// previous closeSocket() bug never fired this event on TCP transport).
+		this.emit(
+			KNXClientEvents.disconnected,
+			`${this._peerHost}:${this._peerPort} ${_sReason}`,
+		)
+
 		if (this.isSerialTransport()) {
 			await this.closeSerialTransport()
 		} else {
 			await this.closeSocket()
 		}
 
-		this.emit(
-			KNXClientEvents.disconnected,
-			`${this._peerHost}:${this._peerPort} ${_sReason}`,
-		)
 		this.clearToSend = true // 26/12/2021 allow to send
 	}
 
