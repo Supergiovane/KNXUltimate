@@ -2899,8 +2899,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private async closeSocket() {
 		this.exitProcessingKNXQueueLoop = true // Exits KNX processing queue loop
 		return new Promise<void>((resolve) => {
-			// already closed
-			if (!this._clientSocket) return
+			if (!this._clientSocket) {
+				resolve()
+				return
+			}
 
 			this.socketReady = false
 
@@ -2915,6 +2917,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			try {
 				if (client instanceof TCPSocket) {
 					// use destroy instead of end here to ensure socket is closed
+					client.once('close', cb)
 					client.destroy()
 				} else {
 					;(client as UDPSocket).close(cb)
@@ -3012,16 +3015,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._clientTunnelSeqNumber = -1
 		this._channelID = null
 
+		// Emit `disconnected` BEFORE awaiting socket teardown so consumers always
+		// learn about the disconnect even if closeSocket() hangs (defensive — the
+		// previous closeSocket() bug never fired this event on TCP transport).
+		this.emit(
+			KNXClientEvents.disconnected,
+			`${this._peerHost}:${this._peerPort} ${_sReason}`,
+		)
+
 		if (this.isSerialTransport()) {
 			await this.closeSerialTransport()
 		} else {
 			await this.closeSocket()
 		}
 
-		this.emit(
-			KNXClientEvents.disconnected,
-			`${this._peerHost}:${this._peerPort} ${_sReason}`,
-		)
 		this.clearToSend = true // 26/12/2021 allow to send
 	}
 
