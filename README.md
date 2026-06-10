@@ -651,7 +651,7 @@ Tips
 
 For a complete example of logging usage, see [logging.ts](./examples/logging.ts) in the examples folder.
 
-## DECONDING THE TELEGRAMS FROM BUS
+## DECODING THE TELEGRAMS FROM BUS
 
 Decoding is very simple.
 
