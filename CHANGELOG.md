@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.5.9](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.8...v5.5.9) (2026-06-10)
+
+
+### Bug Fixes
+
+* closeSocket() never resolves on TCP, blocking disconnected event ([#93](https://github.com/Supergiovane/KNXUltimate/issues/93)) ([5a10b77](https://github.com/Supergiovane/KNXUltimate/commit/5a10b77123bd3cf04b5d6be50409bd122c835a30))
+
 ## [5.5.8](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.7...v5.5.8) (2026-05-24)
 
 
