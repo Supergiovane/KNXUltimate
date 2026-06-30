@@ -1,5 +1,20 @@
 # Changelog
 
+## [6.0.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.9...v6.0.0) (2026-06-30)
+
+### ⚠ BREAKING CHANGES
+
+* **secure:** the KNX/IP Secure and Data Secure **receive path is now validated**. Frames that fail cryptographic authentication or freshness checks are **silently dropped instead of being emitted** as `indication` events. Code that previously (even if unintentionally) acted on forged, tampered or replayed secure telegrams will no longer receive them. This is a security fix, but it changes observable behaviour, hence the major version bump.
+* **secure:** inside an established KNX/IP Secure session, **plaintext KNX/IP frames are now dropped** (only `SecureWrapper` frames and the initial `SESSION_RESPONSE` are accepted). A previously tolerated plaintext `CONNECT_RESPONSE` fallback is no longer honoured.
+* **secure:** the Data Secure sender sequence (48-bit) **no longer wraps around**. When the maximum value is reached, secure sending throws instead of silently reusing a sequence number; new key material is required to continue.
+
+### Features
+
+* **secure:** verify the `SESSION_RESPONSE` device-authentication MAC during the unicast handshake before trusting the server's public key; a forged response now aborts the handshake.
+* **secure:** verify the `SecureWrapper` MAC and enforce a strictly increasing wrapper sequence per session (anti-replay); invalid or replayed wrappers are dropped while keeping the session alive.
+* **secure:** enforce Data Secure per-source anti-replay using the 48-bit sender sequence and reject telegrams with an invalid MAC.
+* **secure:** new optional `secureTunnelConfig.deviceAuthenticationPassword` to supply the device authentication password in manual mode (no keyring). When a keyring is provided it is taken from the keyring automatically.
+
 ## [5.5.9](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.8...v5.5.9) (2026-06-10)
 
 

@@ -25,6 +25,9 @@ import {
 	APCI_SEC,
 	TPCI_DATA,
 	DATA_SECURE_CTR_SUFFIX,
+	AUTH_CTR_IV,
+	AES_BLOCK_LEN,
+	KNXIP_HDR_SECURE_SESSION_RESPONSE,
 	CEMI as SEC_CEMI,
 } from '../../src/secure/secure_knx_constants'
 import {
@@ -70,6 +73,9 @@ type SecureGatewayOptions = {
 	tunnelAssignedIndividualAddress?: string
 	groupKeys?: Record<string, Buffer>
 	initialSendSeq48?: bigint
+	/** 16-byte derived device authentication code; when set the gateway emits a
+	 * SESSION_RESPONSE MAC so clients can verify the handshake. */
+	deviceAuthCode?: Buffer
 }
 
 const X25519_SPKI_PREFIX_DER = Buffer.from('302a300506032b656e032100', 'hex')
@@ -115,6 +121,8 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 
 	private readonly serverPublicKeyRaw: Buffer
 
+	private readonly deviceAuthCode: Buffer | null
+
 	constructor(options: SecureGatewayOptions = {}) {
 		super()
 		this.host = options.host ?? '127.0.0.1'
@@ -139,6 +147,10 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		}
 		this.sendSeq48Start = options.initialSendSeq48 ?? BigInt(Date.now())
 		this.sendSeq48 = this.sendSeq48Start
+		this.deviceAuthCode =
+			options.deviceAuthCode && options.deviceAuthCode.length >= 16
+				? Buffer.from(options.deviceAuthCode.subarray(0, 16))
+				: null
 		const keyPair = crypto.generateKeyPairSync('x25519')
 		this.serverPrivateKey = keyPair.privateKey
 		const exported = keyPair.publicKey.export({
@@ -198,6 +210,23 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		) {
 			throw new Error('Secure session not established')
 		}
+		const { inner } = this.buildSecureGroupWriteInner(groupAddress, value)
+		this.socket.write(this.wrapFrame(inner))
+	}
+
+	// ===== Test attack helpers =====
+
+	/**
+	 * Build the inner KNX/IP tunnelling frame for a secure group write. When
+	 * forceSeq is provided the Data Secure sender sequence is forced to that
+	 * value (used to craft Data Secure replays without advancing the real
+	 * counter). Returns the inner frame and the 48-bit sequence used.
+	 */
+	buildSecureGroupWriteInner(
+		groupAddress: string,
+		value: boolean,
+		forceSeq?: bigint,
+	): { inner: Buffer; seq48: bigint } {
 		const dst = new GroupAddress(groupAddress).raw
 		const key = this.groupKeys.get(dst)
 		if (!key) {
@@ -214,14 +243,31 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		const dstAddress = new KNXAddress(dst, KNXAddressType.TYPE_GROUP)
 		const apci = 0x80 | (value ? 0x01 : 0x00)
 		const npdu = new NPDU(0x00, apci, null)
+		const prevSeq = this.sendSeq48
+		if (forceSeq !== undefined) this.sendSeq48 = forceSeq
+		const seq48 = this.sendSeq48
 		this.applyDataSecure(npdu, control, this.interfaceIa, dst, key)
+		if (forceSeq !== undefined) this.sendSeq48 = prevSeq
 		const cemi = new LDataInd(null, control, srcAddress, dstAddress, npdu)
 		const request = KNXProtocol.newKNXTunnelingRequest(
 			this.channelId,
 			this.nextTunnelSeq(),
 			cemi,
 		)
-		this.socket.write(this.wrapFrame(request.toBuffer()))
+		return { inner: request.toBuffer(), seq48 }
+	}
+
+	/** Wrap an arbitrary inner KNX/IP frame in a fresh SecureWrapper. */
+	wrapInner(inner: Buffer): Buffer {
+		return this.wrapFrame(inner)
+	}
+
+	/** Send raw bytes directly on the socket, bypassing wrapping. */
+	writeRaw(buf: Buffer): void {
+		if (!this.socket) {
+			throw new Error('No socket')
+		}
+		this.socket.write(buf)
 	}
 
 	private handleConnection(socket: Socket) {
@@ -298,14 +344,53 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		})
 		const sessionHash = crypto.createHash('sha256').update(secret).digest()
 		this.sessionKey = sessionHash.subarray(0, 16)
-		const responseLen = KNXIP_HEADER_AND_BODY_LEN(2 + PUBLIC_KEY_LEN)
-		const response = Buffer.concat([
+		// Body = session id (2) + server public key (32) + optional MAC (16).
+		const bodyLen =
+			2 + PUBLIC_KEY_LEN + (this.deviceAuthCode ? MAC_LEN_FULL : 0)
+		const responseLen = KNXIP_HEADER_AND_BODY_LEN(bodyLen)
+		let response = Buffer.concat([
 			Buffer.from('06100952', 'hex'),
 			Buffer.from([responseLen >> 8, responseLen & 0xff]),
 			Buffer.from([this.sessionId >> 8, this.sessionId & 0xff]),
 			this.serverPublicKeyRaw,
 		])
+		if (this.deviceAuthCode) {
+			response = Buffer.concat([
+				response,
+				this.buildSessionResponseMac(responseLen),
+			])
+		}
 		this.socket?.write(response)
+	}
+
+	// Build the SESSION_RESPONSE MAC (device authentication) over the XOR of the
+	// client and server public values and the session id, matching the verifier
+	// in KNXClient.secureVerifySessionResponse.
+	private buildSessionResponseMac(totalLen: number): Buffer {
+		if (!this.deviceAuthCode || !this.clientPublicKey)
+			return Buffer.alloc(0)
+		const xor = Buffer.alloc(PUBLIC_KEY_LEN)
+		for (let i = 0; i < PUBLIC_KEY_LEN; i++)
+			xor[i] = this.clientPublicKey[i] ^ this.serverPublicKeyRaw[i]
+		const additionalData = Buffer.concat([
+			KNXIP_HDR_SECURE_SESSION_RESPONSE,
+			Buffer.from([(totalLen >> 8) & 0xff, totalLen & 0xff]),
+			Buffer.from([(this.sessionId >> 8) & 0xff, this.sessionId & 0xff]),
+			xor,
+		])
+		const block0 = Buffer.alloc(AES_BLOCK_LEN, 0)
+		const macCbc = calculateMessageAuthenticationCodeCBC(
+			this.deviceAuthCode,
+			additionalData,
+			Buffer.alloc(0),
+			block0,
+		)
+		const ctr = crypto.createCipheriv(
+			'aes-128-ctr',
+			this.deviceAuthCode,
+			AUTH_CTR_IV,
+		)
+		return ctr.update(macCbc)
 	}
 
 	private handleSecureWrapper(frame: Buffer) {
@@ -495,7 +580,8 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 			addrFields,
 			Buffer.from([
 				0x00,
-				flags16 & 0xff,
+				// Only the relevant CTRL2 bits are covered by the Data Secure MAC.
+				flags16 & 0xff & SEC_CEMI.CTRL2_RELEVANT_MASK,
 				(TPCI_DATA << 2) + APCI_SEC.HIGH,
 				APCI_SEC.LOW,
 				0x00,

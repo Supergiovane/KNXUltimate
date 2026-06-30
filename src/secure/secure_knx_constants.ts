@@ -64,6 +64,7 @@ export const KNXIP_HDR_TUNNELING_CONNECT_REQUEST = Buffer.from(
 	'hex',
 )
 export const KNXIP_HDR_SECURE_SESSION_REQUEST = Buffer.from('06100951', 'hex')
+export const KNXIP_HDR_SECURE_SESSION_RESPONSE = Buffer.from('06100952', 'hex')
 export const KNXIP_HDR_SECURE_SESSION_AUTHENTICATE = Buffer.from(
 	'06100953',
 	'hex',

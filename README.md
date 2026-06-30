@@ -29,6 +29,34 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 </p>
 
 
+## ⚠️ BREAKING CHANGES IN v6.0.0 (KNX Secure validation)
+
+> **If you use KNX/IP Secure or Data Secure, please read this before upgrading.**
+>
+> Version 6.0.0 hardens the **receive path** of the secure stack. The library now
+> cryptographically validates incoming secure traffic and **drops frames that fail
+> authentication or freshness checks instead of emitting them**:
+>
+> - The `SESSION_RESPONSE` device-authentication MAC is verified during the unicast
+>   handshake; a forged response now aborts the connection.
+> - `SecureWrapper` frames are MAC-verified and protected against replay (the wrapper
+>   sequence must strictly increase). Invalid/replayed wrappers are dropped.
+> - Data Secure group telegrams are MAC-verified and protected against replay per
+>   source address. Forged, tampered or replayed telegrams are **no longer delivered**
+>   as `indication` events.
+> - Inside an established secure session, **plaintext KNX/IP frames are dropped** (only
+>   `SecureWrapper` frames are accepted).
+> - The Data Secure **sender sequence no longer wraps**: once the 48-bit maximum is
+>   reached, sending throws and new key material is required.
+>
+> **What you may need to do:**
+> - In **manual** (no keyring) secure configurations, set the new
+>   `secureTunnelConfig.deviceAuthenticationPassword` so the `SESSION_RESPONSE` MAC can
+>   be verified. When a keyring is provided, this value is taken from the keyring
+>   automatically and no change is needed.
+> - If your application relied (even unintentionally) on receiving unvalidated secure
+>   telegrams, be aware that those frames are now filtered out.
+
 ## CHANGELOG
 
 - [Changelog](https://github.com/Supergiovane/knxultimate/blob/master/CHANGELOG.md)
