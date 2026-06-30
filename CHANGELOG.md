@@ -26,7 +26,6 @@ checks are dropped instead of emitted as indication events.
 
 Bump to 6.0.0, update CHANGELOG and add README warning.
 
-Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com>
 
 ## [6.0.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.9...v6.0.0) (2026-06-30)
 
