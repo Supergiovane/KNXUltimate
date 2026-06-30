@@ -1,5 +1,33 @@
 # Changelog
 
+## [6.0.1](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.9...v6.0.1) (2026-06-30)
+
+
+* feat(secure)!: validate KNX Secure receive path and release 6.0.0 (#95) ([7fc832e](https://github.com/Supergiovane/KNXUltimate/commit/7fc832e37cf191685934210d9dbd457ff39ffd4b)), closes [#95](https://github.com/Supergiovane/KNXUltimate/issues/95)
+
+
+### BREAKING CHANGES
+
+* the KNX/IP Secure and Data Secure receive path is now
+cryptographically validated. Frames that fail authentication or freshness
+checks are dropped instead of emitted as indication events.
+
+- Verify SESSION_RESPONSE device-authentication MAC during the unicast
+  handshake; a forged response aborts the connection.
+- Verify SecureWrapper MAC and enforce a strictly increasing wrapper
+  sequence per session (anti-replay); invalid/replayed wrappers dropped.
+- Enforce Data Secure per-source 48-bit anti-replay and reject telegrams
+  with an invalid MAC.
+- Drop plaintext KNX/IP frames inside an established secure session.
+- Data Secure sender sequence no longer wraps: throws when the 48-bit
+  maximum is reached.
+- New optional secureTunnelConfig.deviceAuthenticationPassword for manual
+  (no keyring) configurations.
+
+Bump to 6.0.0, update CHANGELOG and add README warning.
+
+Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com>
+
 ## [6.0.0](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.9...v6.0.0) (2026-06-30)
 
 ### ⚠ BREAKING CHANGES
