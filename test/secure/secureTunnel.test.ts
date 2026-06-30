@@ -17,6 +17,8 @@ import KNXClient, {
 	type SecureConfig,
 } from '../../src/KNXClient'
 import CEMIConstants from '../../src/protocol/cEMI/CEMIConstants'
+import { Keyring } from '../../src/secure/keyring'
+import { deriveDeviceAuthenticationPassword } from '../../src/secure/security_primitives'
 import { MockSecureGateway } from './MockSecureGateway'
 
 const KEYRING_XML = `<?xml version="1.0" encoding="utf-8"?>
@@ -69,6 +71,24 @@ describe('KNX Secure Tunnel', () => {
 })
 
 async function runSecureTunnelScenario(secureTunnelConfig: SecureConfig) {
+	// Derive the same device authentication code the client gets from the keyring,
+	// so the mock gateway can emit a verifiable SESSION_RESPONSE MAC.
+	const kr = new Keyring()
+	if (secureTunnelConfig.knxkeys_buffer) {
+		await kr.loadFromBuffer(
+			secureTunnelConfig.knxkeys_buffer,
+			secureTunnelConfig.knxkeys_password!,
+		)
+	} else {
+		await kr.load(
+			secureTunnelConfig.knxkeys_file_path!,
+			secureTunnelConfig.knxkeys_password!,
+		)
+	}
+	const ifaceAuth = kr.getInterface('1.1.1')?.decryptedAuthentication
+	assert.ok(ifaceAuth, 'keyring should expose interface authentication')
+	const deviceAuthCode = deriveDeviceAuthenticationPassword(ifaceAuth!)
+
 	const gateway = new MockSecureGateway({
 		groupKeys: {
 			'1/2/3': Buffer.from('00112233445566778899aabbccddeeff', 'hex'),
@@ -76,6 +96,7 @@ async function runSecureTunnelScenario(secureTunnelConfig: SecureConfig) {
 		interfaceIndividualAddress: '1.1.1',
 		tunnelAssignedIndividualAddress: '10.15.251',
 		serial: Buffer.from('010203040506', 'hex'),
+		deviceAuthCode,
 	})
 	await gateway.start()
 

@@ -52,6 +52,7 @@ import {
 	calculateMessageAuthenticationCodeCBC,
 	encryptDataCtr,
 	decryptCtr,
+	deriveDeviceAuthenticationPassword,
 } from './secure/security_primitives'
 import {
 	SCF_ENCRYPTION_S_A_DATA,
@@ -69,6 +70,7 @@ import {
 	KNXIP_HDR_TUNNELING_ACK,
 	KNXIP_HDR_TUNNELING_CONNECT_REQUEST,
 	KNXIP_HDR_SECURE_SESSION_REQUEST,
+	KNXIP_HDR_SECURE_SESSION_RESPONSE,
 	KNXIP_HDR_SECURE_SESSION_AUTHENTICATE,
 	DATA_SECURE_CTR_SUFFIX,
 	AUTH_CTR_IV,
@@ -114,6 +116,14 @@ export interface SecureConfig {
 	knxkeys_password?: string
 	tunnelUserPassword?: string
 	tunnelUserId?: number
+	/**
+	 * Device authentication password of the secure gateway/interface. Used to
+	 * verify the SESSION_RESPONSE MAC during the KNX/IP Secure unicast handshake.
+	 * When a keyring is provided this is taken from the keyring automatically; set
+	 * it explicitly only in manual mode (no keyring). Without it, the
+	 * SESSION_RESPONSE MAC cannot be verified.
+	 */
+	deviceAuthenticationPassword?: string
 }
 
 export enum ConncetionState {
@@ -325,6 +335,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _secureWrapperSeq: number = 0 // 6-byte counter (we store as number increment)
 
+	// Highest wrapper sequence accepted from the peer in the current session.
+	// -1 means "nothing received yet". Used to reject replayed/old SecureWrapper frames.
+	private _secureRxWrapperSeq: number = -1
+
 	private _secureTunnelSeq: number = 0 // 1-byte seq in tunneling connection header
 
 	private _securePrivateKey?: crypto.KeyObject
@@ -338,6 +352,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private _secureGroupKeys: Map<number, Buffer> = new Map()
 
 	private _secureSendSeq48: bigint = 0n
+
+	// Per-source last accepted Data Secure sender sequence (48-bit), keyed by source
+	// individual address. Used to reject replayed/old secure group telegrams.
+	private _secureDataRecvSeq: Map<number, bigint> = new Map()
+
+	// Device authentication code (16-byte derived key) used to verify the
+	// SESSION_RESPONSE MAC. Undefined when no device authentication password is
+	// available (e.g. manual config without it).
+	private _secureDeviceAuthCode?: Buffer
 
 	private _secureSerial: Buffer = Buffer.from('000000000000', 'hex')
 
@@ -809,12 +832,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						payload,
 						1,
 					)
-					this.ensurePlainCEMI(cemi)
-					this.emit(
-						KNXClientEvents.indication,
-						new KNXRoutingIndication(cemi),
-						false,
-					)
+					if (this.ensurePlainCEMI(cemi)) {
+						this.emit(
+							KNXClientEvents.indication,
+							new KNXRoutingIndication(cemi),
+							false,
+						)
+					}
 					break
 				}
 				case CEMIConstants.L_DATA_CON: {
@@ -2641,6 +2665,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._secureSerial = Buffer.from('000000000000', 'hex')
 			this._secureAssignedIa = 0
 			this._secureWrapperSeq = 0
+			this._secureRxWrapperSeq = -1
+			this._secureDataRecvSeq.clear()
 			this._secureSearchProbed.clear()
 
 			cfg.tunnelInterfaceIndividualAddress = ia
@@ -3444,13 +3470,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					knxTunnelingRequest.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_IND
 				) {
-					// Ensure plain KNX (decrypt Data Secure if needed) and emit full telegram
-					this.ensurePlainCEMI(knxTunnelingRequest.cEMIMessage)
-					this.emit(
-						KNXClientEvents.indication,
-						knxTunnelingRequest as any,
-						false,
-					)
+					// Ensure plain KNX (decrypt Data Secure if needed) and emit full
+					// telegram, unless it failed secure validation (drop forged/replayed).
+					if (this.ensurePlainCEMI(knxTunnelingRequest.cEMIMessage)) {
+						this.emit(
+							KNXClientEvents.indication,
+							knxTunnelingRequest as any,
+							false,
+						)
+					}
 				} else if (
 					knxTunnelingRequest.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_CON
@@ -3513,13 +3541,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					knxRoutingInd.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_IND
 				) {
-					// Ensure plain KNX (decrypt Data Secure if needed) and emit full telegram
-					this.ensurePlainCEMI(knxRoutingInd.cEMIMessage)
-					this.emit(
-						KNXClientEvents.indication,
-						knxRoutingInd as any,
-						false,
-					)
+					// Ensure plain KNX (decrypt Data Secure if needed) and emit full
+					// telegram, unless it failed secure validation (drop forged/replayed).
+					if (this.ensurePlainCEMI(knxRoutingInd.cEMIMessage)) {
+						this.emit(
+							KNXClientEvents.indication,
+							knxRoutingInd as any,
+							false,
+						)
+					}
 				} else if (
 					knxRoutingInd.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_CON
@@ -3689,6 +3719,25 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				} catch {}
 			}
 
+			// Derive the device authentication code used to verify the
+			// SESSION_RESPONSE MAC during the unicast handshake.
+			const deviceAuthPwd = (
+				dev?.decryptedAuthentication ||
+				iface?.decryptedAuthentication ||
+				cfg.deviceAuthenticationPassword ||
+				''
+			).trim()
+			if (deviceAuthPwd) {
+				try {
+					this._secureDeviceAuthCode =
+						deriveDeviceAuthenticationPassword(deviceAuthPwd)
+				} catch (e) {
+					this.sysLogger.warn(
+						`Secure: cannot derive device authentication code: ${(e as Error).message}`,
+					)
+				}
+			}
+
 			// Load Backbone key for secure multicast routing (if present)
 			try {
 				const backbones = kr.getBackbones()
@@ -3734,6 +3783,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			'sha256',
 		)
 		this._secureSerial = Buffer.from('000000000000', 'hex')
+		// Optional device authentication code for SESSION_RESPONSE MAC verification.
+		const manualDeviceAuthPwd = cfg.deviceAuthenticationPassword?.trim()
+		if (manualDeviceAuthPwd) {
+			try {
+				this._secureDeviceAuthCode =
+					deriveDeviceAuthenticationPassword(manualDeviceAuthPwd)
+			} catch (e) {
+				this.sysLogger.warn(
+					`Secure: cannot derive device authentication code: ${(e as Error).message}`,
+				)
+			}
+		}
 		try {
 			if (this.isLevelEnabled('info')) {
 				this.sysLogger.info(
@@ -3756,6 +3817,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}) as Buffer
 		// Last 32 bytes contain raw public key
 		this._securePublicKey = exported.subarray(exported.length - 32)
+
+		// Fresh session: reset receive-side freshness state.
+		this._secureWrapperSeq = 0
+		this._secureRxWrapperSeq = -1
+		this._secureDataRecvSeq.clear()
 
 		this._secureHandshakeState = 'session'
 		// Send SESSION_REQUEST immediately
@@ -3801,6 +3867,32 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._secureSessionId = frame.readUInt16BE(6)
 				const serverPublicKey = frame.subarray(8, 40)
 
+				// Verify the SESSION_RESPONSE device-authentication MAC before
+				// trusting the server public key. A forged response without a
+				// valid MAC must abort the handshake.
+				if (this._secureDeviceAuthCode) {
+					if (!this.secureVerifySessionResponse(frame)) {
+						const err = new Error(
+							'SESSION_RESPONSE device-authentication MAC verification failed',
+						)
+						this.emit(KNXClientEvents.error, err)
+						this._secureHandshakeState = undefined
+						this.setDisconnected(err.message).catch(() => {})
+						return
+					}
+					try {
+						this.sysLogger.debug(
+							`[${getTimestamp()}] SESSION_RESPONSE MAC verified`,
+						)
+					} catch {}
+				} else {
+					try {
+						this.sysLogger.warn(
+							`[${getTimestamp()}] SESSION_RESPONSE MAC NOT verified: no device authentication code available (set secureTunnelConfig.deviceAuthenticationPassword or use a keyring).`,
+						)
+					} catch {}
+				}
+
 				// Compute session key
 				const X25519_SPKI_PREFIX_DER = Buffer.from(
 					'302a300506032b656e032100',
@@ -3841,7 +3933,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)
 				}, SECURE_AUTH_TIMEOUT_MS)
 			} else if (type === KNXIP.SECURE_WRAPPER) {
-				const inner = this.secureDecrypt(frame)
+				let inner: Buffer
+				try {
+					inner = this.secureDecrypt(frame)
+				} catch (e) {
+					// Drop replayed, MAC-invalid or malformed wrappers and keep
+					// the session alive instead of acting on untrusted data.
+					try {
+						this.sysLogger.warn(
+							`[${getTimestamp()}] Dropping SecureWrapper: ${(e as Error).message}`,
+						)
+					} catch {}
+					continue
+				}
 				const innerType = inner.readUInt16BE(2)
 				if (
 					innerType === KNXIP.SECURE_SESSION_STATUS &&
@@ -3963,28 +4067,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					} as any
 					this.processInboundMessage(inner, rinfo)
 				}
-			} else if (
-				type === KNXIP.TUNNELING_CONNECT_RESPONSE &&
-				this._secureHandshakeState === 'connect'
-			) {
-				// Plain fallback CONNECT_RESPONSE (rare)
-				if (this._secureHandshakeConnectTimer) {
-					clearTimeout(this._secureHandshakeConnectTimer)
-					this._secureHandshakeConnectTimer = undefined
-				}
-				const ch = frame[6]
-				const status = frame[7]
-				if (status === 0) {
-					this._channelID = ch
-					this._connectionState = ConncetionState.CONNECTED
-					this._numFailedTelegramACK = 0
-					this.clearToSend = true
-					this.emit(KNXClientEvents.connected, this._options)
-					this.startHeartBeat()
-					this.handleKNXQueue()
-				}
+			} else if (this._options.isSecureKNXEnabled) {
+				// Inside a KNX/IP Secure session only SecureWrapper frames (and the
+				// initial plaintext SESSION_RESPONSE handled above) are legitimate.
+				// Any other plaintext KNX/IP frame is dropped: a CONNECT_RESPONSE or
+				// tunnelling frame must arrive wrapped once the session is up.
+				try {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Dropping plaintext frame type=0x${type.toString(16)} inside secure session`,
+					)
+				} catch {}
 			} else {
-				// Other plaintext frames: route to parser if relevant
+				// Plain (non-secure) TCP tunnelling: route to parser as usual.
 				const rinfo: RemoteInfo = {
 					address: this._peerHost,
 					port: this._peerPort,
@@ -4415,23 +4509,63 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private secureDecrypt(frame: Buffer): Buffer {
 		if (!this._secureSessionKey)
 			throw new Error('Secure session not established')
+		if (frame.length < SECURE_WRAPPER_OVERHEAD)
+			throw new Error('SecureWrapper frame too short')
+		const sessionId = frame.readUInt16BE(6)
 		const seq = frame.subarray(8, 14)
 		const serial = frame.subarray(14, 20)
 		const tag = frame.subarray(20, 22)
-		const data = frame.subarray(22, frame.length - 16)
+		const encData = frame.subarray(22, frame.length - MAC_LEN_FULL)
+		const encMac = frame.subarray(frame.length - MAC_LEN_FULL)
 		const ctr0 = Buffer.concat([
 			seq,
 			serial,
 			tag,
 			SECURE_WRAPPER_MAC_SUFFIX,
 		])
-		const dec = crypto.createDecipheriv(
-			'aes-128-ctr',
+		const [data, macTr] = decryptCtr(
 			this._secureSessionKey,
 			ctr0,
+			encMac,
+			encData,
 		)
-		dec.update(frame.subarray(frame.length - MAC_LEN_FULL))
-		return dec.update(data)
+
+		// Verify the wrapper MAC (CBC-MAC over header + session id + plaintext).
+		// A tampered or forged wrapper produces a mismatching MAC and is rejected.
+		const additionalData = Buffer.concat([
+			frame.subarray(0, 6), // KNX/IP header incl. total length
+			frame.subarray(6, 8), // secure session id
+		])
+		const block0 = Buffer.concat([
+			seq,
+			serial,
+			tag,
+			Buffer.from([(data.length >> 8) & 0xff, data.length & 0xff]),
+		])
+		const macCbc = calculateMessageAuthenticationCodeCBC(
+			this._secureSessionKey,
+			additionalData,
+			data,
+			block0,
+		)
+		if (!macCbc.equals(macTr)) {
+			throw new Error('SecureWrapper MAC verification failed')
+		}
+
+		// Freshness / anti-replay: the wrapper sequence must strictly increase
+		// within a session. Reject replayed or out-of-order wrappers.
+		const seqNum = seq.readUIntBE(0, SECURE_SEQ_LEN)
+		if (
+			this._secureRxWrapperSeq >= 0 &&
+			seqNum <= this._secureRxWrapperSeq
+		) {
+			throw new Error(
+				`SecureWrapper replay detected (seq=${seqNum} last=${this._secureRxWrapperSeq} sid=${sessionId})`,
+			)
+		}
+		this._secureRxWrapperSeq = seqNum
+
+		return data
 	}
 
 	private secureBuildSessionRequest(): Buffer {
@@ -4444,6 +4578,46 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			HPAI_CONTROL_ENDPOINT_EMPTY,
 			this._securePublicKey!,
 		])
+	}
+
+	// Verify the SESSION_RESPONSE MAC using the device authentication code.
+	// The MAC authenticates the server's public value (as X xor Y) and the
+	// secure session id; a forged response cannot produce a valid MAC.
+	private secureVerifySessionResponse(frame: Buffer): boolean {
+		if (!this._secureDeviceAuthCode || !this._securePublicKey) return false
+		if (frame.length < 8 + PUBLIC_KEY_LEN + MAC_LEN_FULL) return false
+		const sessionId = frame.readUInt16BE(6)
+		const serverPublicKey = frame.subarray(8, 8 + PUBLIC_KEY_LEN)
+		const receivedMac = frame.subarray(
+			8 + PUBLIC_KEY_LEN,
+			8 + PUBLIC_KEY_LEN + MAC_LEN_FULL,
+		)
+		const xor = Buffer.alloc(PUBLIC_KEY_LEN)
+		for (let i = 0; i < PUBLIC_KEY_LEN; i++)
+			xor[i] = this._securePublicKey[i] ^ serverPublicKey[i]
+		const totalLen = frame.readUInt16BE(4)
+		const additionalData = Buffer.concat([
+			KNXIP_HDR_SECURE_SESSION_RESPONSE,
+			Buffer.from([(totalLen >> 8) & 0xff, totalLen & 0xff]),
+			Buffer.from([(sessionId >> 8) & 0xff, sessionId & 0xff]),
+			xor,
+		])
+		const block0 = Buffer.alloc(AES_BLOCK_LEN, 0)
+		const macCbc = calculateMessageAuthenticationCodeCBC(
+			this._secureDeviceAuthCode,
+			additionalData,
+			Buffer.alloc(0),
+			block0,
+		)
+		// The MAC carried in the frame is CTR-encrypted with the device auth
+		// code (Ctr0 = AUTH_CTR_IV); decrypt it and compare with the CBC-MAC.
+		const ctr = crypto.createDecipheriv(
+			'aes-128-ctr',
+			this._secureDeviceAuthCode,
+			AUTH_CTR_IV,
+		)
+		const macTr = ctr.update(receivedMac)
+		return macCbc.equals(macTr)
 	}
 
 	private secureBuildSessionAuthenticate(serverPublicKey: Buffer): Buffer {
@@ -4525,9 +4699,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				`No Data Secure key for GA ${this.secureFormatGroupAddress(groupAddr)}`,
 			)
 		const seq = Buffer.alloc(SECURE_SEQ_LEN)
-		const current = this._secureSendSeq48 & 0xffffffffffffn
+		// The Data Secure sender sequence is 48-bit and MUST NOT wrap: once the
+		// maximum value has been used, secure sending has to stop until the key
+		// material is renewed. Refuse to send rather than reuse a sequence.
+		const SECURE_SEND_SEQ_MAX = 0xffffffffffffn
+		if (this._secureSendSeq48 > SECURE_SEND_SEQ_MAX) {
+			throw new Error(
+				'Data Secure sender sequence exhausted (48-bit maximum reached); refusing to send. New key material is required.',
+			)
+		}
+		const current = this._secureSendSeq48
 		seq.writeUIntBE(Number(current), 0, 6)
-		this._secureSendSeq48 = (this._secureSendSeq48 + 1n) & 0xffffffffffffn
+		this._secureSendSeq48 += 1n
 		const addrFields = Buffer.from([
 			(srcIa >> 8) & 0xff,
 			srcIa & 0xff,
@@ -4722,32 +4905,35 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 	}
 
-	// Decrypt incoming Data Secure NPDU in-place if applicable
-	private maybeDecryptDataSecure(cemi: any) {
+	// Decrypt incoming Data Secure NPDU in-place if applicable.
+	// Returns false when the telegram is a Data Secure APDU that failed
+	// authentication (bad MAC) or freshness (replay) and must be dropped;
+	// returns true otherwise (decrypted in place, or nothing to do).
+	private maybeDecryptDataSecure(cemi: any): boolean {
 		try {
-			if (!this._options.isSecureKNXEnabled) return
+			if (!this._options.isSecureKNXEnabled) return true
 			if (!this._secureGroupKeys || this._secureGroupKeys.size === 0)
-				return
+				return true
 			const npdu = cemi?.npdu
-			if (!npdu) return
+			if (!npdu) return true
 			if (
 				(npdu.tpci & 0xff) !== APCI_SEC.HIGH ||
 				(npdu.apci & 0xff) !== APCI_SEC.LOW
 			)
-				return
+				return true
 			const dst = cemi?.dstAddress?.get?.() as number
 			const src = cemi?.srcAddress?.get?.() as number
-			if (typeof dst !== 'number' || typeof src !== 'number') return
+			if (typeof dst !== 'number' || typeof src !== 'number') return true
 			const key = this._secureGroupKeys.get(dst)
-			if (!key) return
+			if (!key) return true
 			const ctrlBuf: Buffer = cemi?.control?.toBuffer?.()
-			if (!Buffer.isBuffer(ctrlBuf) || ctrlBuf.length < 2) return
+			if (!Buffer.isBuffer(ctrlBuf) || ctrlBuf.length < 2) return true
 			const flags2 = ctrlBuf[1] & SEC_CEMI.CTRL2_RELEVANT_MASK
 
 			const dataPart: Buffer = npdu.dataBuffer
 				? npdu.dataBuffer.value
 				: Buffer.alloc(0)
-			if (dataPart.length < 1 + SECURE_SEQ_LEN + 4) return
+			if (dataPart.length < 1 + SECURE_SEQ_LEN + 4) return true
 			const scf = dataPart[0]
 			const seq = dataPart.subarray(1, 1 + SECURE_SEQ_LEN)
 			const encPayloadAndMac = dataPart.subarray(1 + SECURE_SEQ_LEN)
@@ -4791,7 +4977,31 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				decPayload,
 				block0,
 			).subarray(0, MAC_LEN_SHORT)
-			if (!macCbc.equals(macTr)) return
+			if (!macCbc.equals(macTr)) {
+				try {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Dropping Data Secure telegram with invalid MAC src=${src} dst=${dst}`,
+					)
+				} catch {}
+				return false
+			}
+
+			// Freshness / anti-replay: the sender sequence is a 48-bit counter that
+			// must strictly increase per source. Reject replays (including seq=0
+			// frames seen after a sender wrap) so a captured telegram cannot be
+			// re-injected and acted upon.
+			const seqNum = seq.readUIntBE(0, SECURE_SEQ_LEN)
+			const lastSeq = this._secureDataRecvSeq.get(src)
+			if (lastSeq !== undefined && BigInt(seqNum) <= lastSeq) {
+				try {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Dropping replayed Data Secure telegram src=${src} dst=${dst} seq=${seqNum} last=${lastSeq}`,
+					)
+				} catch {}
+				return false
+			}
+			this._secureDataRecvSeq.set(src, BigInt(seqNum))
+
 			// Rebuild plain NPDU: TPCI=0x00, APCI=second byte, data after first 2 bytes
 			npdu.tpci = TPCI_DATA
 			if (decPayload.length >= 2) {
@@ -4804,20 +5014,25 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				npdu.apci = 0
 				npdu.data = null
 			}
+			return true
 		} catch (e) {
 			this.sysLogger.error(
 				`maybeDecryptDataSecure error: ${(e as Error).message}`,
 			)
+			return true
 		}
 	}
 
-	// Ensure the provided cEMI message is in plain KNX form before emitting
+	// Ensure the provided cEMI message is in plain KNX form before emitting.
 	// If Data Secure is detected and keys are available, decrypts it in-place.
-	private ensurePlainCEMI<T extends CEMIMessage>(cemi: T): T {
+	// Returns false when the telegram failed secure validation (bad MAC or
+	// replay) and must NOT be delivered to the application.
+	private ensurePlainCEMI<T extends CEMIMessage>(cemi: T): boolean {
 		try {
-			this.maybeDecryptDataSecure(cemi as any)
-		} catch {}
-		return cemi
+			return this.maybeDecryptDataSecure(cemi as any)
+		} catch {
+			return true
+		}
 	}
 
 	private sendDescriptionRequestMessage() {
