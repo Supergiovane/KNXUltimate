@@ -1,4 +1,19 @@
+<p align="center">
+  <img src="img/logo-supervibe.png" alt="KNX Ultimate - Max Supervibe" width="200">
+</p>
+
 ![Logo](img/logo-big.png)
+
+
+
+## The worldwide KNX Engine node package
+
+KNX protocol implementation for Node.js, support KNX/IP Tunneling/Routing, KNX/IP Secure and Data Secure, FT1.2/KBerry TP plain KNXas well as full secure KNX stack. 
+This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](https://flows.nodered.org/node/node-red-contrib-knx-ultimate)  
+
+<br/>
+<br/>
+<br/>
 
 [![CI](https://github.com/Supergiovane/KNXUltimate/actions/workflows/ci.yml/badge.svg)](https://github.com/Supergiovane/KNXUltimate/actions/workflows/ci.yml)
 [![NPM version][npm-version-image]][npm-url]
@@ -8,9 +23,7 @@
 [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 [![Youtube][youtube-image]][youtube-url]
 
-KNX protocol implementation for Node.js, support KNX/IP Tunneling/Routing, KNX/IP Secure and Data Secure, FT1.2/KBerry TP plain KNXas well as full secure KNX stack. 
 
-This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](https://flows.nodered.org/node/node-red-contrib-knx-ultimate)  
 
 <br/>
 
@@ -19,7 +32,9 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 ```
 
 
-![Logo](img/readmemain.png)
+<p align="center">
+  <img src="img/readmemain.png" alt="KNX Ultimate - Max Supervibe" width="70%">
+</p>
 
 
 <p align='center'>
