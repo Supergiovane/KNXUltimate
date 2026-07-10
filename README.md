@@ -25,17 +25,17 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 
 
 
-<br/>
-
-```bash
-  npm i knxultimate
-```
 
 
 <p align="center">
   <img src="img/readmemain.png" alt="KNX Ultimate - Max Supervibe" width="70%">
 </p>
 
+<br/>
+
+```bash
+  npm i knxultimate
+```
 
 <p align='center'>
 <img width="110px" src="https://raw.githubusercontent.com/Supergiovane/KNXUltimate/master/img/KNX_CERTI_MARK_RGB.jpg" ></br></br></br>
