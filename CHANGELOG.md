@@ -1,5 +1,16 @@
 # Changelog
 
+## [6.0.2](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.1...v6.0.2) (2026-07-31)
+
+
+### Bug Fixes
+
+* **secure:** use Extended cEMI frames when Data Secure APDUs exceed the 15-octet Standard-frame limit ([#97](https://github.com/Supergiovane/KNXUltimate/issues/97))
+
+### Tests
+
+* cover the Standard/Extended boundary and every registered DPT family for outgoing Data Secure telegrams
+
 ## [6.0.1](https://github.com/Supergiovane/KNXUltimate/compare/v5.5.9...v6.0.1) (2026-06-30)
 
 

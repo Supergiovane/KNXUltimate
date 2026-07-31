@@ -14,6 +14,7 @@ import { ConnectionStatus, KNX_CONSTANTS } from './protocol/KNXConstants'
 import CEMIConstants from './protocol/cEMI/CEMIConstants'
 import CEMIFactory from './protocol/cEMI/CEMIFactory'
 import CEMIMessage from './protocol/cEMI/CEMIMessage'
+import { FrameType } from './protocol/cEMI/ControlField'
 import KNXProtocol, { KnxMessage, KnxResponse } from './protocol/KNXProtocol'
 import KNXConnectResponse from './protocol/KNXConnectResponse'
 import HPAI, { KnxProtocol } from './protocol/HPAI'
@@ -93,6 +94,8 @@ import {
 	MAC_LEN_FULL,
 	MAC_LEN_SHORT,
 } from './secure/secure_knx_constants'
+
+const STANDARD_FRAME_MAX_APDU_LENGTH = 0x0f
 
 export type DiscoveryInterface = {
 	ip: string
@@ -4798,14 +4801,21 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		ga: number,
 		flags: number,
 	): Buffer {
+		const frameFlags = this.secureRequiresExtendedFrame(secureApdu)
+			? flags & 0x7fff
+			: flags
 		return Buffer.concat([
 			Buffer.from([SEC_CEMI.L_DATA_REQ, SEC_CEMI.ADDITIONAL_INFO_NONE]),
-			Buffer.from([(flags >> 8) & 0xff, flags & 0xff]),
+			Buffer.from([(frameFlags >> 8) & 0xff, frameFlags & 0xff]),
 			Buffer.from([(srcIa >> 8) & 0xff, srcIa & 0xff]),
 			Buffer.from([(ga >> 8) & 0xff, ga & 0xff]),
 			Buffer.from([secureApdu.length - 1]),
 			secureApdu,
 		])
+	}
+
+	private secureRequiresExtendedFrame(secureApdu: Buffer): boolean {
+		return secureApdu.length - 1 > STANDARD_FRAME_MAX_APDU_LENGTH
 	}
 
 	private secureParseGroupAddress(ga: string): number {
@@ -4875,6 +4885,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				flags16,
 				src,
 			)
+			if (this.secureRequiresExtendedFrame(secureApduFull)) {
+				cemi.control.frameType = FrameType.type0
+			}
 			// Replace NPDU header + data with SecureAPDU
 			npdu.tpci = APCI_SEC.HIGH
 			npdu.apci = APCI_SEC.LOW
