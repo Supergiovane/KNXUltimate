@@ -5,6 +5,13 @@
 
 ### Bug Fixes
 
+* **secure:** use extended frames for long Data Secure APDUs ([b51960c](https://github.com/Supergiovane/KNXUltimate/commit/b51960c785aea1326e440a7d4e5e02c03102ca4c))
+
+## [6.0.2](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.1...v6.0.2) (2026-07-31)
+
+
+### Bug Fixes
+
 * **secure:** use Extended cEMI frames when Data Secure APDUs exceed the 15-octet Standard-frame limit ([#97](https://github.com/Supergiovane/KNXUltimate/issues/97))
 
 ### Tests
