@@ -346,5 +346,8 @@ build
 
 /.nyc_output/
 
+# Local credentials and addresses for opt-in real KNX gateway tests
+.env.knx-test
+
 # Ignore all PDF files
 *.[Pp][Dd][Ff]
