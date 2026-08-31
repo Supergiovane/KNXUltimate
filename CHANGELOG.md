@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.0.3](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.2...v6.0.3) (2026-08-31)
+
+
+### Features
+
+* **core:** add automatic KNX reconnection ([4409bd8](https://github.com/Supergiovane/KNXUltimate/commit/4409bd8fb65ec5dcd8fcf0a9bfcd92ccbf252b1e))
+
 ## [6.0.2](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.1...v6.0.2) (2026-07-31)
 
 
