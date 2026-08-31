@@ -96,6 +96,7 @@ import {
 } from './secure/secure_knx_constants'
 
 const STANDARD_FRAME_MAX_APDU_LENGTH = 0x0f
+const AUTO_RECONNECT_DELAY_MS = 5000
 
 export type DiscoveryInterface = {
 	ip: string
@@ -196,6 +197,8 @@ export type KNXClientOptions = {
 	physAddr?: string
 	/** Connection keep alive timeout. Time after which the connection is closed if no ping received */
 	connectionKeepAliveTimeout?: number
+	/** Reconnect indefinitely after an unexpected disconnection. Activated by Connect() and stopped by Disconnect(). */
+	autoReconnect?: boolean
 	/** The IP of your KNX router/interface (for Routers, use "224.0.23.12") */
 	ipAddr?: string
 	/** The port, default is "3671" */
@@ -229,6 +232,7 @@ export type KNXClientOptions = {
 const optionsDefaults: KNXClientOptions = {
 	physAddr: '',
 	connectionKeepAliveTimeout: KNX_CONSTANTS.CONNECTION_ALIVE_TIME,
+	autoReconnect: false,
 	ipAddr: '224.0.23.12',
 	ipPort: 3671,
 	hostProtocol: 'Multicast',
@@ -259,6 +263,8 @@ export enum KNXTimer {
 	DISCOVERY = 'discovery',
 	/** Waits for the gateway description gather responses */
 	GATEWAYDESCRIPTION = 'GatewayDescription',
+	/** Delay before reconnecting after an unexpected disconnection */
+	RECONNECT = 'reconnect',
 }
 
 export type SnifferPacket = {
@@ -304,6 +310,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private _clientSocket: UDPSocket | TCPSocket
 
 	private _serialDriver?: SerialFT12
+
+	private _createSocketOverride?: (client: KNXClient) => void
+
+	private _connectionRequested = false
+
+	private _lastKnxLayer = TunnelTypes.TUNNEL_LINKLAYER
 
 	private sysLogger: KNXLogger
 
@@ -394,6 +406,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private _secureHandshakeAuthTimer?: NodeJS.Timeout
 
 	private _secureHandshakeConnectTimer?: NodeJS.Timeout
+
+	private _secureConnectSendTimer?: NodeJS.Timeout
 
 	// Secure routing (multicast) initial timer sync helper
 	private _secureRoutingSyncTimer?: NodeJS.Timeout
@@ -495,8 +509,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			throw error
 		}
 
-		if (createSocket) {
-			createSocket(this)
+		this._createSocketOverride = createSocket
+		this.initializeSocket()
+	}
+
+	private initializeSocket() {
+		if (this._createSocketOverride) {
+			this._createSocketOverride(this)
 		} else {
 			this.createSocket()
 		}
@@ -530,7 +549,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 			this.udpSocket.on(SocketEvents.error, (error) => {
 				this.socketReady = false
-				this.emit(KNXClientEvents.error, error)
+				this.handleSocketError(error)
 			})
 
 			this.udpSocket.on(SocketEvents.close, () => {
@@ -645,7 +664,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 			this.udpSocket.on(SocketEvents.error, (error) => {
 				this.socketReady = false
-				this.emit(KNXClientEvents.error, error)
+				this.handleSocketError(error)
 			})
 			this.udpSocket.on(SocketEvents.close, () => {
 				this.socketReady = false
@@ -721,7 +740,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// Reset queue exit flag on fresh TCP connect
 			this.exitProcessingKNXQueueLoop = false
 			this.secureStartSession().catch((err) => {
-				this.emit(KNXClientEvents.error, err)
+				this.handleConnectionAttemptFailure(
+					err instanceof Error ? err : new Error(String(err)),
+				)
 			})
 		})
 		this.tcpSocket.on('data', (data: Buffer) => {
@@ -736,7 +757,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		})
 		this.tcpSocket.on('error', (error) => {
 			this.socketReady = false
-			this.emit(KNXClientEvents.error, error)
+			this.handleSocketError(error)
 		})
 		this.tcpSocket.on('close', () => {
 			this.socketReady = false
@@ -968,6 +989,88 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		for (const timer of this.timers.keys()) {
 			this.clearTimer(timer)
 		}
+		for (const timer of [
+			this._secureHandshakeSessionTimer,
+			this._secureHandshakeAuthTimer,
+			this._secureHandshakeConnectTimer,
+			this._secureConnectSendTimer,
+			this._secureRoutingSyncTimer,
+		]) {
+			if (timer) clearTimeout(timer)
+		}
+		this._secureHandshakeSessionTimer = undefined
+		this._secureHandshakeAuthTimer = undefined
+		this._secureHandshakeConnectTimer = undefined
+		this._secureConnectSendTimer = undefined
+		this._secureRoutingSyncTimer = undefined
+		this._secureHandshakeState = undefined
+	}
+
+	private handleSocketError(error: Error) {
+		this.emit(KNXClientEvents.error, error)
+		if (
+			this._options.autoReconnect &&
+			this._connectionRequested &&
+			this._connectionState !== ConncetionState.DISCONNECTED &&
+			this._connectionState !== ConncetionState.DISCONNECTING
+		) {
+			this.setDisconnected(`Socket error: ${error.message}`).catch(
+				() => {},
+			)
+		}
+	}
+
+	private handleConnectionAttemptFailure(error: Error) {
+		this.emit(KNXClientEvents.error, error)
+		if (
+			this._options.autoReconnect &&
+			this._connectionRequested &&
+			this._connectionState === ConncetionState.CONNECTING
+		) {
+			this.setDisconnected(error.message).catch(() => {})
+		}
+	}
+
+	private scheduleReconnect() {
+		if (
+			!this._options.autoReconnect ||
+			!this._connectionRequested ||
+			this._connectionState !== ConncetionState.DISCONNECTED ||
+			this.timers.has(KNXTimer.RECONNECT)
+		) {
+			return
+		}
+
+		this.sysLogger.info(
+			`[${getTimestamp()}] KNXClient: reconnecting to ${this._peerHost}:${this._peerPort} in ${AUTO_RECONNECT_DELAY_MS / 1000} seconds`,
+		)
+		this.setTimer(
+			KNXTimer.RECONNECT,
+			() => {
+				if (
+					!this._connectionRequested ||
+					this._connectionState !== ConncetionState.DISCONNECTED
+				) {
+					return
+				}
+
+				try {
+					if (!this.isSerialTransport()) {
+						this.initializeSocket()
+					}
+					this.Connect(this._lastKnxLayer)
+				} catch (error) {
+					const reconnectError =
+						error instanceof Error
+							? error
+							: new Error(String(error))
+					this.emit(KNXClientEvents.error, reconnectError)
+					this._connectionState = ConncetionState.DISCONNECTED
+					this.scheduleReconnect()
+				}
+			},
+			AUTO_RECONNECT_DELAY_MS,
+		)
 	}
 
 	private processKnxPacketQueueItem(_knxPacket: KNXPacket): Promise<boolean> {
@@ -2778,6 +2881,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			throw new Error('Socket is already connected. Disconnect first.')
 		}
 
+		this._connectionRequested = true
+		this._lastKnxLayer = knxLayer
+		this.clearTimer(KNXTimer.RECONNECT)
+		this.exitProcessingKNXQueueLoop = false
 		this._connectionState = ConncetionState.CONNECTING
 		this._numFailedTelegramACK = 0 // 25/12/2021 Reset the failed ACK counter
 		this.clearToSend = true // 26/12/2021 allow to send
@@ -2818,7 +2925,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.setTimer(
 				KNXTimer.CONNECTION,
 				() => {
-					this.emit(KNXClientEvents.error, timeoutError)
+					this.handleConnectionAttemptFailure(timeoutError)
 				},
 				1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
 			)
@@ -2865,15 +2972,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 									this._peerHost,
 								)
 							} catch (err) {
-								this.emit(
-									KNXClientEvents.error,
+								this.handleConnectionAttemptFailure(
 									err instanceof Error
 										? err
 										: new Error('TCP connect error'),
 								)
 							}
 						})
-						.catch((err) => this.emit(KNXClientEvents.error, err))
+						.catch((err) =>
+							this.handleConnectionAttemptFailure(
+								err instanceof Error
+									? err
+									: new Error(String(err)),
+							),
+						)
 				})
 				return
 			}
@@ -2883,15 +2995,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					try {
 						this.tcpSocket.connect(this._peerPort, this._peerHost)
 					} catch (err) {
-						this.emit(
-							KNXClientEvents.error,
+						this.handleConnectionAttemptFailure(
 							err instanceof Error
 								? err
 								: new Error('TCP connect error'),
 						)
 					}
 				})
-				.catch((err) => this.emit(KNXClientEvents.error, err))
+				.catch((err) =>
+					this.handleConnectionAttemptFailure(
+						err instanceof Error ? err : new Error(String(err)),
+					),
+				)
 		} else {
 			// Multicast
 			// If secure routing requested, ensure keyring/backbone key is loaded (async, no need to await)
@@ -2899,15 +3014,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.secureEnsureKeyring()
 					.then(() => {
 						if (!this._secureBackboneKey) {
-							this.emit(
-								KNXClientEvents.error,
+							this.handleConnectionAttemptFailure(
 								new Error(
 									'No Backbone key found in keyring for secure multicast',
 								),
 							)
 						}
 					})
-					.catch((err) => this.emit(KNXClientEvents.error, err))
+					.catch((err) =>
+						this.handleConnectionAttemptFailure(
+							err instanceof Error ? err : new Error(String(err)),
+						),
+					)
 			}
 			// For multicast there is no handshake; emit connected at 'listening' only in plain mode
 			// If socket is already listening and we're in plain mode, emit now
@@ -2945,6 +3063,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 			try {
 				if (client instanceof TCPSocket) {
+					if (client.destroyed) {
+						resolve()
+						return
+					}
 					// use destroy instead of end here to ensure socket is closed
 					client.once('close', cb)
 					client.destroy()
@@ -2964,7 +3086,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * Sends a DISCONNECT_REQUEST telegram to the BUS and closes the socket
 	 */
 	async Disconnect() {
+		this._connectionRequested = false
+		this.clearTimer(KNXTimer.RECONNECT)
+
 		if (!this.isSerialTransport() && this._clientSocket === null) {
+			if (
+				this._options.autoReconnect &&
+				this._connectionState === ConncetionState.DISCONNECTED
+			) {
+				return
+			}
 			throw new Error('No client socket defined')
 		}
 
@@ -2993,7 +3124,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				`[${getTimestamp()}] ` +
 					`KNXClient: into Disconnect(), channel id is not defined so skip disconnect packet and close socket`,
 			)
-			await this.closeSocket()
+			await this.setDisconnected(
+				'Disconnected before a KNX channel was established.',
+			)
 			return
 		}
 
@@ -3043,6 +3176,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		this._clientTunnelSeqNumber = -1
 		this._channelID = null
+		this.exitProcessingKNXQueueLoop = true
+		this.commandQueue = []
 
 		// Emit `disconnected` BEFORE awaiting socket teardown so consumers always
 		// learn about the disconnect even if closeSocket() hangs (defensive — the
@@ -3051,6 +3186,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			KNXClientEvents.disconnected,
 			`${this._peerHost}:${this._peerPort} ${_sReason}`,
 		)
+		this.clearToSend = true // 26/12/2021 allow to send
 
 		if (this.isSerialTransport()) {
 			await this.closeSerialTransport()
@@ -3058,7 +3194,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			await this.closeSocket()
 		}
 
-		this.clearToSend = true // 26/12/2021 allow to send
+		this.scheduleReconnect()
 	}
 
 	/**
@@ -3836,8 +3972,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.tcpSocket.write(this.secureBuildSessionRequest())
 		// Session timeout
 		this._secureHandshakeSessionTimer = setTimeout(() => {
-			this.emit(
-				KNXClientEvents.error,
+			this.handleConnectionAttemptFailure(
 				new Error('Timeout waiting for SESSION_RESPONSE'),
 			)
 		}, SECURE_SESSION_TIMEOUT_MS)
@@ -3930,8 +4065,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.tcpSocket.write(this.secureWrap(authFrame))
 				this._secureHandshakeState = 'auth'
 				this._secureHandshakeAuthTimer = setTimeout(() => {
-					this.emit(
-						KNXClientEvents.error,
+					this.handleConnectionAttemptFailure(
 						new Error('Timeout waiting for SESSION_STATUS'),
 					)
 				}, SECURE_AUTH_TIMEOUT_MS)
@@ -3980,7 +4114,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						return
 					}
 					const conn = this.secureBuildConnectRequest()
-					setTimeout(() => {
+					this._secureConnectSendTimer = setTimeout(() => {
+						this._secureConnectSendTimer = undefined
+						if (
+							this._connectionState !== ConncetionState.CONNECTING
+						) {
+							return
+						}
 						try {
 							this.sysLogger.debug(
 								`[${getTimestamp()}] TX 0205 TUNNELING_CONNECT_REQUEST (wrapped)`,
@@ -3990,8 +4130,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						this._secureHandshakeState = 'connect'
 						this._secureHandshakeConnectTimer = setTimeout(
 							() =>
-								this.emit(
-									KNXClientEvents.error,
+								this.handleConnectionAttemptFailure(
 									new Error(
 										'Timeout waiting for CONNECT_RESPONSE',
 									),

@@ -190,6 +190,7 @@ You can ignore this section until you actually need one of these behaviors.
 | -------- | ---------- | ----------- |
 | `localIPAddress` (string) | all | Bind the local UDP/TCP socket to a specific local interface IP. Useful with multiple NICs. |
 | `interface` (string) | all | Local interface name to select the NIC (alternative to `localIPAddress`). |
+| `autoReconnect` (bool) | all | After the first `Connect()`, reconnect indefinitely every 5 seconds following an unexpected disconnection or failed connection attempt. An explicit `Disconnect()` stops retrying. Default `false`. |
 | `suppress_ack_ldatareq` (bool) | tunnelling, serial | Controls the cEMI `L_DATA_REQ` bus ACK bit. In plain `TunnelUDP`, when `false` the client also waits for the corresponding tunnelling ACK; set `true` only if your interface needs it. Default `false`. |
 | `theGatewayIsKNXVirtual` (bool) | tunnelling | Special handling for ETS KNX Virtual (adds `localIPAddress` to the tunnel endpoint). Default `false`. |
 
@@ -758,6 +759,7 @@ Examples overview:
 - [simpleSample](./examples/simpleSample.ts): Minimal connect + single write. Warning: sends telegrams.
 - [test-toggle](./examples/test-toggle.ts): Interactive ON/OFF toggle from CLI. Warning: sends telegrams.
 - [disconnection](./examples/disconnection.ts): Demonstrates clean disconnects and error handling.
+- [autoReconnect](./examples/autoReconnect.ts): Keeps a KNX/IP tunnel available by reconnecting every 5 seconds after unexpected connection loss. Safe: does not send telegrams.
 - [logging](./examples/logging.ts): Shows how to attach to the log stream and change log levels.
 - [monitorBusMinimal](./examples/monitorBusMinimal.ts): Minimal listener that connects and prints incoming telegrams. Warning: connects to the bus but does not send telegrams.
 - [showDatapoints](./examples/showDatapoints.ts): Lists supported datapoints and shows how payloads are built. Safe: does not send to the bus.
