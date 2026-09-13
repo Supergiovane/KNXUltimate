@@ -200,7 +200,7 @@ You can ignore this unless you want to tune send pacing.
 
 | Property | Applies to | Description |
 | -------- | ---------- | ----------- |
-| `KNXQueueSendIntervalMilliseconds` (number) | all | Inter-telegram delay in ms. Default about `25`. Don't go below `20`. |
+| `KNXQueueSendIntervalMilliseconds` (number) | all | Inter-telegram delay in ms. Default about `25`. Don't go below `20`. In `TunnelUDP`, ACKs, heartbeats and disconnect packets are sent immediately and do not affect application telegram spacing. |
 
 ### Secure options
 
@@ -330,7 +330,7 @@ List of events raised by KNXultimate, in proper order. For the signatures, pleas
 | connecting   | KNXUltimate is connecting to the KNX/IP Gateway. Please wait for the *connected* event to start sending KNX telegrams. |
 | connected    | KNXUltimate has successfully connected with the KNX/IP Gateway.                                      |
 | indication   | KNXUltimate has received a KNX telegram, that's available in the **datagram** variable. Please see the examples. |
-| ackReceived  | Ack telegram from KNX/IP Gateway has been received. This confirms that the telegram sent by KNXUltimate has reached the KNX/IP Gateway successfully. |
+| ackReceived  | Reports `(packet, success)` for a tunnelling request. `success` is `true` after a matching successful gateway ACK, or `false` after two retries without a successful ACK. On retry exhaustion, `TunnelUDP` closes the tunnel and emits `error` and `disconnected`; `autoReconnect` reconnects when enabled. |
 | disconnected | The KNX connection has been disconnected.                                                            |
 | close        | The main KNXUltimate socket has been closed.                                                         |
 | error        | KNXUltimate has raised an error. The error description is provided as well.                         |

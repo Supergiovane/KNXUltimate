@@ -333,7 +333,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private exitProcessingKNXQueueLoop: boolean
 
-	private currentItemHandledByTheQueue: KNXQueueItem
+	private pendingTunnelingRequest?: KNXTunnelingRequest
 
 	private queueLock = false
 
@@ -981,6 +981,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private clearAllTimers() {
+		this.clearPendingTunnelingRequest()
 		// use dedicated methods where possible
 		this.stopDiscovery()
 		this.stopHeartBeat()
@@ -1346,7 +1347,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		// Limiter: limits max telegrams per second
 		while (this.commandQueue.length > 0) {
-			if (!this.clearToSend) {
+			const nextItem = this.commandQueue[this.commandQueue.length - 1]
+			const isRetransmission =
+				this.pendingTunnelingRequest !== undefined &&
+				nextItem.knxPacket === this.pendingTunnelingRequest &&
+				nextItem.ACK === this.pendingTunnelingRequest
+			if (
+				(!this.clearToSend ||
+					this.pendingTunnelingRequest !== undefined) &&
+				!isRetransmission
+			) {
 				this.sysLogger.debug(
 					`[${getTimestamp()}] ` +
 						`KNXClient: handleKNXQueue: Clear to send is false. Pause processing queue.`,
@@ -1390,7 +1400,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				await wait(200)
 				continue
 			}
-			this.currentItemHandledByTheQueue = item
 			// Associa il sequence number di tunneling al momento dell'invio
 			try {
 				if (this._options.hostProtocol === 'TunnelTCP') {
@@ -1438,21 +1447,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 	}
 
-	/**
-	 * Write knxPacket to socket
-	 */
-	send(
-		_knxPacket: KNXPacket,
-		_ACK: KNXTunnelingRequest,
-		_priority: boolean,
-		_expectedSeqNumberForACK: number,
-	): void {
-		const toBeAdded: KNXQueueItem = {
-			knxPacket: _knxPacket,
-			ACK: _ACK,
-			expectedSeqNumberForACK: _expectedSeqNumberForACK,
-		}
-
+	private recordOutgoingPacket(_knxPacket: KNXPacket) {
 		if (this._options.sniffingMode) {
 			const buffer = _knxPacket.toBuffer()
 			this.sniffingPackets.push({
@@ -1465,10 +1460,54 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 			this.lastSnifferRequest = Date.now()
 		}
+	}
+
+	/** Send session control traffic without touching the application queue or ACK state. */
+	private sendUDPControlPacket(knxPacket: KNXPacket): Promise<boolean> {
+		this.recordOutgoingPacket(knxPacket)
+		if (!this.socketReady || !this.udpSocket) {
+			this.emit(
+				KNXClientEvents.error,
+				new Error(
+					`Cannot send ${this.getKNXConstantName(knxPacket.type)}: UDP socket is not ready`,
+				),
+			)
+			return Promise.resolve(false)
+		}
+		return this.processKnxPacketQueueItem(knxPacket)
+	}
+
+	/**
+	 * Send control packets immediately or enqueue application telegrams.
+	 */
+	send(
+		_knxPacket: KNXPacket,
+		_ACK: KNXTunnelingRequest,
+		_priority: boolean,
+		_expectedSeqNumberForACK: number,
+	): void {
+		if (
+			this._options.hostProtocol === 'TunnelUDP' &&
+			[
+				KNX_CONSTANTS.TUNNELING_ACK,
+				KNX_CONSTANTS.CONNECTIONSTATE_REQUEST,
+				KNX_CONSTANTS.DISCONNECT_REQUEST,
+				KNX_CONSTANTS.DISCONNECT_RESPONSE,
+			].includes(_knxPacket.type)
+		) {
+			this.sendUDPControlPacket(_knxPacket)
+			return
+		}
+
+		const toBeAdded: KNXQueueItem = {
+			knxPacket: _knxPacket,
+			ACK: _ACK,
+			expectedSeqNumberForACK: _expectedSeqNumberForACK,
+		}
+		this.recordOutgoingPacket(_knxPacket)
 
 		if (_priority) {
 			this.commandQueue.push(toBeAdded) // Put the item as first to be sent.
-			this.clearToSend = true
 		} else {
 			this.commandQueue.unshift(toBeAdded) // Put the item as last to be sent.
 		}
@@ -2032,6 +2071,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private startHeartBeat(): void {
 		this.stopHeartBeat()
+		if (!this.isConnected()) return
 		this._heartbeatFailures = 0
 		this._heartbeatRunning = true
 		this.runHeartbeat()
@@ -3116,6 +3156,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		this._connectionState = ConncetionState.DISCONNECTING
+		if (this._options.hostProtocol === 'TunnelUDP') {
+			this.exitProcessingKNXQueueLoop = true
+			this.commandQueue = []
+		}
 
 		// 20/04/2022 this._channelID === null can happen when the KNX Gateway is already disconnected
 		if (this._channelID === null) {
@@ -3204,7 +3248,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		if (this.isSerialTransport()) {
 			return
 		}
-		if (!this._heartbeatRunning) {
+		if (!this._heartbeatRunning || !this.isConnected()) {
 			return
 		}
 
@@ -3258,10 +3302,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return this._clientTunnelSeqNumber
 	}
 
-	private getCurrentItemHandledByTheQueue() {
-		return this.currentItemHandledByTheQueue.expectedSeqNumberForACK
-	}
-
 	// Secure Tunneling (TCP) sequence helpers
 	private secureGetTunnelSeq() {
 		return this._secureTunnelSeq & 0xff
@@ -3285,9 +3325,55 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/**
+	 * Cancel the outstanding ACK and any retransmission still waiting in the queue.
+	 */
+	private clearPendingTunnelingRequest() {
+		this.clearTimer(KNXTimer.ACK)
+		if (this.pendingTunnelingRequest) {
+			this.commandQueue = this.commandQueue.filter(
+				(item) => item.ACK !== this.pendingTunnelingRequest,
+			)
+		}
+		this.pendingTunnelingRequest = undefined
+		this._numFailedTelegramACK = 0
+	}
+
+	private async failTunnelingRequest(
+		knxTunnelingRequest: KNXTunnelingRequest,
+		error: Error,
+	) {
+		// The peer may still expect this sequence. Never advance within this tunnel.
+		this._connectionState = ConncetionState.DISCONNECTING
+		this.exitProcessingKNXQueueLoop = true
+		this.commandQueue = []
+		this.clearAllTimers()
+		this.emit(KNXClientEvents.ackReceived, knxTunnelingRequest, false)
+		this.emit(KNXClientEvents.error, error)
+		try {
+			if (
+				this.socketReady &&
+				this.udpSocket &&
+				this._channelID !== null
+			) {
+				await this.sendUDPControlPacket(
+					KNXProtocol.newKNXDisconnectRequest(this._channelID),
+				)
+			}
+		} finally {
+			if (this._connectionState === ConncetionState.DISCONNECTING) {
+				await this.setDisconnected(error.message)
+			}
+		}
+	}
+
+	/**
 	 * Setup a timer while waiting for an ACK of `knxTunnelingRequest`
 	 */
 	private setTimerWaitingForACK(knxTunnelingRequest: KNXTunnelingRequest) {
+		if (this.pendingTunnelingRequest !== knxTunnelingRequest) {
+			this._numFailedTelegramACK = 0
+		}
+		this.pendingTunnelingRequest = knxTunnelingRequest
 		this.clearToSend = false // 26/12/2021 stop sending until ACK received
 		const timeoutErr = new errors.RequestTimeoutError(
 			`seqCounter:${knxTunnelingRequest.seqCounter}, DestAddr:${
@@ -3302,38 +3388,24 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.setTimer(
 			KNXTimer.ACK,
 			() => {
+				if (this.pendingTunnelingRequest !== knxTunnelingRequest) return
 				this._numFailedTelegramACK += 1
 				if (this._numFailedTelegramACK > 2) {
-					this._numFailedTelegramACK = 0
-					// 08/04/2022 Emits the event informing that the last ACK has not been acknowledge.
-					this.emit(
-						KNXClientEvents.ackReceived,
-						knxTunnelingRequest,
-						false,
-					)
-					this.clearToSend = true
-					this.emit(KNXClientEvents.error, timeoutErr)
-					this.sysLogger.error(
-						`KNXClient: _setTimerWaitingForACK: ${
-							timeoutErr.message || 'Undef error'
-						} no ACK received. ABORT sending datagram with seqNumber ${this.getSeqNumber()} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
-					)
+					this.failTunnelingRequest(knxTunnelingRequest, timeoutErr)
 				} else {
-					// 26/12/2021 // If no ACK received, resend the datagram once with the same sequence number
+					// Retry the same request without releasing other application telegrams.
 					this.sysLogger.error(
 						`KNXClient: _setTimerWaitingForACK: ${
 							timeoutErr.message || 'Undef error'
 						} no ACK received. Retransmit datagram with seqNumber ${
-							this.currentItemHandledByTheQueue
-								.expectedSeqNumberForACK
+							knxTunnelingRequest.seqCounter
 						} from ${knxTunnelingRequest.cEMIMessage.srcAddress.toString()} to ${knxTunnelingRequest.cEMIMessage.dstAddress.toString()}`,
 					)
 					this.send(
 						knxTunnelingRequest,
 						knxTunnelingRequest,
 						true,
-						this.currentItemHandledByTheQueue
-							.expectedSeqNumberForACK,
+						knxTunnelingRequest.seqCounter,
 					)
 				}
 			},
@@ -3508,7 +3580,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					}
 
 					// 16/03/2022
-					this.clearTimer(KNXTimer.ACK)
+					this.clearPendingTunnelingRequest()
 					this._channelID = knxConnectResponse.channelID
 					this._connectionState = ConncetionState.CONNECTED
 					this._numFailedTelegramACK = 0 // 16/03/2022 Reset the failed ACK counter
@@ -3562,6 +3634,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				}
 
 				this._connectionState = ConncetionState.DISCONNECTING
+				if (this._options.hostProtocol === 'TunnelUDP') {
+					this.clearAllTimers()
+					this.exitProcessingKNXQueueLoop = true
+					this.commandQueue = []
+				}
 				this.sendDisconnectResponseMessage(
 					knxDisconnectRequest.channelID,
 				)
@@ -3596,7 +3673,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.send(
 						knxTunnelAck,
 						undefined,
-						true, // Gives the priority into the queue! It must be replied ASAP.
+						true, // TunnelUDP ACKs bypass the application queue.
 						this.getSeqNumber(),
 					)
 				} catch (error) {
@@ -3633,44 +3710,27 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					return
 				}
 
-				// Check the received ACK sequence number
-				if (!this._options.suppress_ack_ldatareq) {
-					if (
-						knxTunnelingAck.seqCounter ===
-						this.getCurrentItemHandledByTheQueue()
-					) {
-						this.clearTimer(KNXTimer.ACK)
-						this._numFailedTelegramACK = 0 // 25/12/2021 clear the current ACK failed telegram number
-						this.clearToSend = true // I'm ready to send a new datagram now
-						// 08/04/2022 Emits the event informing that the last ACK has been acknowledge.
-						this.emit(
-							KNXClientEvents.ackReceived,
-							knxTunnelingAck,
-							true,
-						)
-						this.sysLogger.debug(
-							`[${getTimestamp()}] ` +
-								`Received KNX packet: TUNNELING: DELETED_TUNNELING_ACK FROM PENDING ACK's, ChannelID:${this._channelID} seqCounter:${knxTunnelingAck.seqCounter} Host:${this._options.ipAddr}:${this._options.ipPort}`,
-						)
-					} else {
-						// Inform that i received an ACK with an unexpected sequence number. It should be handled as error, but for now, only log.
-						this.sysLogger.error(
-							`Received KNX packet: TUNNELING: Unexpected Tunnel Ack with seqCounter = ${knxTunnelingAck.seqCounter}, expecting ${this.getCurrentItemHandledByTheQueue()}. Don't care for now.`,
-						)
-						this.clearTimer(KNXTimer.ACK)
-						this._numFailedTelegramACK = 0 // 25/12/2021 clear the current ACK failed telegram number
-						this.clearToSend = true // I'm ready to send a new datagram now
-						// 08/04/2022 Emits the event informing that the last ACK has been acknowledge.
-						this.emit(
-							KNXClientEvents.ackReceived,
-							knxTunnelingAck,
-							true,
-						)
-						// this.emit(KNXClientEvents.error, `Unexpected Tunnel Ack ${knxTunnelingAck.seqCounter}`);
-					}
-				} else {
-					this.clearToSend = true // I'm ready to send a new datagram now
+				const pendingRequest = this.pendingTunnelingRequest
+				if (!pendingRequest) return
+				if (knxTunnelingAck.seqCounter !== pendingRequest.seqCounter) {
+					this.sysLogger.debug(
+						`Ignoring TUNNELING_ACK seqCounter:${knxTunnelingAck.seqCounter}, expecting:${pendingRequest.seqCounter}`,
+					)
+					return
 				}
+				if (knxTunnelingAck.status !== KNX_CONSTANTS.E_NO_ERROR) {
+					this.sysLogger.warn(
+						`TUNNELING_ACK seqCounter:${knxTunnelingAck.seqCounter} rejected with status:${knxTunnelingAck.status}; keeping the request pending`,
+					)
+					return
+				}
+
+				this.clearPendingTunnelingRequest()
+				this.clearToSend = true
+				this.emit(KNXClientEvents.ackReceived, knxTunnelingAck, true)
+				this.sysLogger.debug(
+					`[${getTimestamp()}] Received TUNNELING_ACK channelID:${knxTunnelingAck.channelID} seqCounter:${knxTunnelingAck.seqCounter}`,
+				)
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.ROUTING_INDICATION
 			) {

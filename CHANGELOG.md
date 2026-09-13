@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+* **tunneling:** send UDP acknowledgements, heartbeats and disconnect packets independently of the application queue, preserving logging and packet capture.
+* **tunneling:** keep the outstanding request blocked until a successful ACK with the matching channel and sequence arrives; ignore unexpected, duplicate and unsuccessful ACKs.
+* **tunneling:** preserve the original request across retries, cancel queued retries after a late ACK, and close the tunnel after retry exhaustion without sending the next sequence. Automatic reconnection remains available when enabled.
+
 ## [6.0.3](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.2...v6.0.3) (2026-08-31)
 
 

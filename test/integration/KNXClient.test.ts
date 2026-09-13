@@ -218,12 +218,21 @@ const getMockPacketsForDisconnectRequestTest: SnifferPacket[] = [
 		deltaRes: 8,
 		resType: 'KNXConnectResponse',
 	},
+	// The initial heartbeat is sent immediately after the connection is established.
+	{
+		reqType: 'KNXConnectionStateRequest',
+		request: '06100207001024000801000000000000',
+		deltaReq: 0,
+		response: '0610020800082400',
+		resType: 'KNXConnectionStateResponse',
+		deltaRes: 1,
+	},
 	// Disconnect
 	{
 		reqType: 'KNXDisconnectRequest',
 		request: '06100209001024000801000000000000',
 		deltaReq: 500,
-		response: '0610020a00085100',
+		response: '0610020a00082400',
 		resType: 'KNXDisconnectResponse',
 		deltaRes: 4,
 	},
