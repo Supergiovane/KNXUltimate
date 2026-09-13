@@ -299,6 +299,7 @@ You should see something like this in the console window (the **msg.payload** is
 | .read (GA)                         | Sends a READ telegram to the BUS. **GA** is the group address (for example "0/0/1").                 |
 | .discover()                        | Sends a discover request on the KNX default multicast port and returns the results as an array. This is an async method. See the example in the **examples** folder |
 | .getGatewayDescription()           | Sends a gateway description request. It works after an established connection. The async results will be sent to the *descriptionResponse* event. There is an example in the **examples** folder named **gatewaydescription.ts** . |
+| .getCurrentItemHandledByTheQueue()  | Returns the sequence number awaiting a tunnelling ACK, or `undefined` when none is pending. Retained for compatibility with Node-RED queue diagnostics; calling it does not change the queue or ACK state. |
 
 ### writeRaw notes
 

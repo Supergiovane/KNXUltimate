@@ -1,16 +1,21 @@
 # Changelog
 
+## [6.0.5](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.4...v6.0.5) (2026-09-13)
+
+### Bug Fixes
+
+* **core:** restore the public `getCurrentItemHandledByTheQueue()` method used by Node-RED queue diagnostics, fixing `getCurrentItemHandledByTheQueue is not a function` errors that interrupted sends, including periodic sends, while a tunnelling ACK was pending. Return the pending request's sequence number, or `undefined` safely when no ACK is pending, without changing queue or ACK handling.
+
+### Tests
+
+* cover periodic sends while waiting for an ACK, queue diagnostics during retries, calls before sending and after disconnection, and sequence counter wraparound.
+
 ## [6.0.4](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.3...v6.0.4) (2026-09-13)
 
 
 ### Bug Fixes
 
 * **tunneling:** isolate UDP control traffic from pending ACKs ([881f3e7](https://github.com/Supergiovane/KNXUltimate/commit/881f3e78ac8960b3ee830f17490490d2b63364b2))
-
-## Unreleased
-
-### Bug Fixes
-
 * **tunneling:** send UDP acknowledgements, heartbeats and disconnect packets independently of the application queue, preserving logging and packet capture.
 * **tunneling:** keep the outstanding request blocked until a successful ACK with the matching channel and sequence arrives; ignore unexpected, duplicate and unsuccessful ACKs.
 * **tunneling:** preserve the original request across retries, cancel queued retries after a late ACK, and close the tunnel after retry exhaustion without sending the next sequence. Automatic reconnection remains available when enabled.

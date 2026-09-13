@@ -129,6 +129,64 @@ describe('KNXClient TunnelUDP queue and acknowledgements', () => {
 		}
 	}
 
+	it('allows Node-RED to log a busy queue and enqueue the next periodic telegram', async () => {
+		const h = setup()
+		const warnings: string[] = []
+		const sendPeriodicTelegram = (value: boolean) => {
+			if (!h.client.clearToSend) {
+				warnings.push(
+					`Waiting for telegram ACK with sequence ${h.client.getCurrentItemHandledByTheQueue()}`,
+				)
+			}
+			h.write(value)
+		}
+
+		sendPeriodicTelegram(true)
+		await clock.tickAsync(100)
+		assert.doesNotThrow(() => sendPeriodicTelegram(false))
+		assert.deepEqual(warnings, [
+			'Waiting for telegram ACK with sequence 194',
+		])
+		assert.equal(h.client.getCurrentItemHandledByTheQueue(), 194)
+		assert.deepEqual(
+			h.requests().map((p) => p.seq),
+			[194],
+		)
+
+		h.heartbeat()
+		await clock.tickAsync(900)
+		assert.equal(h.client.getCurrentItemHandledByTheQueue(), 194)
+		assert.equal(h.client.clearToSend, false)
+		assert.deepEqual(
+			h.requests().map((p) => p.seq),
+			[194, 194],
+		)
+		h.ack(194)
+		await clock.tickAsync(100)
+		assert.equal(h.client.getCurrentItemHandledByTheQueue(), 195)
+		assert.deepEqual(
+			h.requests().map((p) => p.seq),
+			[194, 194, 195],
+		)
+		h.ack(195)
+		assert.equal(h.client.getCurrentItemHandledByTheQueue(), undefined)
+		assert.deepEqual(h.errors, [])
+	})
+
+	it('safely reports no pending ACK before sending or after disconnecting', async () => {
+		const h = setup()
+		h.client.clearToSend = false
+		assert.equal(h.client.getCurrentItemHandledByTheQueue(), undefined)
+		h.client.clearToSend = true
+		h.write()
+		assert.equal(h.client.getCurrentItemHandledByTheQueue(), 194)
+
+		const disconnected = h.client.Disconnect()
+		h.receive(KNXProtocol.newKNXDisconnectResponse(81, 0))
+		await disconnected
+		assert.equal(h.client.getCurrentItemHandledByTheQueue(), undefined)
+	})
+
 	const intervals = [25, 100]
 	intervals.forEach((interval) => {
 		it(`keeps the original request pending across a heartbeat with a ${interval} ms queue`, async () => {
@@ -349,12 +407,14 @@ describe('KNXClient TunnelUDP queue and acknowledgements', () => {
 		await clock.tickAsync(100)
 		h.heartbeat()
 		h.ack(0)
+		assert.equal(h.client.getCurrentItemHandledByTheQueue(), 255)
 		assert.deepEqual(
 			h.requests().map((p) => p.seq),
 			[255],
 		)
 		h.ack(255)
 		await clock.tickAsync(100)
+		assert.equal(h.client.getCurrentItemHandledByTheQueue(), 0)
 		assert.deepEqual(
 			h.requests().map((p) => p.seq),
 			[255, 0],

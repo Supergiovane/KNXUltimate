@@ -3302,6 +3302,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return this._clientTunnelSeqNumber
 	}
 
+	/**
+	 * Return the sequence number awaiting a tunnelling ACK, or undefined if none.
+	 * Kept public for compatibility with Node-RED queue diagnostics.
+	 */
+	public getCurrentItemHandledByTheQueue(): number | undefined {
+		return this.pendingTunnelingRequest?.seqCounter
+	}
+
 	// Secure Tunneling (TCP) sequence helpers
 	private secureGetTunnelSeq() {
 		return this._secureTunnelSeq & 0xff
