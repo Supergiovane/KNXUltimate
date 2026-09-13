@@ -2,6 +2,13 @@
 
 ## [6.0.5](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.4...v6.0.5) (2026-09-13)
 
+
+### Bug Fixes
+
+* **core:** restore queue diagnostics for Node-RED ([34dda47](https://github.com/Supergiovane/KNXUltimate/commit/34dda470b1346f8fcfa1d4c27cf4bbdde002f44b))
+
+## [6.0.5](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.4...v6.0.5) (2026-09-13)
+
 ### Bug Fixes
 
 * **core:** restore the public `getCurrentItemHandledByTheQueue()` method used by Node-RED queue diagnostics, fixing `getCurrentItemHandledByTheQueue is not a function` errors that interrupted sends, including periodic sends, while a tunnelling ACK was pending. Return the pending request's sequence number, or `undefined` safely when no ACK is pending, without changing queue or ACK handling.
