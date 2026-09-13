@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.0.4](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.3...v6.0.4) (2026-09-13)
+
+
+### Bug Fixes
+
+* **tunneling:** isolate UDP control traffic from pending ACKs ([881f3e7](https://github.com/Supergiovane/KNXUltimate/commit/881f3e78ac8960b3ee830f17490490d2b63364b2))
+
 ## Unreleased
 
 ### Bug Fixes
