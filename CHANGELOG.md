@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.0.6](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.5...v6.0.6) (2026-09-14)
+
+
+### Bug Fixes
+
+* **network:** preserve local IPv4 address selection ([fc3ccd3](https://github.com/Supergiovane/KNXUltimate/commit/fc3ccd3f26fb8851605c3e51d0c53fee213c2d50))
+
 ## Unreleased
 
 ### Bug Fixes
