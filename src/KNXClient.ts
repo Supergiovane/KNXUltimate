@@ -209,7 +209,7 @@ export type KNXClientOptions = {
 	isSecureKNXEnabled?: boolean
 	/** Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true */
 	suppress_ack_ldatareq?: boolean
-	/** The local IP address to be used to connect to the KNX/IP Bus. Leave blank, will be automatically filled by KNXUltimate */
+	/** Local IPv4 for UDP binding and multicast interface selection. Takes precedence over interface; leave blank for automatic selection. */
 	localIPAddress?: string
 	/** Specifies the local eth interface to be used to connect to the KNX Bus. */
 	interface?: string
@@ -499,9 +499,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		try {
-			this._options.localIPAddress = ipAddressHelper.getLocalAddress(
-				this._options.interface,
-			)
+			if (!this._options.localIPAddress) {
+				this._options.localIPAddress = ipAddressHelper.getLocalAddress(
+					this._options.interface,
+				)
+			}
 		} catch (error) {
 			this.sysLogger.error(
 				`ipAddressHelper.getLocalAddress:${error.message}`,

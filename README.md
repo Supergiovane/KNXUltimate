@@ -188,11 +188,13 @@ You can ignore this section until you actually need one of these behaviors.
 
 | Property | Applies to | Description |
 | -------- | ---------- | ----------- |
-| `localIPAddress` (string) | all | Bind the local UDP/TCP socket to a specific local interface IP. Useful with multiple NICs. |
-| `interface` (string) | all | Local interface name to select the NIC (alternative to `localIPAddress`). |
+| `localIPAddress` (string) | TunnelUDP, Multicast | Local IPv4 address for UDP tunnel binding and multicast interface selection. Takes precedence over `interface` for local address selection; leave blank to select automatically. |
+| `interface` (string) | IP transports | Local interface name to select the NIC. When `localIPAddress` is blank, uses the first non-internal IPv4 address reported for this interface. |
 | `autoReconnect` (bool) | all | After the first `Connect()`, reconnect indefinitely every 5 seconds following an unexpected disconnection or failed connection attempt. An explicit `Disconnect()` stops retrying. Default `false`. |
 | `suppress_ack_ldatareq` (bool) | tunnelling, serial | Controls the cEMI `L_DATA_REQ` bus ACK bit. In plain `TunnelUDP`, when `false` the client also waits for the corresponding tunnelling ACK; set `true` only if your interface needs it. Default `false`. |
 | `theGatewayIsKNXVirtual` (bool) | tunnelling | Special handling for ETS KNX Virtual (adds `localIPAddress` to the tunnel endpoint). Default `false`. |
+
+If an interface has multiple IPv4 addresses (for example, a host address plus a VRRP/keepalived VIP), later addresses no longer replace its first suitable IPv4. Node.js does not expose primary/secondary or VRRP flags, so automatic selection still depends on the order reported by the OS. For UDP tunnelling with a fixed host address, set `localIPAddress: '192.168.178.252'` in the `KNXClient` options to select that address regardless of ordering. The address must be assigned locally. TCP socket source selection follows the OS routing table.
 
 ### Queue pacing
 

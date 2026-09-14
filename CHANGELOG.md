@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+* **network:** keep the first suitable IPv4 address for each interface instead of replacing it with later aliases or VRRP/VIP addresses ([Node-RED #531](https://github.com/Supergiovane/node-red-contrib-knx-ultimate/issues/531)).
+* **network:** honor an explicit `localIPAddress` instead of overwriting it with automatic interface selection, allowing UDP tunnels to bind to a stable host address regardless of interface address ordering.
+
 ## [6.0.5](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.4...v6.0.5) (2026-09-13)
 
 

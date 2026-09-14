@@ -62,7 +62,11 @@ export function getIPv4Interfaces(): { [key: string]: NetworkInterfaceInfo } {
 							iface,
 							intf,
 						)
-						candidateInterfaces[iface] = intf
+						// Keep the first suitable IPv4; later aliases/VIPs must not
+						// overwrite it. The OS does not identify primary addresses here.
+						if (!hasProp(candidateInterfaces, iface)) {
+							candidateInterfaces[iface] = intf
+						}
 					} else {
 						logger.debug(
 							'Found NOT suitable interface: %s (%j)',
