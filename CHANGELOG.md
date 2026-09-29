@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.0.8](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.6...v6.0.8) (2026-09-29)
+
+
+### Bug Fixes
+
+* **secure:** restore Data Secure status reception in 6.0.7 ([7b14712](https://github.com/Supergiovane/KNXUltimate/commit/7b14712ea6b0a1d94e9bd14f7c6a42cf66b35696))
+
 ## [6.0.7](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.6...v6.0.7) (2026-09-29)
 
 ### Bug Fixes
