@@ -94,8 +94,11 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 > - Data Secure group telegrams are MAC-verified and protected against replay per
 >   source address. Forged, tampered or replayed telegrams are **no longer delivered**
 >   as `indication` events.
-> - Inside an established secure session, **plaintext KNX/IP frames are dropped** (only
->   `SecureWrapper` frames are accepted).
+> - Inside an established secure session, unprotected KNX/IP frames are dropped.
+>   Gateways such as Apricum may send Data Secure group indications without an IP
+>   wrapper: these are accepted only on the active tunnel, with a known group key,
+>   a valid Data Secure MAC and a fresh sender sequence. Unwrapped session/control
+>   frames and plain group data remain rejected.
 > - The Data Secure **sender sequence no longer wraps**: once the 48-bit maximum is
 >   reached, sending throws and new key material is required.
 >

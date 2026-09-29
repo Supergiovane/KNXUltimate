@@ -1,5 +1,15 @@
 # Changelog
 
+## [6.0.7](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.6...v6.0.7) (2026-09-29)
+
+### Bug Fixes
+
+* **secure:** receive authenticated Data Secure group indications sent without an IP wrapper by Apricum gateways. Require an established tunnel, the matching channel, a known group key, valid MAC and fresh sender sequence; continue rejecting unprotected traffic. Fixes status updates missing in Node-RED after secure writes.
+
+### Tests
+
+* Cover unwrapped Data Secure reception, MAC tampering, replay across wrapped and unwrapped paths, invalid payloads, unknown group keys and mismatched tunnel channels.
+
 ## [6.0.6](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.5...v6.0.6) (2026-09-14)
 
 

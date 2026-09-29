@@ -224,6 +224,72 @@ describe('KNX Secure validation (negative paths)', () => {
 		)
 	})
 
+	it('receives unwrapped Data Secure status updates from an authenticated tunnel', async () => {
+		const { gw, cli } = await setup(deviceAuthCode)
+		const indications = collectIndications(cli)
+		gw.writeRaw(gw.buildSecureGroupWriteInner(GA, true).inner)
+		gw.writeRaw(gw.buildSecureGroupWriteInner(GA, false).inner)
+		await delay(300)
+		assert.deepStrictEqual(indications, [true, false])
+	})
+
+	it('rejects unwrapped Data Secure tampering and replays across both receive paths', async () => {
+		const { gw, cli } = await setup(deviceAuthCode)
+		const indications = collectIndications(cli)
+		const first = gw.buildSecureGroupWriteInner(GA, true).inner
+		const tampered = Buffer.from(first)
+		tampered[tampered.length - 1] ^= 0xff
+		gw.writeRaw(tampered)
+		await delay(100)
+		assert.deepStrictEqual(indications, [])
+		gw.writeRaw(first)
+		gw.writeRaw(first)
+		gw.writeRaw(gw.wrapInner(first))
+		await delay(200)
+		assert.deepStrictEqual(indications, [true])
+		const second = gw.buildSecureGroupWriteInner(GA, false).inner
+		gw.writeRaw(gw.wrapInner(second))
+		gw.writeRaw(second)
+		await delay(200)
+		assert.deepStrictEqual(indications, [true, false])
+	})
+
+	it('rejects unwrapped indications with no key, wrong channel, or invalid secure payload', async () => {
+		const { gw, cli } = await setup(deviceAuthCode)
+		const indications = collectIndications(cli)
+		const valid = gw.buildSecureGroupWriteInner(GA, true).inner
+		// The fixture has no additional cEMI information: APCI starts at 19,
+		// SCF at 21. None of these frames may consume the sender counter.
+		const wrongChannel = Buffer.from(valid)
+		wrongChannel[7] ^= 1
+		const confirmation = Buffer.from(valid)
+		confirmation[10] = CEMIConstants.L_DATA_CON
+		const unknownGroup = Buffer.from(valid)
+		unknownGroup[17] ^= 1
+		const plain = Buffer.from(valid)
+		plain[19] = 0
+		plain[20] = 0x81
+		const wrongScf = Buffer.from(valid)
+		wrongScf[21] = 0
+		const truncated = Buffer.from(valid.subarray(0, 24))
+		truncated.writeUInt16BE(truncated.length, 4)
+		for (const frame of [
+			wrongChannel,
+			confirmation,
+			unknownGroup,
+			plain,
+			wrongScf,
+			truncated,
+		]) {
+			gw.writeRaw(frame)
+		}
+		await delay(200)
+		assert.deepStrictEqual(indications, [])
+		gw.writeRaw(valid)
+		await delay(200)
+		assert.deepStrictEqual(indications, [true])
+	})
+
 	it('drops plaintext KNX/IP frames inside the secure session', async () => {
 		const { gw, cli } = await setup(deviceAuthCode)
 		const indications = collectIndications(cli)

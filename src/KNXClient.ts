@@ -4280,10 +4280,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.processInboundMessage(inner, rinfo)
 				}
 			} else if (this._options.isSecureKNXEnabled) {
-				// Inside a KNX/IP Secure session only SecureWrapper frames (and the
-				// initial plaintext SESSION_RESPONSE handled above) are legitimate.
-				// Any other plaintext KNX/IP frame is dropped: a CONNECT_RESPONSE or
-				// tunnelling frame must arrive wrapped once the session is up.
+				// Some gateways (e.g. Apricum) send Data Secure indications without
+				// an IP wrapper. Accept only authenticated group data on our active
+				// tunnel; unprotected data and session/control frames remain rejected.
+				if (this.receiveUnwrappedDataSecureIndication(frame)) continue
 				try {
 					this.sysLogger.warn(
 						`[${getTimestamp()}] Dropping plaintext frame type=0x${type.toString(16)} inside secure session`,
@@ -4300,6 +4300,46 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.processInboundMessage(frame, rinfo)
 			}
 		}
+	}
+
+	private receiveUnwrappedDataSecureIndication(frame: Buffer): boolean {
+		if (!this.isConnected() || !this._secureSessionKey) return false
+		let packet: KNXTunnelingRequest
+		try {
+			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(frame)
+			if (knxHeader.service_type !== KNX_CONSTANTS.TUNNELING_REQUEST)
+				return false
+			packet = knxMessage as KNXTunnelingRequest
+			const cemi = packet.cEMIMessage
+			const npdu = cemi.npdu
+			const secureData = npdu.dataBuffer?.value
+			if (
+				packet.channelID !== this._channelID ||
+				cemi.msgCode !== CEMIConstants.L_DATA_IND ||
+				cemi.control.addressType !== KNXAddress.TYPE_GROUP ||
+				npdu.tpci !== APCI_SEC.HIGH ||
+				npdu.apci !== APCI_SEC.LOW ||
+				!this._secureGroupKeys.has(cemi.dstAddress.get()) ||
+				!secureData ||
+				secureData.length < 1 + SECURE_SEQ_LEN + 2 + MAC_LEN_SHORT ||
+				secureData[0] !== SCF_ENCRYPTION_S_A_DATA
+			)
+				return false
+
+			// Decrypt exactly once: this also advances the shared sender replay
+			// counter, preventing replay between wrapped and unwrapped traffic.
+			if (!this.ensurePlainCEMI(cemi)) return false
+			if (
+				!npdu.isGroupRead &&
+				!npdu.isGroupResponse &&
+				!npdu.isGroupWrite
+			)
+				return false
+		} catch {
+			return false
+		}
+		this.emit(KNXClientEvents.indication, packet, false)
+		return true
 	}
 
 	private secureWrap(frame: Buffer): Buffer {
