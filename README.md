@@ -80,7 +80,7 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 - [How to collaborate](#how-to-collaborate)
 - [License](#license)
 
-## Changes in v6.1.0 (protocol and KNX Secure hardening)
+## Changes in v6.2.0 (protocol and KNX Secure hardening)
 
 Version 6.1.0 includes fixes and improvements based on an external audit against the
 KNXnet/IP specification (ISO 22510:2019), aligned with XKNX where appropriate. Most
