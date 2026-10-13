@@ -7,7 +7,7 @@
 
 * harden KNX Secure and tunnelling ([#110](https://github.com/Supergiovane/KNXUltimate/issues/110)) ([a0631c4](https://github.com/Supergiovane/KNXUltimate/commit/a0631c489645e811d2edf251ff5cd342234e28fc))
 
-## [6.1.0](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.8...v6.1.0) (2026-10-13)
+## [6.2.0](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.8...v6.1.0) (2026-10-13)
 
 Fixes from an external audit against ISO 22510:2019 (KNXnet/IP, incl. Secure), aligned with XKNX where the specification leaves room. Most stricter receive checks are opt-in. Keyrings without an ETS signature require `knxkeys_validate_signature: false`; malformed or unauthenticated Data Secure telegrams for keyed group addresses are dropped by default.
 
