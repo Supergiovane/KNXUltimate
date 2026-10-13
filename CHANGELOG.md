@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (6.1.0)
+## [6.1.0](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.8...v6.1.0) (2026-10-13)
 
 Fixes from an external audit against ISO 22510:2019 (KNXnet/IP, incl. Secure), aligned with XKNX where the specification leaves room. Most stricter receive checks are opt-in. Keyrings without an ETS signature require `knxkeys_validate_signature: false`; malformed or unauthenticated Data Secure telegrams for keyed group addresses are dropped by default.
 
@@ -64,14 +64,7 @@ Fixes from an external audit against ISO 22510:2019 (KNXnet/IP, incl. Secure), a
 
 ### Bug Fixes
 
-* **network:** preserve local IPv4 address selection ([fc3ccd3](https://github.com/Supergiovane/KNXUltimate/commit/fc3ccd3f26fb8851605c3e51d0c53fee213c2d50))
-
-## Unreleased
-
-### Bug Fixes
-
-* **network:** keep the first suitable IPv4 address for each interface instead of replacing it with later aliases or VRRP/VIP addresses ([Node-RED #531](https://github.com/Supergiovane/node-red-contrib-knx-ultimate/issues/531)).
-* **network:** honor an explicit `localIPAddress` instead of overwriting it with automatic interface selection, allowing UDP tunnels to bind to a stable host address regardless of interface address ordering.
+* **network:** preserve the first suitable IPv4 address for each interface and honor explicit `localIPAddress` values, avoiding later aliases or VRRP/VIP addresses replacing the selected address and allowing stable UDP bindings ([#531](https://github.com/Supergiovane/node-red-contrib-knx-ultimate/issues/531), [fc3ccd3](https://github.com/Supergiovane/KNXUltimate/commit/fc3ccd3f26fb8851605c3e51d0c53fee213c2d50)).
 
 ## [6.0.5](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.4...v6.0.5) (2026-09-13)
 
@@ -371,6 +364,15 @@ Bump to 6.0.0, update CHANGELOG and add README warning.
 ### Bug Fixes
 
 * remover unwanted files ([34ca0ac](https://github.com/Supergiovane/KNXUltimate/commit/34ca0ac5e411a76ee0a88d7d077db0dcd00ff023))
+* TunnelUDP keeps configured `physAddr` as its source IA; the tunnel-assigned IA from `CONNECT_RESPONSE` is applied only to TunnelTCP (secure), restoring the expected UDP behavior.
+
+### Tests/CI
+
+* Stabilized integration tests by avoiding real `os.networkInterfaces()` in CI and lowering log verbosity during tests.
+
+### Docs
+
+* Clarified TunnelUDP vs TunnelTCP individual-address behavior and added UDP tunnelling tips for ACK suppression and `localIPAddress`.
 
 # [5.0.0-beta.5](https://github.com/Supergiovane/KNXUltimate/compare/v5.0.0-beta.4...v5.0.0-beta.5) (2025-09-15)
 
@@ -819,16 +821,3 @@ Bump to 6.0.0, update CHANGELOG and add README warning.
 * securwe keyring ([0b1a250](https://github.com/Supergiovane/KNXUltimate/commit/0b1a250aa5ce46c18c6fcee3528b2069d3e06d5e))
 * typed event emitter ([2360e63](https://github.com/Supergiovane/KNXUltimate/commit/2360e632dcadd58acb2aec4fd9785ceae8f7f761))
 * typescript refactor ([ec8e26b](https://github.com/Supergiovane/KNXUltimate/commit/ec8e26b5601a0af96faac8e967ff95a96ed8e605))
-## [Unreleased]
-
-### Fixes
-
-- TunnelUDP keeps using configured `physAddr` as source IA; the tunnel-assigned IA from `CONNECT_RESPONSE` is now applied only for TunnelTCP (secure). Improves compatibility and restores legacy behavior expected by tools/tests.
-
-### Tests/CI
-
-- Stabilized integration tests by avoiding real `os.networkInterfaces()` in CI and lowering log verbosity during tests.
-
-### Docs
-
-- Clarified IA behavior for TunnelUDP vs TunnelTCP in README, plus tips for UDP tunnelling (ACK suppression and `localIPAddress`).
