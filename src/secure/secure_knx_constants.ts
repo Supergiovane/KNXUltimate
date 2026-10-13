@@ -52,10 +52,13 @@ export const APCI_SEC = {
 export const TPCI_DATA = 0x00 // data TPDU
 
 // Secure Wrapper constants
+// KNX/IP Secure tunnelling uses the fixed 0x0000 message tag (as XKNX does).
+// Secure routing uses a fresh random tag in secureWrapRouting().
 export const SECURE_WRAPPER_TAG = Buffer.from('0000', 'hex')
 export const SECURE_WRAPPER_CTR_SUFFIX = Buffer.from('0000ff00', 'hex')
 export const SECURE_WRAPPER_MAC_SUFFIX = Buffer.from('ff00', 'hex')
 export const SECURE_WRAPPER_OVERHEAD = 38 // header(6)+sid(2)+seq(6)+serial(6)+tag(2)+mac(16)
+export const SECURE_WRAPPER_MIN_LEN = 44 // overhead + at least an inner KNX/IP header (6)
 export const KNXIP_HDR_SECURE_WRAPPER = Buffer.from('06100950', 'hex')
 export const KNXIP_HDR_TUNNELING_REQUEST = Buffer.from('06100420', 'hex')
 export const KNXIP_HDR_TUNNELING_ACK = Buffer.from('06100421', 'hex')
@@ -87,12 +90,20 @@ export const CONNECT_SEND_DELAY_MS = 150
 export const DEFAULT_STATUS_TIMEOUT_MS = 5000
 export const WAIT_FOR_STATUS_DEFAULT_MS = 4000
 export const KNXIP_HEADER_LEN = 6
+// Upper bound for a KNX/IP frame on a TCP stream; larger lengths mean a corrupted stream
+export const TCP_MAX_FRAME_LEN = 4096
+
+// SESSION_STATUS codes
+export const SECURE_SESSION_STATUS_TIMEOUT = 0x03
+export const SECURE_SESSION_STATUS_KEEPALIVE = 0x04
+export const SECURE_SESSION_STATUS_CLOSE = 0x05
 export const TUNNEL_CONN_HEADER_LEN = 0x04
 export const DEFAULT_SRC_IA_FALLBACK = '1.1.255'
 
 // KNX Secure default timeouts (handshake phases)
-export const SECURE_SESSION_TIMEOUT_MS = 5000 // wait for SESSION_RESPONSE
-export const SECURE_AUTH_TIMEOUT_MS = 5000 // wait for SESSION_STATUS
+// Up to 10 s: ECDH can be slow on embedded gateways
+export const SECURE_SESSION_TIMEOUT_MS = 10000 // wait for SESSION_RESPONSE
+export const SECURE_AUTH_TIMEOUT_MS = 10000 // wait for SESSION_STATUS
 export const SECURE_CONNECT_TIMEOUT_MS = 15000 // wait for CONNECT_RESPONSE
 
 // HPAI/CRD for connect request

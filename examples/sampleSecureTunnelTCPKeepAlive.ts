@@ -7,6 +7,7 @@
  * Use at your own risk; the author assumes no liability for damages.
  */
 
+import path from 'path'
 import KNXClient, { SecureConfig } from '../src/KNXClient'
 
 function now() {
@@ -18,16 +19,16 @@ async function main() {
   // KNX Secure + Data Secure configuration (adjust to your environment)
   const secureCfg: SecureConfig = {
     tunnelInterfaceIndividualAddress: '1.1.254',
-    knxkeys_file_path:
-      '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
+    knxkeys_file_path: path.join(process.cwd(), 'documents', 'Secure Test.knxkeys'),
     knxkeys_password: 'passwordprogetto',
   }
 
   // To use manual credentials instead of the ETS keyring:
   // const secureCfg: SecureConfig = {
-  //   tunnelInterfaceIndividualAddress: '1.1.254',
   //   tunnelUserPassword: '<your-tunnel-password>',
   //   tunnelUserId: <your-tunnel-user-id>,
+  //   deviceAuthenticationPassword: '<gateway-device-authentication-code>', // recommended
+  //   groupKeys: { '1/1/1': '<32 hex characters>' }, // only for Data Secure group addresses
   // }
 
   const client = new KNXClient({

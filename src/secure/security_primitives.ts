@@ -123,6 +123,14 @@ export function encryptDataCtr(
  * @param deviceAuthenticationPassword - Password string
  * @returns 16-byte derived key
  */
+/**
+ * Constant-time MAC comparison. Returns false for buffers of different length.
+ */
+export function macEquals(a: Buffer, b: Buffer): boolean {
+	if (!a || !b || a.length !== b.length) return false
+	return crypto.timingSafeEqual(a, b)
+}
+
 export function deriveDeviceAuthenticationPassword(
 	deviceAuthenticationPassword: string,
 ): Buffer {

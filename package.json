@@ -1,7 +1,7 @@
 {
   "name": "knxultimate",
   "description": "KNX protocol implementation for Node.js, support KNX/IP Tunneling/Routing, KNX/IP Secure and Data Secure, FT1.2/KBerry TP plain KNXas well as full secure KNX stack. This is the ENGINE of Node-Red KNX-Ultimate node. Go check it!",
-  "version": "6.0.8",
+  "version": "6.1.0",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "files": [
@@ -28,6 +28,8 @@
     "prepack": "npm run build && node scripts/cleanupPackArtifacts.js",
     "example:secure:multicast": "node -r esbuild-register -e \"require('./examples/sampleSecureMulticast.ts')\"",
     "example:secure:tunnel": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCP.ts')\"",
+    "example:secure:tunnel:groupkeys": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCPGroupKeys.ts')\"",
+    "example:tunnel:tcp": "node -r esbuild-register -e \"require('./examples/samplePlainTunnelTCP.ts')\"",
     "example:writeRaw": "node -r esbuild-register -e \"require('./examples/writeRaw.ts')\"",
     "example:respondRaw": "node -r esbuild-register -e \"require('./examples/respondRaw.ts')\"",
     "example:bridge:noderedmsg": "node -r esbuild-register -e \"require('./examples/bridgeTunnelToNodeRedMsg.ts')\"",

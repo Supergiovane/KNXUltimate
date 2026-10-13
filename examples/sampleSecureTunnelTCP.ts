@@ -46,20 +46,20 @@ async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): P
 async function main() {
   // KNX Secure + Data Secure configuration
   const knxkeysPath = path.join(process.cwd(), 'documents', 'Secure Test.knxkeys')
-   const secureCfg: SecureConfig = {
-     knxkeys_buffer: fs.readFileSync(knxkeysPath),
-     // Alternative to knxkeys_buffer:
-     // knxkeys_file_path: knxkeysPath,
-     knxkeys_password: 'passwordprogetto',
+  const secureCfg: SecureConfig = {
+    knxkeys_buffer: fs.readFileSync(knxkeysPath),
+    // Alternative to knxkeys_buffer:
+    // knxkeys_file_path: knxkeysPath,
+    knxkeys_password: 'passwordprogetto', // A wrong password fails with "Keyring signature verification failed"
+    // tunnelInterfaceIndividualAddress: '1.1.254', // Optional: omit to auto-select a free tunnel from the keyring
 
-    // If you do not have the ETS keyring, comment the block above and use the
-    // manual secure credentials below. Data Secure will be unavailable.
-   tunnelInterfaceIndividualAddress: '1.1.254',
-    tunnelUserPassword: '6N.nv0sz', // Replace with your tunnel password
-    tunnelUserId: 3, // Replace with the tunnel user ID defined in ETS
-   }
+    // Optional hardening (both default to false):
+    // requireDeviceAuthentication: true, // refuse gateways that cannot be authenticated
+    // strictSecurity: true, // drop plain telegrams on keyed GAs and senders outside a sender list present in the keyring
+  }
 
-  
+  // Without an ETS keyring use the manual credentials instead, see
+  // sampleSecureTunnelTCPGroupKeys.ts (Data Secure via secureTunnelConfig.groupKeys).
 
   const client = new KNXClient({
     // Secure tunnel over TCP with Data Secure support from the keyring

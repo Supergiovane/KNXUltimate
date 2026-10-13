@@ -54,6 +54,7 @@ import {
 	encryptDataCtr,
 	decryptCtr,
 	deriveDeviceAuthenticationPassword,
+	macEquals,
 } from './secure/security_primitives'
 import {
 	SCF_ENCRYPTION_S_A_DATA,
@@ -93,10 +94,17 @@ import {
 	AES_BLOCK_LEN,
 	MAC_LEN_FULL,
 	MAC_LEN_SHORT,
+	SECURE_WRAPPER_MIN_LEN,
+	SECURE_SESSION_STATUS_TIMEOUT,
+	SECURE_SESSION_STATUS_CLOSE,
+	TCP_MAX_FRAME_LEN,
 } from './secure/secure_knx_constants'
 
 const STANDARD_FRAME_MAX_APDU_LENGTH = 0x0f
 const AUTO_RECONNECT_DELAY_MS = 5000
+// Serial number KNXUltimate uses for itself in KNX/IP Secure frames ("knxu")
+const KNXULTIMATE_SERIAL_NUMBER = Buffer.from('00006b6e7875', 'hex')
+const MAX_RECONNECT_BACKOFF_MS = 60000
 
 export type DiscoveryInterface = {
 	ip: string
@@ -118,6 +126,12 @@ export interface SecureConfig {
 	 */
 	knxkeys_buffer?: Buffer
 	knxkeys_password?: string
+	/**
+	 * Verify the ETS keyring signature (default: true, as XKNX). A keyring
+	 * without a Signature is rejected unless this is false; set false only for
+	 * keyrings that were not exported by ETS.
+	 */
+	knxkeys_validate_signature?: boolean
 	tunnelUserPassword?: string
 	tunnelUserId?: number
 	/**
@@ -128,6 +142,28 @@ export interface SecureConfig {
 	 * SESSION_RESPONSE MAC cannot be verified.
 	 */
 	deviceAuthenticationPassword?: string
+	/**
+	 * Refuse the KNX/IP Secure unicast handshake when no device authentication
+	 * code is available, instead of only logging a warning. Without the code the
+	 * gateway is not authenticated (a forged gateway would be accepted).
+	 * Default: false (kept for backward compatibility).
+	 */
+	requireDeviceAuthentication?: boolean
+	/**
+	 * Data Secure group keys, as { "1/2/3": key }. The key is a 16-byte Buffer, a
+	 * 32-character hex string, or a base64 string that decodes to 16 bytes. Works
+	 * with or without a keyring; on conflict these keys win over the keyring ones.
+	 */
+	groupKeys?: Record<string, Buffer | string>
+	/**
+	 * Stricter KNX Secure receive checks (default: false, for backward
+	 * compatibility):
+	 * - drop plain telegrams addressed to a group address that has a Data Secure key;
+	 * - drop Data Secure telegrams from a sender not listed for that group address
+	 *   in the keyring (only when the keyring lists the senders);
+	 * - secure routing: drop wrappers whose timer is older than the latency tolerance.
+	 */
+	strictSecurity?: boolean
 }
 
 export enum ConncetionState {
@@ -203,9 +239,9 @@ export type KNXClientOptions = {
 	ipAddr?: string
 	/** The port, default is "3671" */
 	ipPort?: number | string
-	/** Default: "TunnelUDP". "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces, or "TunnelTCP" for secure KNX Interfaces (not yet implemented) */
+	/** Default: "TunnelUDP". "Multicast" if you're connecting to a KNX Router. "TunnelUDP" for KNX Interfaces, or "TunnelTCP" for tunnelling over TCP (KNX/IP Secure, or plain when isSecureKNXEnabled is false) */
 	hostProtocol?: KNXClientProtocol
-	/** True: Enables the secure connection. Leave false until KNX-Secure has been released. */
+	/** True: enables KNX/IP Secure (TunnelTCP: secure session; Multicast: secure routing) and Data Secure for keyed group addresses. */
 	isSecureKNXEnabled?: boolean
 	/** Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true */
 	suppress_ack_ldatareq?: boolean
@@ -301,6 +337,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _heartbeatFailures: number
 
+	// Extra reconnect delay after E_NO_MORE_CONNECTIONS (0 = default delay)
+	private _reconnectBackoffMs = 0
+
+	// Sequence number of the last inbound TUNNELING_REQUEST, to drop repeats
+	private _lastRxTunnelSeq?: number
+
 	private _heartbeatRunning: boolean
 
 	private max_HeartbeatFailures: number
@@ -366,6 +408,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private _secureGroupKeys: Map<number, Buffer> = new Map()
 
+	// Allowed Data Secure senders per group address (from the keyring
+	// interface); enforced only with secureTunnelConfig.strictSecurity.
+	private _secureGroupSenders: Map<number, Set<number>> = new Map()
+
 	private _secureSendSeq48: bigint = 0n
 
 	// Per-source last accepted Data Secure sender sequence (48-bit), keyed by source
@@ -377,7 +423,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	// available (e.g. manual config without it).
 	private _secureDeviceAuthCode?: Buffer
 
-	private _secureSerial: Buffer = Buffer.from('000000000000', 'hex')
+	// Trimmed variant of a manually entered device authentication code
+	private _secureDeviceAuthCodeAlt?: Buffer
+
+	// Our own serial number in outgoing Secure Wrappers and TimerNotify. It must
+	// differ from the gateway's: with the same session key, tag and counter, a
+	// shared serial would reuse the AES-CTR keystream (XKNX uses its own too).
+	private _secureSerial: Buffer = Buffer.from(KNXULTIMATE_SERIAL_NUMBER)
 
 	private _secureAssignedIa: number = 0
 
@@ -412,11 +464,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	// Secure routing (multicast) initial timer sync helper
 	private _secureRoutingSyncTimer?: NodeJS.Timeout
 
+	// No TimerNotify answer within the latency tolerance: adopt our own timer
+	private _secureRoutingFallbackTimer?: NodeJS.Timeout
+
+	// Body (timer + serial + tag) of the last TimerNotify we sent, to recognize
+	// it when multicast loopback delivers it back to us
+	private _secureRoutingLastNotify?: Buffer
+
 	private _secureHandshakeState?:
 		| 'connecting'
 		| 'session'
 		| 'auth'
 		| 'connect'
+		| 'connected'
 
 	get udpSocket() {
 		if (this._clientSocket instanceof UDPSocket) {
@@ -643,6 +703,23 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 							this.secureSendTimerNotify()
 						} catch {}
 					}, 120)
+					// Nobody answered: our own timer becomes the reference
+					try {
+						clearTimeout(this._secureRoutingFallbackTimer as any)
+					} catch {}
+					this._secureRoutingFallbackTimer = setTimeout(
+						() => {
+							if (this._secureRoutingTimerAuthenticated) return
+							this._secureRoutingTimerAuthenticated = true
+							try {
+								this.sysLogger.debug(
+									`[${getTimestamp()}] Secure routing: no TimerNotify answer, using the local timer`,
+								)
+							} catch {}
+							this.secureRoutingEmitConnectedIfPending()
+						},
+						120 + Math.max(1000, this._secureRoutingLatencyMs),
+					)
 				}
 			})
 			this.udpSocket.on(
@@ -741,6 +818,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.socketReady = true
 			// Reset queue exit flag on fresh TCP connect
 			this.exitProcessingKNXQueueLoop = false
+			if (!this._options.isSecureKNXEnabled) {
+				this.plainTcpConnect()
+				return
+			}
 			this.secureStartSession().catch((err) => {
 				this.handleConnectionAttemptFailure(
 					err instanceof Error ? err : new Error(String(err)),
@@ -998,6 +1079,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this._secureHandshakeConnectTimer,
 			this._secureConnectSendTimer,
 			this._secureRoutingSyncTimer,
+			this._secureRoutingFallbackTimer,
 		]) {
 			if (timer) clearTimeout(timer)
 		}
@@ -1006,6 +1088,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._secureHandshakeConnectTimer = undefined
 		this._secureConnectSendTimer = undefined
 		this._secureRoutingSyncTimer = undefined
+		this._secureRoutingFallbackTimer = undefined
 		this._secureHandshakeState = undefined
 	}
 
@@ -1044,8 +1127,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			return
 		}
 
+		const delayMs = this._reconnectBackoffMs || AUTO_RECONNECT_DELAY_MS
 		this.sysLogger.info(
-			`[${getTimestamp()}] KNXClient: reconnecting to ${this._peerHost}:${this._peerPort} in ${AUTO_RECONNECT_DELAY_MS / 1000} seconds`,
+			`[${getTimestamp()}] KNXClient: reconnecting to ${this._peerHost}:${this._peerPort} in ${delayMs / 1000} seconds`,
 		)
 		this.setTimer(
 			KNXTimer.RECONNECT,
@@ -1072,7 +1156,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.scheduleReconnect()
 				}
 			},
-			AUTO_RECONNECT_DELAY_MS,
+			delayMs,
 		)
 	}
 
@@ -2590,7 +2674,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const cfg = this._options.secureTunnelConfig
 		if (!cfg) throw new Error('Secure config not provided')
 		// Load keyring once to access interfaces
-		const kr = new Keyring()
 		const keyringBuffer =
 			Buffer.isBuffer(cfg.knxkeys_buffer) && cfg.knxkeys_buffer.length > 0
 				? cfg.knxkeys_buffer
@@ -2602,17 +2685,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				'IA discovery for KNX/IP Secure requires an ETS keyring (set secureTunnelConfig.knxkeys_file_path or secureTunnelConfig.knxkeys_buffer).',
 			)
 		}
-		const pwd = cfg.knxkeys_password?.trim()
-		if (!pwd) {
+		if (!cfg.knxkeys_password?.trim()) {
 			throw new Error(
 				'IA discovery for KNX/IP Secure requires a keyring password (set secureTunnelConfig.knxkeys_password).',
 			)
 		}
-		if (keyringBuffer) {
-			await kr.loadFromBuffer(keyringBuffer, pwd)
-		} else {
-			await kr.load(path!, pwd)
-		}
+		const kr = await this.secureLoadKeyring(
+			keyringBuffer,
+			path,
+			cfg.knxkeys_password,
+		)
 
 		// Discover gateways and find the one matching ipAddr/ipPort
 		const timeout = 3000
@@ -2810,7 +2892,6 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			// Reset per-attempt secure state so keyring derivation uses the new IA
 			this._secureUserPasswordKey = undefined
 			this._secureUserId = 2
-			this._secureSerial = Buffer.from('000000000000', 'hex')
 			this._secureAssignedIa = 0
 			this._secureWrapperSeq = 0
 			this._secureRxWrapperSeq = -1
@@ -2964,17 +3045,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
 			this._clientTunnelSeqNumber = -1
-			this.setTimer(
-				KNXTimer.CONNECTION,
-				() => {
-					this.handleConnectionAttemptFailure(timeoutError)
-				},
-				1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
-			)
 			// 27/06/2023, leave some time to the dgram, to do the bind and read local ip and local port
 			this.setTimer(
 				KNXTimer.CONNECT_REQUEST,
 				() => {
+					// The gateway gets the full CONNECT_REQUEST_TIMEOUT from the moment
+					// the request is actually sent.
+					this.setTimer(
+						KNXTimer.CONNECTION,
+						() => {
+							this.handleConnectionAttemptFailure(timeoutError)
+						},
+						1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
+					)
 					this.sendConnectRequestMessage(new TunnelCRI(knxLayer))
 				},
 				2000,
@@ -2985,7 +3068,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			const iaEmpty =
 				!cfg?.tunnelInterfaceIndividualAddress ||
 				cfg.tunnelInterfaceIndividualAddress.trim() === ''
-			if (this._options.isSecureKNXEnabled && iaEmpty) {
+			// Without a keyring the tunnel user is identified by tunnelUserId and
+			// password alone, so no interface IA needs to be discovered.
+			const hasKeyring =
+				(Buffer.isBuffer(cfg?.knxkeys_buffer) &&
+					cfg.knxkeys_buffer.length > 0) ||
+				!!cfg?.knxkeys_file_path?.trim()
+			if (this._options.isSecureKNXEnabled && iaEmpty && hasKeyring) {
 				try {
 					this.sysLogger.info(
 						`[${getTimestamp()}] Secure TCP: no tunnel IA provided. Starting discovery-based selection for ${this._peerHost}:${this._peerPort}`,
@@ -3032,7 +3121,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				return
 			}
 			// Otherwise, proceed with direct connect using provided IA
-			this.secureEnsureKeyring()
+			// (plain TCP tunnelling needs no keyring)
+			const prepare = this._options.isSecureKNXEnabled
+				? this.secureEnsureKeyring()
+				: Promise.resolve()
+			prepare
 				.then(() => {
 					try {
 						this.tcpSocket.connect(this._peerPort, this._peerHost)
@@ -3111,7 +3204,20 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					}
 					// use destroy instead of end here to ensure socket is closed
 					client.once('close', cb)
-					client.destroy()
+					const closeFrame = this.secureBuildSessionCloseFrame()
+					if (closeFrame && client.writable) {
+						// Tell the gateway the session is over, then close.
+						let closed = false
+						const destroy = () => {
+							if (closed) return
+							closed = true
+							client.destroy()
+						}
+						setTimeout(destroy, 200).unref?.()
+						client.write(closeFrame, () => destroy())
+					} else {
+						client.destroy()
+					}
 				} else {
 					;(client as UDPSocket).close(cb)
 				}
@@ -3222,6 +3328,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 		this._clientTunnelSeqNumber = -1
 		this._channelID = null
+		this._lastRxTunnelSeq = undefined
 		this.exitProcessingKNXQueueLoop = true
 		this.commandQueue = []
 
@@ -3241,6 +3348,36 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		this.scheduleReconnect()
+	}
+
+	// Best effort DISCONNECT_REQUEST before dropping a dead UDP tunnel, so a
+	// gateway with a single tunnelling slot frees it without waiting for its
+	// own timeout.
+	private disconnectAfterHeartbeatFailure(reason: string) {
+		if (
+			this._options.hostProtocol !== 'TunnelUDP' ||
+			this._channelID === null ||
+			this._channelID === undefined
+		) {
+			this.setDisconnected(reason)
+			return
+		}
+		this._connectionState = ConncetionState.DISCONNECTING
+		let done = false
+		const finish = () => {
+			if (done) return
+			done = true
+			if (this._connectionState !== ConncetionState.DISCONNECTED) {
+				this.setDisconnected(reason)
+			}
+		}
+		setTimeout(finish, 500).unref?.()
+		this.sendUDPControlPacket(
+			KNXProtocol.newKNXDisconnectRequest(
+				this._channelID,
+				(HPAI as any).NULLHPAI,
+			),
+		).then(finish, finish)
 	}
 
 	/**
@@ -3279,7 +3416,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				if (this._heartbeatFailures >= this.max_HeartbeatFailures) {
 					this._heartbeatFailures = 0
 					this.emit(KNXClientEvents.error, deadError)
-					this.setDisconnected(deadError.message)
+					this.disconnectAfterHeartbeatFailure(deadError.message)
 				}
 			},
 			1000 * KNX_CONSTANTS.CONNECTIONSTATE_REQUEST_TIMEOUT,
@@ -3438,25 +3575,27 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 */
 	private processInboundMessage(msg: Buffer, rinfo: RemoteInfo) {
 		let sProcessInboundLog = ''
+		// Data shorter than the length declared in the header: incomplete frame
+		if (msg && msg.length >= 6 && msg.readUInt16BE(4) > msg.length) {
+			this.sysLogger.warn(
+				`[${getTimestamp()}] Dropping incomplete KNX/IP frame: header length ${msg.readUInt16BE(4)}, received ${msg.length} bytes`,
+			)
+			return
+		}
+		// Extra bytes after the declared length are ignored (as XKNX)
+		if (
+			msg &&
+			msg.length >= 6 &&
+			msg.readUInt16BE(4) >= 6 &&
+			msg.readUInt16BE(4) < msg.length
+		) {
+			this.sysLogger.debug(
+				`[${getTimestamp()}] Ignoring ${msg.length - msg.readUInt16BE(4)} bytes after the declared KNX/IP frame length`,
+			)
+			msg = msg.subarray(0, msg.readUInt16BE(4))
+		}
 		try {
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(msg)
-
-			// If we're waiting on a heartbeat reply but receive any frame from the
-			// same peer, consider the connection alive and reset the heartbeat timer.
-			try {
-				if (
-					this.timers.has(KNXTimer.CONNECTION_STATE) &&
-					this._connectionState === ConncetionState.CONNECTED &&
-					rinfo?.address === this._peerHost &&
-					rinfo?.port === this._peerPort
-				) {
-					this.clearTimer(KNXTimer.CONNECTION_STATE)
-					this._heartbeatFailures = 0
-					this.sysLogger.debug(
-						`[${getTimestamp()}] Heartbeat satisfied by inbound traffic from ${rinfo.address}:${rinfo.port}`,
-					)
-				}
-			} catch {}
 
 			// Composing debug string
 			sProcessInboundLog = `peerHost:${this._peerHost}:${this._peerPort}`
@@ -3575,6 +3714,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						knxConnectResponse.status !==
 						ConnectionStatus.E_NO_ERROR
 					) {
+						// No free tunnel on the gateway: back off before retrying
+						this._reconnectBackoffMs =
+							knxConnectResponse.status ===
+							KNX_CONSTANTS.E_NO_MORE_CONNECTIONS
+								? Math.min(
+										Math.max(
+											2 * this._reconnectBackoffMs,
+											2 * AUTO_RECONNECT_DELAY_MS,
+										),
+										MAX_RECONNECT_BACKOFF_MS,
+									)
+								: 0
 						this.emit(
 							KNXClientEvents.error,
 							Error(
@@ -3591,6 +3742,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 					// 16/03/2022
 					this.clearPendingTunnelingRequest()
+					this._reconnectBackoffMs = 0
 					this._channelID = knxConnectResponse.channelID
 					this._connectionState = ConncetionState.CONNECTED
 					this._numFailedTelegramACK = 0 // 16/03/2022 Reset the failed ACK counter
@@ -3626,6 +3778,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			} else if (
 				knxHeader.service_type === KNX_CONSTANTS.DISCONNECT_RESPONSE
 			) {
+				const knxDisconnectResponse =
+					knxMessage as KNXDisconnectResponse
+				if (knxDisconnectResponse.channelID !== this._channelID) {
+					this.sysLogger.debug(
+						`[${getTimestamp()}] Ignoring DISCONNECT_RESPONSE for channel ${knxDisconnectResponse.channelID} (ours: ${this._channelID})`,
+					)
+					return
+				}
 				if (this._connectionState !== ConncetionState.DISCONNECTING) {
 					this.emit(
 						KNXClientEvents.error,
@@ -3674,22 +3834,44 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)
 					return
 				}
-				try {
-					const knxTunnelAck = KNXProtocol.newKNXTunnelingACK(
-						knxTunnelingRequest.channelID,
-						knxTunnelingRequest.seqCounter,
-						KNX_CONSTANTS.E_NO_ERROR,
-					)
-					this.send(
-						knxTunnelAck,
-						undefined,
-						true, // TunnelUDP ACKs bypass the application queue.
-						this.getSeqNumber(),
-					)
-				} catch (error) {
-					this.sysLogger.error(
-						`Received KNX packet: TUNNELING: L_DATA_IND, ERROR BUILDING THE TUNNELINK ACK: ${error.message}`,
-					)
+				// TUNNELLING_ACK and repeats exist only on UDP: over TCP (plain
+				// or secure) no ACK is sent (03.08.04 §5.4.2.6, as XKNX does).
+				const isUdpTunnel = this._options.hostProtocol === 'TunnelUDP'
+				if (isUdpTunnel) {
+					try {
+						const knxTunnelAck = KNXProtocol.newKNXTunnelingACK(
+							knxTunnelingRequest.channelID,
+							knxTunnelingRequest.seqCounter,
+							KNX_CONSTANTS.E_NO_ERROR,
+						)
+						this.send(
+							knxTunnelAck,
+							undefined,
+							true, // TunnelUDP ACKs bypass the application queue.
+							this.getSeqNumber(),
+						)
+					} catch (error) {
+						this.sysLogger.error(
+							`Received KNX packet: TUNNELING: L_DATA_IND, ERROR BUILDING THE TUNNELINK ACK: ${error.message}`,
+						)
+					}
+				}
+
+				// The last sequence number again (our ACK got lost): ACKed again
+				// above but not re-emitted, as XKNX does. Unlike XKNX, frames with
+				// any other unexpected sequence number are still ACKed and emitted:
+				// dropping them could lose telegrams from gateways that number
+				// frames loosely (kept for compatibility, see README).
+				if (isUdpTunnel) {
+					if (
+						this._lastRxTunnelSeq === knxTunnelingRequest.seqCounter
+					) {
+						this.sysLogger.debug(
+							`[${getTimestamp()}] Ignoring repeated TUNNELING_REQUEST seqCounter:${knxTunnelingRequest.seqCounter}`,
+						)
+						return
+					}
+					this._lastRxTunnelSeq = knxTunnelingRequest.seqCounter
 				}
 
 				if (
@@ -3781,7 +3963,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 						const knxConnectionStateResponse =
 							knxMessage as KNXConnectionStateResponse
+						// Only a successful response for our active channel reaches this
+						// branch that clears the heartbeat timeout. Other inbound traffic
+						// cannot stand in for CONNECTIONSTATE_RESPONSE.
 						if (
+							knxConnectionStateResponse.channelID !==
+							this._channelID
+						) {
+							this.sysLogger.debug(
+								`[${getTimestamp()}] Ignoring CONNECTIONSTATE_RESPONSE for channel ${knxConnectionStateResponse.channelID} (ours: ${this._channelID})`,
+							)
+						} else if (
 							knxConnectionStateResponse.status !==
 							KNX_CONSTANTS.E_NO_ERROR
 						) {
@@ -3815,12 +4007,182 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.sysLogger.error(
 				`Received KNX packet: Error processing inbound message: ${e.message} ${sProcessInboundLog} ChannelID:${this._channelID} Host:${this._options.ipAddr}:${this._options.ipPort}. This means that KNX-Ultimate received a malformed Header or CEMI message from your KNX Gateway.`,
 			)
+			this.ackUnparsableTunnelingRequest(msg)
 		}
+	}
+
+	// A TUNNELING_REQUEST of our channel whose cEMI cannot be parsed is still
+	// ACKed (and dropped), so the gateway does not repeat it or drop the tunnel.
+	private ackUnparsableTunnelingRequest(msg: Buffer) {
+		try {
+			if (
+				this._options.hostProtocol !== 'TunnelUDP' ||
+				this._connectionState !== ConncetionState.CONNECTED ||
+				this._channelID === null ||
+				this._channelID === undefined ||
+				!msg ||
+				msg.length < 10 ||
+				msg[0] !== KNX_CONSTANTS.HEADER_SIZE_10 ||
+				msg[1] !== KNX_CONSTANTS.KNXNETIP_VERSION_10 ||
+				msg.readUInt16BE(2) !== KNX_CONSTANTS.TUNNELING_REQUEST ||
+				msg.readUInt16BE(4) !== msg.length ||
+				msg[6] !== 0x04 ||
+				msg[7] !== this._channelID
+			)
+				return
+			const knxTunnelAck = KNXProtocol.newKNXTunnelingACK(
+				this._channelID,
+				msg[8],
+				KNX_CONSTANTS.E_NO_ERROR,
+			)
+			this.send(knxTunnelAck, undefined, true, this.getSeqNumber())
+		} catch {}
 	}
 
 	// ===== KNX/IP Secure Support (migrated from SecureTunnelTCP) =====
 	private async secureEnsureKeyring(): Promise<void> {
 		if (!this._options?.secureTunnelConfig) return
+		const cfg = this._options.secureTunnelConfig
+		this._secureDeviceAuthCode = undefined
+		this._secureDeviceAuthCodeAlt = undefined
+		this._secureGroupSenders = new Map()
+		await this.secureLoadCredentials()
+		this.secureApplyConfiguredGroupKeys()
+		if (
+			cfg.requireDeviceAuthentication &&
+			this._options.hostProtocol === 'TunnelTCP' &&
+			!this._secureDeviceAuthCode
+		) {
+			throw new Error(
+				'KNX/IP Secure: requireDeviceAuthentication is set but no device authentication code is available (set secureTunnelConfig.deviceAuthenticationPassword or use a keyring that contains it).',
+			)
+		}
+	}
+
+	// Load the keyring trying the trimmed password first (previous behaviour),
+	// then the password exactly as given, in case its spaces are significant.
+	private async secureLoadKeyring(
+		keyringBuffer: Buffer | undefined,
+		keyringPath: string | undefined,
+		rawPassword: string,
+	): Promise<Keyring> {
+		const trimmed = rawPassword.trim()
+		const candidates =
+			trimmed === rawPassword ? [trimmed] : [trimmed, rawPassword]
+		let loadError: unknown
+		for (const candidate of candidates) {
+			const kr = new Keyring()
+			try {
+				const options = {
+					validateSignature:
+						this._options.secureTunnelConfig
+							?.knxkeys_validate_signature,
+				}
+				if (keyringBuffer) {
+					await kr.loadFromBuffer(keyringBuffer, candidate, options)
+				} else {
+					await kr.load(keyringPath!, candidate, options)
+				}
+				return kr
+			} catch (e) {
+				loadError = e
+			}
+		}
+		throw loadError
+	}
+
+	// A manually entered code is tried exactly as given and, if different,
+	// without surrounding spaces (the value used to be trimmed).
+	private secureSetManualDeviceAuthCodes(value?: string) {
+		if (!value) return
+		const trimmed = value.trim()
+		this.secureSetDeviceAuthCodes(
+			trimmed && trimmed !== value ? [value, trimmed] : [value],
+		)
+	}
+
+	private secureSetDeviceAuthCodes(passwords: string[]) {
+		const codes: Buffer[] = []
+		for (const pwd of passwords) {
+			try {
+				codes.push(deriveDeviceAuthenticationPassword(pwd))
+			} catch (e) {
+				this.sysLogger.warn(
+					`Secure: cannot derive device authentication code: ${(e as Error).message}`,
+				)
+			}
+		}
+		this._secureDeviceAuthCode = codes[0]
+		this._secureDeviceAuthCodeAlt = codes[1]
+	}
+
+	// Load Data Secure group keys passed in secureTunnelConfig.groupKeys.
+	private secureApplyConfiguredGroupKeys() {
+		const groupKeys = this._options.secureTunnelConfig?.groupKeys
+		if (!groupKeys) return
+		for (const [gaStr, rawKey] of Object.entries(groupKeys)) {
+			let key: Buffer
+			if (Buffer.isBuffer(rawKey)) {
+				key = rawKey
+			} else if (typeof rawKey === 'string') {
+				const value = rawKey.replace(/\s+/g, '')
+				if (/^[0-9a-fA-F]{32}$/.test(value)) {
+					key = Buffer.from(value, 'hex')
+				} else {
+					// Buffer.from(..., 'base64') is permissive and silently ignores
+					// invalid characters. Validate and round-trip before trusting it.
+					const unpadded = value.replace(/=+$/, '')
+					const padding = value.length - unpadded.length
+					const expectedPadding = (4 - (unpadded.length % 4)) % 4
+					const validBase64 =
+						/^[A-Za-z0-9+/]+={0,2}$/.test(value) &&
+						unpadded.length % 4 !== 1 &&
+						(padding === 0 ||
+							(value.length % 4 === 0 &&
+								padding === expectedPadding))
+					if (!validBase64) {
+						throw new Error(
+							`KNX Data Secure: secureTunnelConfig.groupKeys["${gaStr}"] must be a Buffer, 32 hex characters, or a base64-encoded key.`,
+						)
+					}
+					key = Buffer.from(
+						unpadded + '='.repeat(expectedPadding),
+						'base64',
+					)
+					if (
+						key.toString('base64').replace(/=+$/, '') !== unpadded
+					) {
+						throw new Error(
+							`KNX Data Secure: secureTunnelConfig.groupKeys["${gaStr}"] is not valid base64.`,
+						)
+					}
+				}
+			} else {
+				throw new Error(
+					`KNX Data Secure: secureTunnelConfig.groupKeys["${gaStr}"] must be a Buffer, 32 hex characters, or a base64-encoded key.`,
+				)
+			}
+			if (key.length !== 16) {
+				throw new Error(
+					`KNX Data Secure: secureTunnelConfig.groupKeys["${gaStr}"] must decode to a 16-byte key.`,
+				)
+			}
+			let ga: number
+			try {
+				ga = KNXAddress.createFromString(
+					gaStr,
+					KNXAddress.TYPE_GROUP,
+				).get()
+			} catch {
+				throw new Error(
+					`KNX Data Secure: secureTunnelConfig.groupKeys has an invalid group address "${gaStr}".`,
+				)
+			}
+			this._secureGroupKeys.set(ga, Buffer.from(key))
+		}
+	}
+
+	private async secureLoadCredentials(): Promise<void> {
 		const cfg = this._options.secureTunnelConfig
 		// Peer host/port now come from KNXClientOptions.ipAddr/ipPort (not from secure config)
 		// Drive secure logs from KNXClientOptions.loglevel; no separate boolean
@@ -3858,18 +4220,18 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const isTunnelTCP = this._options.hostProtocol === 'TunnelTCP'
 
 		if (hasKeyring) {
-			const kr = new Keyring()
-			const pwd = cfg.knxkeys_password?.trim()
+			const rawPwd = cfg.knxkeys_password ?? ''
+			const pwd = rawPwd.trim()
 			if (!pwd) {
 				throw new Error(
 					'KNX/IP Secure requires secureTunnelConfig.knxkeys_password when secureTunnelConfig.knxkeys_file_path or secureTunnelConfig.knxkeys_buffer is provided.',
 				)
 			}
-			if (keyringBuffer) {
-				await kr.loadFromBuffer(keyringBuffer, pwd)
-			} else {
-				await kr.load(keyringPath!, pwd)
-			}
+			const kr = await this.secureLoadKeyring(
+				keyringBuffer,
+				keyringPath,
+				rawPwd,
+			)
 			this._secureKeyring = kr
 
 			const iface = cfg.tunnelInterfaceIndividualAddress
@@ -3889,11 +4251,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					)
 				}
 				this._secureUserId = userId
-				const password = (
-					iface?.decryptedPassword ||
-					cfg.tunnelUserPassword ||
-					''
-				).trim()
+				const password =
+					iface?.decryptedPassword || cfg.tunnelUserPassword || ''
 				if (!password) {
 					throw new Error(
 						'KNX/IP Secure requires a tunnel user password; set secureTunnelConfig.tunnelUserPassword or provide one in the keyring.',
@@ -3916,35 +4275,30 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				const ga = this.secureParseGroupAddress(gaStr)
 				this._secureGroupKeys.set(ga, g.decryptedKey.slice(0, 16))
 			}
+			// Allowed senders per group address, as listed for our interface
+			for (const [gaStr, senders] of iface?.groupAddresses ?? []) {
+				if (!senders || senders.length === 0) continue
+				this._secureGroupSenders.set(
+					this.secureParseGroupAddress(gaStr),
+					new Set(senders.map((ia) => ia.raw)),
+				)
+			}
 
-			// Pick KNX Serial from gateway device if available
+			// Gateway device (for its device authentication code)
 			const gatewayIaStr =
 				iface?.host?.toString() || iface?.individualAddress?.toString()
 			const dev = gatewayIaStr ? kr.getDevice(gatewayIaStr) : undefined
-			if (dev?.serialNumber) {
-				try {
-					const ser = Buffer.from(dev.serialNumber, 'hex')
-					if (ser.length === 6) this._secureSerial = ser
-				} catch {}
-			}
 
 			// Derive the device authentication code used to verify the
 			// SESSION_RESPONSE MAC during the unicast handshake.
-			const deviceAuthPwd = (
-				dev?.decryptedAuthentication ||
-				iface?.decryptedAuthentication ||
-				cfg.deviceAuthenticationPassword ||
-				''
-			).trim()
-			if (deviceAuthPwd) {
-				try {
-					this._secureDeviceAuthCode =
-						deriveDeviceAuthenticationPassword(deviceAuthPwd)
-				} catch (e) {
-					this.sysLogger.warn(
-						`Secure: cannot derive device authentication code: ${(e as Error).message}`,
-					)
-				}
+			const keyringAuthPwd =
+				dev?.decryptedAuthentication || iface?.decryptedAuthentication
+			if (keyringAuthPwd) {
+				this.secureSetDeviceAuthCodes([keyringAuthPwd])
+			} else {
+				this.secureSetManualDeviceAuthCodes(
+					cfg.deviceAuthenticationPassword,
+				)
 			}
 
 			// Load Backbone key for secure multicast routing (if present)
@@ -3991,26 +4345,38 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			16,
 			'sha256',
 		)
-		this._secureSerial = Buffer.from('000000000000', 'hex')
 		// Optional device authentication code for SESSION_RESPONSE MAC verification.
-		const manualDeviceAuthPwd = cfg.deviceAuthenticationPassword?.trim()
-		if (manualDeviceAuthPwd) {
-			try {
-				this._secureDeviceAuthCode =
-					deriveDeviceAuthenticationPassword(manualDeviceAuthPwd)
-			} catch (e) {
-				this.sysLogger.warn(
-					`Secure: cannot derive device authentication code: ${(e as Error).message}`,
-				)
-			}
-		}
+		this.secureSetManualDeviceAuthCodes(cfg.deviceAuthenticationPassword)
 		try {
 			if (this.isLevelEnabled('info')) {
 				this.sysLogger.info(
-					`[${getTimestamp()}] Secure TCP: using manual tunnel password (no keyring). Data Secure features disabled. tunnelUserId=${this._secureUserId}`,
+					`[${getTimestamp()}] Secure TCP: using manual tunnel password (no keyring). Data Secure ${cfg.groupKeys ? 'uses secureTunnelConfig.groupKeys' : 'disabled (no group keys)'}. tunnelUserId=${this._secureUserId}`,
 				)
 			}
 		} catch {}
+	}
+
+	// Plain (non-secure) tunnelling over TCP: send the CONNECT_REQUEST directly;
+	// the CONNECT_RESPONSE is handled by processInboundMessage.
+	private plainTcpConnect() {
+		this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
+		this.setTimer(
+			KNXTimer.CONNECTION,
+			() => {
+				this.handleConnectionAttemptFailure(
+					new Error(
+						`Connection timeout to ${this._peerHost}:${this._peerPort}`,
+					),
+				)
+			},
+			1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
+		)
+		try {
+			this.sysLogger.debug(
+				`[${getTimestamp()}] TX 0205 TUNNELING_CONNECT_REQUEST (plain TCP)`,
+			)
+		} catch {}
+		this.tcpSocket.write(this.secureBuildConnectRequest())
 	}
 
 	private async secureStartSession(): Promise<void> {
@@ -4027,7 +4393,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// Last 32 bytes contain raw public key
 		this._securePublicKey = exported.subarray(exported.length - 32)
 
-		// Fresh session: reset receive-side freshness state.
+		// Fresh session: forget the previous session key and id, so wrappers of
+		// an earlier session can never be accepted, and reset freshness state.
+		this._secureSessionKey = undefined
+		this._secureSessionId = undefined
 		this._secureWrapperSeq = 0
 		this._secureRxWrapperSeq = -1
 		this._secureDataRecvSeq.clear()
@@ -4053,15 +4422,53 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._tcpRxBuffer = Buffer.concat([this._tcpRxBuffer, data])
 		while (this._tcpRxBuffer.length >= 6) {
 			const totalLen = this._tcpRxBuffer.readUInt16BE(4)
+			if (
+				this._tcpRxBuffer[0] !== KNXIP_HEADER_LEN ||
+				totalLen < KNXIP_HEADER_LEN ||
+				totalLen > TCP_MAX_FRAME_LEN
+			) {
+				// A TCP stream cannot be resynchronized after a bad header:
+				// drop the buffered bytes and close the connection.
+				const err = new Error(
+					`Invalid KNX/IP header on TCP stream (len=${totalLen}); closing connection`,
+				)
+				this._tcpRxBuffer = Buffer.alloc(0)
+				this.emit(KNXClientEvents.error, err)
+				this._secureHandshakeState = undefined
+				this.setDisconnected(err.message).catch(() => {})
+				return
+			}
 			if (this._tcpRxBuffer.length < totalLen) break
 			const frame = this._tcpRxBuffer.subarray(0, totalLen)
 			this._tcpRxBuffer = this._tcpRxBuffer.subarray(totalLen)
+			if (frame[1] !== KNX_CONSTANTS.KNXNETIP_VERSION_10) {
+				// Framing is still valid: skip only this frame
+				try {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Dropping KNX/IP frame with unsupported protocol version 0x${frame[1].toString(16)}`,
+					)
+				} catch {}
+				continue
+			}
 
 			const type = frame.readUInt16BE(2)
 			if (
 				type === KNXIP.SECURE_SESSION_RESPONSE &&
 				this._secureHandshakeState === 'session'
 			) {
+				// session id (2) + server public key (32) + MAC (16)
+				if (
+					frame.length <
+					KNXIP_HEADER_LEN + 2 + PUBLIC_KEY_LEN + MAC_LEN_FULL
+				) {
+					this._secureHandshakeState = undefined
+					this.handleConnectionAttemptFailure(
+						new Error(
+							`Invalid SESSION_RESPONSE length ${frame.length}`,
+						),
+					)
+					return
+				}
 				if (this._secureHandshakeSessionTimer) {
 					clearTimeout(this._secureHandshakeSessionTimer)
 					this._secureHandshakeSessionTimer = undefined
@@ -4106,23 +4513,33 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					'302a300506032b656e032100',
 					'hex',
 				)
-				const serverKey = crypto.createPublicKey({
-					key: Buffer.concat([
-						X25519_SPKI_PREFIX_DER,
-						serverPublicKey,
-					]),
-					format: 'der',
-					type: 'spki',
-				})
-				const secret = crypto.diffieHellman({
-					privateKey: this._securePrivateKey!,
-					publicKey: serverKey,
-				})
-				const sessHash = crypto
-					.createHash('sha256')
-					.update(secret)
-					.digest()
-				this._secureSessionKey = sessHash.subarray(0, 16)
+				try {
+					const serverKey = crypto.createPublicKey({
+						key: Buffer.concat([
+							X25519_SPKI_PREFIX_DER,
+							serverPublicKey,
+						]),
+						format: 'der',
+						type: 'spki',
+					})
+					const secret = crypto.diffieHellman({
+						privateKey: this._securePrivateKey!,
+						publicKey: serverKey,
+					})
+					const sessHash = crypto
+						.createHash('sha256')
+						.update(secret)
+						.digest()
+					this._secureSessionKey = sessHash.subarray(0, 16)
+				} catch (e) {
+					this._secureHandshakeState = undefined
+					this.handleConnectionAttemptFailure(
+						new Error(
+							`Invalid SESSION_RESPONSE public key: ${(e as Error).message}`,
+						),
+					)
+					return
+				}
 
 				// Send SESSION_AUTHENTICATE (wrapped)
 				const authFrame =
@@ -4234,6 +4651,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					}
 					if (status === 0) {
 						// Promote to KNXClient connected state
+						this._secureHandshakeState = 'connected'
 						this._channelID = ch
 						// Ensure queue processing is enabled after tunnel established
 						this.exitProcessingKNXQueueLoop = false
@@ -4269,6 +4687,37 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						} catch {}
 						this.handleKNXQueue()
 					}
+				} else if (innerType === KNXIP.SECURE_SESSION_STATUS) {
+					// Outside the handshake: the gateway closes or times out the
+					// session (KEEPALIVE needs no action).
+					const status = inner[6]
+					try {
+						this.sysLogger.debug(
+							`[${getTimestamp()}] RX 0954 SECURE_SESSION_STATUS status=${status} (${this.secureDescribeSessionStatus(status)})`,
+						)
+					} catch {}
+					if (
+						status === SECURE_SESSION_STATUS_TIMEOUT ||
+						status === SECURE_SESSION_STATUS_CLOSE
+					) {
+						this._secureHandshakeState = undefined
+						this.setDisconnected(
+							this.secureDescribeSessionStatus(status),
+						).catch(() => {})
+						return
+					}
+				} else if (
+					this._secureHandshakeState === 'connecting' ||
+					this._secureHandshakeState === 'session' ||
+					this._secureHandshakeState === 'auth' ||
+					this._secureHandshakeState === 'connect'
+				) {
+					// During the handshake only the expected message is accepted
+					try {
+						this.sysLogger.warn(
+							`[${getTimestamp()}] Dropping unexpected secure frame type=0x${innerType.toString(16)} during handshake (state=${this._secureHandshakeState})`,
+						)
+					} catch {}
 				} else {
 					// Feed decrypted inner KNX/IP frames into the regular pipeline
 					const rinfo: RemoteInfo = {
@@ -4419,11 +4868,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			case 1:
 				return 'Secure session authentication failed: verify secureTunnelConfig.tunnelUserPassword and tunnelUserId.'
 			case 2:
-				return 'Secure session rejected by gateway (access denied or disabled user).'
+				return 'Secure session unauthenticated: the gateway rejected the session (access denied or disabled user).'
 			case 3:
-				return 'Secure session aborted due to sequence or timing mismatch.'
+				return 'Secure session timed out on the gateway.'
 			case 4:
-				return 'Secure session aborted because the gateway detected a cryptographic integrity error.'
+				return 'Secure session keep-alive.'
+			case 5:
+				return 'Secure session closed by the gateway.'
 			default:
 				return ''
 		}
@@ -4497,6 +4948,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			)
 			// Assemble full 0x0955 frame
 			const body = Buffer.concat([timerBytes, serial, tag, mac])
+			this._secureRoutingLastNotify = Buffer.concat([
+				timerBytes,
+				serial,
+				tag,
+			])
 			const hdr = Buffer.from('061009550024', 'hex')
 			const frame = Buffer.concat([hdr, body])
 			this.udpSocket.send(frame, this._peerPort, this._peerHost, () => {})
@@ -4578,7 +5034,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		if (!this._secureBackboneKey)
 			throw new Error('Backbone key not set for secure routing')
 		// Validate header
-		if (wrapper.length < 6 + 2 + 6 + 6 + 2 + 16)
+		if (wrapper.length < SECURE_WRAPPER_MIN_LEN)
 			throw new Error('Invalid SecureWrapper length')
 		const service = wrapper.readUInt16BE(2)
 		if (service !== KNX_CONSTANTS.SECURE_WRAPPER)
@@ -4619,7 +5075,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			plain,
 			b0,
 		)
-		if (!macCbc.equals(macTr)) {
+		if (!macEquals(macCbc, macTr)) {
 			throw new Error('SecureWrapper MAC verification failed')
 		}
 		return plain
@@ -4633,14 +5089,30 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				if (!this._options.isSecureKNXEnabled) return
 				// Decrypt and forward inner KNX/IP frame
 				const inner = this.secureDecryptRouting(msg)
-				// Optional: basic timer handling (update max received timer)
+				// Timer handling: the multicast timer only moves forward
 				try {
 					// Extract sequence information to update timer offset
 					const seq = msg.subarray(8, 14)
 					const timerValue = seq.readUIntBE(0, 6)
 					const localNow = Math.floor(performance.now())
 					const delta = timerValue - localNow
-					if (!this._secureRoutingTimerAuthenticated) {
+					if (this._secureRoutingTimerAuthenticated) {
+						const localTimer = this.secureRoutingTimerValue()
+						if (
+							this._options.secureTunnelConfig?.strictSecurity &&
+							timerValue <
+								localTimer - this._secureRoutingLatencyMs
+						) {
+							try {
+								this.sysLogger.warn(
+									`[${getTimestamp()}] Dropping outdated secure routing frame from ${rinfo.address} timer=${timerValue} local=${localTimer} (strictSecurity)`,
+								)
+							} catch {}
+							return
+						}
+						if (timerValue > localTimer)
+							this._secureRoutingTimerOffsetMs = delta
+					} else {
 						this._secureRoutingTimerOffsetMs = delta
 						this._secureRoutingTimerAuthenticated = true
 						// Align Data Secure sender seq to routing timer (timer strategy)
@@ -4672,6 +5144,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				try {
 					if (!this._secureBackboneKey) return
 					if (msg.length < 0x24) return
+					// Our own TimerNotify, looped back by multicast: not a sync
+					if (
+						this._secureRoutingLastNotify?.equals(
+							msg.subarray(6, 20),
+						)
+					)
+						return
 					const seq = msg.subarray(6, 12)
 					const serial = msg.subarray(12, 18)
 					const tag = msg.subarray(18, 20)
@@ -4701,9 +5180,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						Buffer.alloc(0),
 						b0,
 					)
-					if (macCbc.equals(macTr)) {
+					if (macEquals(macCbc, macTr)) {
 						const t = seq.readUIntBE(0, 6)
 						const localNow = Math.floor(performance.now())
+						// Never move an authenticated timer backwards
+						if (
+							this._secureRoutingTimerAuthenticated &&
+							t <= this.secureRoutingTimerValue()
+						)
+							return
 						this._secureRoutingTimerOffsetMs = t - localNow
 						this._secureRoutingTimerAuthenticated = true
 						// Align Data Secure sender seq to routing timer
@@ -4761,9 +5246,16 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	private secureDecrypt(frame: Buffer): Buffer {
 		if (!this._secureSessionKey)
 			throw new Error('Secure session not established')
-		if (frame.length < SECURE_WRAPPER_OVERHEAD)
+		if (frame.length < SECURE_WRAPPER_MIN_LEN)
 			throw new Error('SecureWrapper frame too short')
 		const sessionId = frame.readUInt16BE(6)
+		if (
+			this._secureSessionId !== undefined &&
+			sessionId !== this._secureSessionId
+		)
+			throw new Error(
+				`SecureWrapper for another session (sid=${sessionId}, ours=${this._secureSessionId})`,
+			)
 		const seq = frame.subarray(8, 14)
 		const serial = frame.subarray(14, 20)
 		const tag = frame.subarray(20, 22)
@@ -4800,7 +5292,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			data,
 			block0,
 		)
-		if (!macCbc.equals(macTr)) {
+		if (!macEquals(macCbc, macTr)) {
 			throw new Error('SecureWrapper MAC verification failed')
 		}
 
@@ -4820,6 +5312,33 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return data
 	}
 
+	// Wrapped SESSION_STATUS CLOSE for an established secure session.
+	private secureBuildSessionCloseFrame(): Buffer | undefined {
+		if (
+			this._options.hostProtocol !== 'TunnelTCP' ||
+			!this._options.isSecureKNXEnabled ||
+			!this._secureSessionKey
+		)
+			return undefined
+		try {
+			const status = Buffer.from([
+				0x06,
+				0x10,
+				0x09,
+				0x54,
+				0x00,
+				0x08,
+				SECURE_SESSION_STATUS_CLOSE,
+				0x00,
+			])
+			const frame = this.secureWrap(status)
+			this._secureSessionKey = undefined
+			return frame
+		} catch {
+			return undefined
+		}
+	}
+
 	private secureBuildSessionRequest(): Buffer {
 		// 06 10 | 09 51 | len | HPAI | <client public key 32B>
 		const bodyLen = HPAI_CONTROL_ENDPOINT_EMPTY.length + PUBLIC_KEY_LEN
@@ -4836,7 +5355,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	// The MAC authenticates the server's public value (as X xor Y) and the
 	// secure session id; a forged response cannot produce a valid MAC.
 	private secureVerifySessionResponse(frame: Buffer): boolean {
-		if (!this._secureDeviceAuthCode || !this._securePublicKey) return false
+		return [this._secureDeviceAuthCode, this._secureDeviceAuthCodeAlt].some(
+			(code) =>
+				!!code && this.secureVerifySessionResponseWith(frame, code),
+		)
+	}
+
+	private secureVerifySessionResponseWith(
+		frame: Buffer,
+		deviceAuthCode: Buffer,
+	): boolean {
+		if (!this._securePublicKey) return false
 		if (frame.length < 8 + PUBLIC_KEY_LEN + MAC_LEN_FULL) return false
 		const sessionId = frame.readUInt16BE(6)
 		const serverPublicKey = frame.subarray(8, 8 + PUBLIC_KEY_LEN)
@@ -4856,7 +5385,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		])
 		const block0 = Buffer.alloc(AES_BLOCK_LEN, 0)
 		const macCbc = calculateMessageAuthenticationCodeCBC(
-			this._secureDeviceAuthCode,
+			deviceAuthCode,
 			additionalData,
 			Buffer.alloc(0),
 			block0,
@@ -4865,11 +5394,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		// code (Ctr0 = AUTH_CTR_IV); decrypt it and compare with the CBC-MAC.
 		const ctr = crypto.createDecipheriv(
 			'aes-128-ctr',
-			this._secureDeviceAuthCode,
+			deviceAuthCode,
 			AUTH_CTR_IV,
 		)
 		const macTr = ctr.update(receivedMac)
-		return macCbc.equals(macTr)
+		return macEquals(macCbc, macTr)
 	}
 
 	private secureBuildSessionAuthenticate(serverPublicKey: Buffer): Buffer {
@@ -5172,31 +5701,70 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	// authentication (bad MAC) or freshness (replay) and must be dropped;
 	// returns true otherwise (decrypted in place, or nothing to do).
 	private maybeDecryptDataSecure(cemi: any): boolean {
+		// Once the telegram is known to be a Data Secure APDU for a keyed group
+		// address, any failure drops it (fail closed) instead of delivering
+		// undecrypted data to the application.
+		let isKeyedSecureApdu = false
 		try {
 			if (!this._options.isSecureKNXEnabled) return true
 			if (!this._secureGroupKeys || this._secureGroupKeys.size === 0)
 				return true
 			const npdu = cemi?.npdu
 			if (!npdu) return true
-			if (
-				(npdu.tpci & 0xff) !== APCI_SEC.HIGH ||
-				(npdu.apci & 0xff) !== APCI_SEC.LOW
-			)
+			if (cemi?.control?.addressType !== KNXAddress.TYPE_GROUP)
 				return true
 			const dst = cemi?.dstAddress?.get?.() as number
 			const src = cemi?.srcAddress?.get?.() as number
 			if (typeof dst !== 'number' || typeof src !== 'number') return true
 			const key = this._secureGroupKeys.get(dst)
 			if (!key) return true
+			const strict = !!this._options.secureTunnelConfig?.strictSecurity
+			if (
+				(npdu.tpci & 0xff) !== APCI_SEC.HIGH ||
+				(npdu.apci & 0xff) !== APCI_SEC.LOW
+			) {
+				if (!strict) return true
+				try {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Dropping plain telegram to Data Secure group ${this.secureFormatGroupAddress(dst)} from src=${src} (strictSecurity)`,
+					)
+				} catch {}
+				return false
+			}
+			isKeyedSecureApdu = true
+			const allowedSenders = this._secureGroupSenders.get(dst)
+			if (strict && allowedSenders && !allowedSenders.has(src)) {
+				try {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Dropping Data Secure telegram from sender not listed in the keyring src=${src} dst=${dst} (strictSecurity)`,
+					)
+				} catch {}
+				return false
+			}
 			const ctrlBuf: Buffer = cemi?.control?.toBuffer?.()
-			if (!Buffer.isBuffer(ctrlBuf) || ctrlBuf.length < 2) return true
+			if (!Buffer.isBuffer(ctrlBuf) || ctrlBuf.length < 2) return false
 			const flags2 = ctrlBuf[1] & SEC_CEMI.CTRL2_RELEVANT_MASK
 
 			const dataPart: Buffer = npdu.dataBuffer
 				? npdu.dataBuffer.value
 				: Buffer.alloc(0)
-			if (dataPart.length < 1 + SECURE_SEQ_LEN + 4) return true
+			if (dataPart.length < 1 + SECURE_SEQ_LEN + MAC_LEN_SHORT) {
+				try {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Dropping truncated Data Secure telegram src=${src} dst=${dst}`,
+					)
+				} catch {}
+				return false
+			}
 			const scf = dataPart[0]
+			if (scf !== SCF_ENCRYPTION_S_A_DATA) {
+				try {
+					this.sysLogger.warn(
+						`[${getTimestamp()}] Dropping Data Secure telegram with unsupported SCF 0x${scf.toString(16)} src=${src} dst=${dst}`,
+					)
+				} catch {}
+				return false
+			}
 			const seq = dataPart.subarray(1, 1 + SECURE_SEQ_LEN)
 			const encPayloadAndMac = dataPart.subarray(1 + SECURE_SEQ_LEN)
 			const encMac = encPayloadAndMac.subarray(-MAC_LEN_SHORT)
@@ -5239,7 +5807,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				decPayload,
 				block0,
 			).subarray(0, MAC_LEN_SHORT)
-			if (!macCbc.equals(macTr)) {
+			if (!macEquals(macCbc, macTr)) {
 				try {
 					this.sysLogger.warn(
 						`[${getTimestamp()}] Dropping Data Secure telegram with invalid MAC src=${src} dst=${dst}`,
@@ -5281,7 +5849,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			this.sysLogger.error(
 				`maybeDecryptDataSecure error: ${(e as Error).message}`,
 			)
-			return true
+			return !isKeyedSecureApdu
 		}
 	}
 

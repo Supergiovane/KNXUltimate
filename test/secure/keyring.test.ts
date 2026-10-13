@@ -9,7 +9,14 @@
 
 import { describe, it } from 'node:test'
 import assert from 'assert'
+import path from 'path'
 import { Keyring } from '../../src/secure/keyring'
+import signKeyringXml from './signKeyring'
+
+// Keyring exported by ETS 6.3.1, password "passwordprogetto"
+const ETS_KEYRINGS = [
+	path.join(__dirname, '..', '..', 'documents', 'Secure Test.knxkeys'),
+]
 
 const password = 'knxPassword'
 const created = '2024-10-03T12:34:56Z'
@@ -39,7 +46,10 @@ const keyringXml = `<?xml version="1.0" encoding="utf-8"?>
 describe('secure keyring', () => {
 	it('loads and decrypts interfaces, group addresses, devices, and backbone entries', async () => {
 		const keyring = new Keyring()
-		await keyring.loadFromString(keyringXml, password)
+		await keyring.loadFromString(
+			await signKeyringXml(keyringXml, password),
+			password,
+		)
 
 		assert.strictEqual(keyring.getCreatedBy(), 'UnitTest')
 		assert.strictEqual(keyring.getCreated(), created)
@@ -78,5 +88,109 @@ describe('secure keyring', () => {
 		assert.strictEqual(device?.decryptedAuthentication, 'devAuth987')
 		assert.strictEqual(device?.sequenceNumber, 42)
 		assert.strictEqual(device?.serialNumber, '12345678')
+	})
+
+	it('verifies the ETS keyring signature', async () => {
+		for (const file of ETS_KEYRINGS) {
+			const keyring = new Keyring()
+			await keyring.load(file, 'passwordprogetto')
+			const iface = keyring.getInterfaces().values().next().value
+			assert.strictEqual(
+				iface?.decryptedAuthentication,
+				'codiceautenticazione',
+			)
+		}
+	})
+
+	it('rejects an ETS keyring opened with the wrong password', async () => {
+		for (const file of ETS_KEYRINGS) {
+			await assert.rejects(
+				new Keyring().load(file, 'knxPassword'),
+				/signature verification failed/,
+			)
+		}
+	})
+
+	it('extracts passwords shorter than 8 characters (ETS pads to 32 bytes)', () => {
+		const keyring = new Keyring() as any
+		for (const pwd of ['a', 'abc', 'abcdefg', 'abcdefgh', 'abcdefghi']) {
+			const pad = 32 - 8 - pwd.length
+			const data = Buffer.concat([
+				Buffer.alloc(8, 0x55),
+				Buffer.from(pwd, 'utf-8'),
+				Buffer.alloc(pad, pad),
+			])
+			assert.strictEqual(keyring.extractPassword(data), pwd)
+		}
+	})
+
+	it('rejects an unsigned keyring by default (as XKNX)', async () => {
+		await assert.rejects(
+			new Keyring().loadFromString(keyringXml, password),
+			/has no Signature/,
+		)
+	})
+
+	it('loads an unsigned keyring when signature validation is disabled', async () => {
+		const keyring = new Keyring()
+		await keyring.loadFromString(keyringXml, password, {
+			validateSignature: false,
+		})
+		assert.strictEqual(
+			keyring.getInterface('1.1.1')?.decryptedPassword,
+			'ifPass123',
+		)
+	})
+
+	it('rejects a wrong password on an unsigned keyring with credentials (padding check)', async () => {
+		await assert.rejects(
+			new Keyring().loadFromString(keyringXml, 'wrongPassword', {
+				validateSignature: false,
+			}),
+			/invalid padding/,
+		)
+	})
+
+	it('rejects a wrong password on a signed keyring that holds only keys', async () => {
+		const keysOnly = `<?xml version="1.0" encoding="utf-8"?>
+<Keyring CreatedBy="UnitTest" Created="${created}">
+  <Backbone Key="${backboneKeyEnc}" Latency="20" MulticastAddress="224.0.23.12" />
+  <GroupAddresses>
+    <Group Address="1/2/3" Key="${groupKeyEnc}" />
+  </GroupAddresses>
+</Keyring>`
+		const signed = await signKeyringXml(keysOnly, password)
+		await assert.rejects(
+			new Keyring().loadFromString(signed, 'wrongPassword'),
+			/wrong keyring password/,
+		)
+		const keyring = new Keyring()
+		await keyring.loadFromString(signed, password)
+		assert.strictEqual(
+			keyring.getGroupAddress('1/2/3')?.decryptedKey?.toString('hex'),
+			'00112233445566778899aabbccddeeff',
+		)
+	})
+
+	it('rejects a keyring with an empty Signature attribute', async () => {
+		const xml = keyringXml.replace(
+			'<Keyring CreatedBy',
+			'<Keyring Signature="" CreatedBy',
+		)
+		await assert.rejects(
+			new Keyring().loadFromString(xml, password),
+			/has no Signature/,
+		)
+	})
+
+	it('rejects passwords whose padding bytes are not all equal', () => {
+		const keyring = new Keyring() as any
+		const data = Buffer.concat([
+			Buffer.alloc(8, 0x55),
+			Buffer.from('abcdefgh'),
+			Buffer.alloc(15, 0),
+			Buffer.from([16]),
+		])
+		assert.throws(() => keyring.extractPassword(data), /invalid padding/)
 	})
 })

@@ -28,8 +28,9 @@ async function main() {
     (process.env.KNX_KEYS_PATH || '').trim() ||
     path.join(process.cwd(), 'documents', 'Secure Test.knxkeys')
 
-  const knxkeysPassword = (process.env.KNX_KEYS_PASSWORD || '').trim()
-  if (!knxkeysPassword) {
+  // Preserve whitespace: the keyring password may intentionally contain it.
+  const knxkeysPassword = process.env.KNX_KEYS_PASSWORD
+  if (knxkeysPassword === undefined || knxkeysPassword.length === 0) {
     throw new Error('Missing KNX_KEYS_PASSWORD (ETS keyring password).')
   }
 

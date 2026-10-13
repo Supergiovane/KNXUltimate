@@ -41,9 +41,13 @@ const secureConfig: SecureConfig = {
   knxkeys_file_path: '/path/to/project.knxkeys', // Replace with your ETS keyring path
   knxkeys_password: 'your-keyring-password',
   // If you do not have a keyring, comment the two lines above and provide manual tunnel credentials:
-  // tunnelInterfaceIndividualAddress: '1.1.254',
   // tunnelUserPassword: 'your-tunnel-password',
   // tunnelUserId: 2,
+  // deviceAuthenticationPassword: 'your-device-authentication-code', // recommended: authenticates the gateway
+  // groupKeys: { '1/1/1': '00112233445566778899aabbccddeeff' }, // Data Secure keys, only if needed
+  // Optional hardening (default false):
+  // requireDeviceAuthentication: true,
+  // strictSecurity: true,
 }
 
 /**
@@ -53,7 +57,7 @@ const secureOptions: KNXClientOptions = {
   ipAddr: '192.168.1.10', // IP address of the secure KNX/IP interface
   ipPort: 3671,
   hostProtocol: 'TunnelTCP',
-  physAddr: '1.1.200', // Optional; when omitted, the client negotiates an available tunnel IA from the keyring
+  physAddr: '1.1.200', // Optional; the gateway assigns the tunnel IA used on the bus
   loglevel: 'info',
   isSecureKNXEnabled: true,
   secureTunnelConfig: secureConfig,

@@ -116,6 +116,15 @@ export interface Device {
 	serialNumber?: string
 }
 
+export interface KeyringLoadOptions {
+	/**
+	 * Verify the ETS keyring signature (default: true, as XKNX). With true a
+	 * keyring without a Signature attribute is rejected; set false only for
+	 * keyrings that were not exported by ETS.
+	 */
+	validateSignature?: boolean
+}
+
 export class Keyring {
 	private interfaces: Map<string, Interface> = new Map()
 
@@ -137,7 +146,11 @@ export class Keyring {
 	 * Load keyring content using either a file path to a .knxkeys file
 	 * or a string containing the keyring (raw XML or base64 of the .knxkeys binary).
 	 */
-	async load(source: string, password: string): Promise<void> {
+	async load(
+		source: string,
+		password: string,
+		options: KeyringLoadOptions = {},
+	): Promise<void> {
 		let xmlContent: string
 
 		if (fs.existsSync(source)) {
@@ -165,22 +178,30 @@ export class Keyring {
 			}
 		}
 
-		await this.loadFromXml(xmlContent, password)
+		await this.loadFromXml(xmlContent, password, options)
 	}
 
 	/**
 	 * Explicit helper to load from string (raw XML or base64 .knxkeys).
 	 */
-	async loadFromString(content: string, password: string): Promise<void> {
-		return this.load(content, password)
+	async loadFromString(
+		content: string,
+		password: string,
+		options: KeyringLoadOptions = {},
+	): Promise<void> {
+		return this.load(content, password, options)
 	}
 
 	/**
 	 * Explicit helper to load from a Buffer (typically the raw `.knxkeys` file bytes).
 	 */
-	async loadFromBuffer(content: Buffer, password: string): Promise<void> {
+	async loadFromBuffer(
+		content: Buffer,
+		password: string,
+		options: KeyringLoadOptions = {},
+	): Promise<void> {
 		const xmlContent = await this.unzipKnxKeys(content)
-		await this.loadFromXml(xmlContent, password)
+		await this.loadFromXml(xmlContent, password, options)
 	}
 
 	getCreatedBy(): string | undefined {
@@ -196,26 +217,41 @@ export class Keyring {
 	 * This is CRITICAL - must use salt "1.keyring.ets.knx.org"
 	 */
 	private hashKeyringPassword(password: string): Buffer {
-		return crypto.pbkdf2Sync(
-			Buffer.from(password, 'utf-8'),
-			Buffer.from('1.keyring.ets.knx.org', 'utf-8'),
-			65536, // iterations
-			16, // key length
-			'sha256',
-		)
+		return hashKeyringPassword(password)
 	}
 
 	private async loadFromXml(
 		xmlContent: string,
 		password: string,
+		options: KeyringLoadOptions = {},
 	): Promise<void> {
 		const parser = new xml2js.Parser()
 		const result = await parser.parseStringPromise(xmlContent)
 
 		// Hash the password using PBKDF2 (MUST use salt "1.keyring.ets.knx.org")
 		this.passwordHash = this.hashKeyringPassword(password)
-		if (process.env.KNX_DEBUG === '1')
-			console.log('Password hash:', this.passwordHash.toString('hex'))
+
+		// ETS signs the keyring with the password: a mismatch means a wrong
+		// password (or a modified file) and would only yield garbage keys.
+		if (options.validateSignature !== false) {
+			const { signature, computed } = await computeKeyringSignature(
+				xmlContent,
+				this.passwordHash,
+			)
+			if (!signature) {
+				throw new Error(
+					'Keyring signature verification failed: the keyring has no Signature (set validateSignature to false only for keyrings not exported by ETS).',
+				)
+			}
+			if (
+				signature.length !== computed.length ||
+				!crypto.timingSafeEqual(signature, computed)
+			) {
+				throw new Error(
+					'Keyring signature verification failed: wrong keyring password or modified keyring file.',
+				)
+			}
+		}
 
 		await this.parseKeyring(result)
 	}
@@ -235,16 +271,23 @@ export class Keyring {
 
 	/**
 	 * Extract password from decrypted data (match xknx)
-	 * Format: 8 bytes header + password + PKCS#7 padding
+	 * Format: 8 bytes header + password + padding. ETS always encrypts 32 bytes,
+	 * so short passwords carry more than 16 padding bytes. Every padding byte
+	 * holds the padding length: anything else means a wrong keyring password.
 	 */
 	private extractPassword(data: Buffer): string {
 		if (!data || data.length === 0) return ''
 		const pad = data[data.length - 1]
-		const padLen = pad >= 1 && pad <= 16 ? pad : 0
-		const end = data.length - padLen
-		if (end <= 8) return ''
-		const payload = data.slice(8, end)
-		return payload.toString('utf-8')
+		if (
+			pad < 1 ||
+			pad > data.length - 8 ||
+			!data.subarray(data.length - pad).every((b) => b === pad)
+		) {
+			throw new Error(
+				'Keyring decryption failed: invalid padding (wrong keyring password?).',
+			)
+		}
+		return data.subarray(8, data.length - pad).toString('utf-8')
 	}
 
 	/**
@@ -368,14 +411,12 @@ export class Keyring {
 			)
 			if (process.env.KNX_DEBUG === '1')
 				console.log(
-					`Interface ${iface.individualAddress} password raw:`,
-					decrypted.toString('hex'),
+					`Interface ${iface.individualAddress} password raw: ${decrypted.length} bytes`,
 				)
 			iface.decryptedPassword = this.extractPassword(decrypted)
 			if (process.env.KNX_DEBUG === '1')
 				console.log(
-					`Interface ${iface.individualAddress} password:`,
-					iface.decryptedPassword,
+					`Interface ${iface.individualAddress} password: ${iface.decryptedPassword.length} chars`,
 				)
 		}
 
@@ -389,14 +430,12 @@ export class Keyring {
 			)
 			if (process.env.KNX_DEBUG === '1')
 				console.log(
-					`Interface ${iface.individualAddress} auth raw:`,
-					decrypted.toString('hex'),
+					`Interface ${iface.individualAddress} auth raw: ${decrypted.length} bytes`,
 				)
 			iface.decryptedAuthentication = this.extractPassword(decrypted)
 			if (process.env.KNX_DEBUG === '1')
 				console.log(
-					`Interface ${iface.individualAddress} auth:`,
-					iface.decryptedAuthentication,
+					`Interface ${iface.individualAddress} auth: ${iface.decryptedAuthentication.length} chars`,
 				)
 		}
 
@@ -441,8 +480,7 @@ export class Keyring {
 			)
 			if (process.env.KNX_DEBUG === '1')
 				console.log(
-					'Backbone key:',
-					backbone.decryptedKey?.toString('hex'),
+					`Backbone key: ${backbone.decryptedKey?.length ?? 0} bytes`,
 				)
 		}
 
@@ -472,8 +510,7 @@ export class Keyring {
 			)
 			if (process.env.KNX_DEBUG === '1')
 				console.log(
-					`Group ${group.address} key:`,
-					group.decryptedKey?.toString('hex'),
+					`Group ${group.address} key: ${group.decryptedKey?.length ?? 0} bytes`,
 				)
 		}
 
@@ -509,8 +546,7 @@ export class Keyring {
 			)
 			if (process.env.KNX_DEBUG === '1')
 				console.log(
-					`Device ${device.individualAddress} tool key:`,
-					device.decryptedToolKey?.toString('hex'),
+					`Device ${device.individualAddress} tool key: ${device.decryptedToolKey?.length ?? 0} bytes`,
 				)
 		}
 
@@ -524,8 +560,7 @@ export class Keyring {
 			)
 			if (process.env.KNX_DEBUG === '1')
 				console.log(
-					`Device ${device.individualAddress} mgmt raw:`,
-					decrypted.toString('hex'),
+					`Device ${device.individualAddress} mgmt raw: ${decrypted.length} bytes`,
 				)
 			device.decryptedManagementPassword = this.extractPassword(decrypted)
 		}
@@ -540,8 +575,7 @@ export class Keyring {
 			)
 			if (process.env.KNX_DEBUG === '1')
 				console.log(
-					`Device ${device.individualAddress} auth raw:`,
-					decrypted.toString('hex'),
+					`Device ${device.individualAddress} auth raw: ${decrypted.length} bytes`,
 				)
 			device.decryptedAuthentication = this.extractPassword(decrypted)
 		}
@@ -577,4 +611,65 @@ export class Keyring {
 	getDevice(address: string): Device | undefined {
 		return this.devices.get(address)
 	}
+}
+
+/**
+ * Compute the ETS keyring signature (same algorithm as XKNX): SHA-256 over a
+ * serialization of the element tree (start marker, local element name,
+ * attributes sorted by name except xmlns/Signature, end marker) followed by
+ * the base64 keyring password hash, truncated to 16 bytes. Also returns the
+ * Signature found in the keyring (undefined when absent or empty).
+ */
+export async function computeKeyringSignature(
+	xmlContent: string,
+	passwordHash: Buffer,
+): Promise<{ signature?: Buffer; computed: Buffer }> {
+	const parser = new xml2js.Parser({
+		explicitChildren: true,
+		preserveChildrenOrder: true,
+	})
+	const doc = await parser.parseStringPromise(xmlContent)
+	const root = doc?.Keyring
+	const signatureB64: string = root?.$?.Signature ?? ''
+
+	const chunks: Buffer[] = []
+	const appendString = (value: string) => {
+		const encoded = Buffer.from(value, 'utf-8')
+		chunks.push(Buffer.from([encoded.length & 0xff]), encoded)
+	}
+	const walk = (name: string, node: any) => {
+		chunks.push(Buffer.from([1]))
+		appendString(name.includes(':') ? name.split(':').pop()! : name)
+		const attrs = node?.$ || {}
+		for (const attr of Object.keys(attrs).sort()) {
+			if (attr === 'xmlns' || attr === 'Signature') continue
+			appendString(attr)
+			appendString(String(attrs[attr]))
+		}
+		for (const child of node?.$$ || []) walk(child['#name'], child)
+		chunks.push(Buffer.from([2]))
+	}
+	walk('Keyring', root)
+	appendString(passwordHash.toString('base64'))
+
+	const computed = crypto
+		.createHash('sha256')
+		.update(Buffer.concat(chunks))
+		.digest()
+		.subarray(0, 16)
+	const signature = signatureB64.trim()
+		? Buffer.from(signatureB64, 'base64')
+		: undefined
+	return { signature, computed }
+}
+
+/** PBKDF2 hash of a keyring password (salt "1.keyring.ets.knx.org"). */
+export function hashKeyringPassword(password: string): Buffer {
+	return crypto.pbkdf2Sync(
+		Buffer.from(password, 'utf-8'),
+		Buffer.from('1.keyring.ets.knx.org', 'utf-8'),
+		65536,
+		16,
+		'sha256',
+	)
 }

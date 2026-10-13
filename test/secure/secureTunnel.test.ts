@@ -20,6 +20,7 @@ import CEMIConstants from '../../src/protocol/cEMI/CEMIConstants'
 import { Keyring } from '../../src/secure/keyring'
 import { deriveDeviceAuthenticationPassword } from '../../src/secure/security_primitives'
 import { MockSecureGateway } from './MockSecureGateway'
+import signKeyringXml from './signKeyring'
 
 const KEYRING_XML = `<?xml version="1.0" encoding="utf-8"?>
 <Keyring CreatedBy="UnitTest" Created="2024-10-03T12:34:56Z">
@@ -40,10 +41,14 @@ describe('KNX Secure Tunnel', () => {
 	let keyringPath: string
 	let keyringBuffer: Buffer
 
-	before(() => {
+	before(async () => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'knx-secure-'))
 		keyringPath = path.join(tmpDir, 'test.knxkeys')
-		fs.writeFileSync(keyringPath, KEYRING_XML, 'utf8')
+		fs.writeFileSync(
+			keyringPath,
+			await signKeyringXml(KEYRING_XML, 'knxPassword'),
+			'utf8',
+		)
 		keyringBuffer = fs.readFileSync(keyringPath)
 	})
 

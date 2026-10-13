@@ -7,6 +7,7 @@
  * Use at your own risk; the author assumes no liability for damages.
  */
 
+import path from 'path'
 import KNXClient, { SecureConfig } from '../src/KNXClient'
 import CEMIConstants from '../src/protocol/cEMI/CEMIConstants'
 
@@ -51,8 +52,7 @@ async function main() {
 
   // KNX Secure routing (multicast) config - uses Backbone key from ETS keyring
   const secureCfg: SecureConfig = {
-    knxkeys_file_path:
-      '/Users/massimosaccani/Documents/GitHub/KNXUltimate/documents/Secure Test.knxkeys',
+    knxkeys_file_path: path.join(process.cwd(), 'documents', 'Secure Test.knxkeys'),
     knxkeys_password: 'passwordprogetto'
   }
 
