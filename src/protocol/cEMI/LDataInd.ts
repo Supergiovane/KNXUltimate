@@ -68,7 +68,7 @@ export default class LDataInd extends CEMIMessage {
 		let additionalInfo = null
 		if (addLength > 0) {
 			additionalInfo = new KNXDataBuffer(
-				buffer.subarray(offset, addLength),
+				buffer.subarray(offset, offset + addLength),
 			)
 			offset += addLength
 		}

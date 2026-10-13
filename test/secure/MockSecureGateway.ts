@@ -36,6 +36,7 @@ import {
 	decryptCtr,
 } from '../../src/secure/security_primitives'
 import KNXProtocol from '../../src/protocol/KNXProtocol'
+import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
 import KNXTunnelingRequest from '../../src/protocol/KNXTunnelingRequest'
 import KNXTunnelingAck from '../../src/protocol/KNXTunnelingAck'
 import KNXConnectResponse from '../../src/protocol/KNXConnectResponse'
@@ -61,6 +62,8 @@ type GatewayEvents = {
 		value: boolean
 		plainApdu: Buffer
 	}) => void
+	sessionStatus: (status: number) => void
+	tunnelAck: () => void
 }
 
 type SecureGatewayOptions = {
@@ -76,6 +79,8 @@ type SecureGatewayOptions = {
 	/** 16-byte derived device authentication code; when set the gateway emits a
 	 * SESSION_RESPONSE MAC so clients can verify the handshake. */
 	deviceAuthCode?: Buffer
+	/** Send a SESSION_RESPONSE cut after the public key (no MAC). */
+	truncateSessionResponse?: boolean
 }
 
 const X25519_SPKI_PREFIX_DER = Buffer.from('302a300506032b656e032100', 'hex')
@@ -94,6 +99,8 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 	private sessionKey: Buffer | null = null
 
 	private readonly sessionId: number
+
+	private readonly truncateSessionResponse: boolean
 
 	private readonly channelId: number
 
@@ -128,6 +135,7 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		this.host = options.host ?? '127.0.0.1'
 		this.port = options.port ?? 0
 		this.sessionId = options.sessionId ?? 0x5100
+		this.truncateSessionResponse = !!options.truncateSessionResponse
 		this.channelId = options.channelId ?? 0x51
 		this.serial =
 			options.serial && options.serial.length === SERIAL_LEN
@@ -257,9 +265,45 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		return { inner: request.toBuffer(), seq48 }
 	}
 
+	/** Inner KNX/IP tunnelling frame for a plain (not Data Secure) group write. */
+	buildPlainGroupWriteInner(groupAddress: string, value: boolean): Buffer {
+		const dst = new GroupAddress(groupAddress).raw
+		const control = new ControlField()
+		control.addressType = KNXAddressType.TYPE_GROUP
+		control.ack = 0
+		control.repeat = 1
+		const cemi = new LDataInd(
+			null,
+			control,
+			new KNXAddress(this.interfaceIa, KNXAddressType.TYPE_INDIVIDUAL),
+			new KNXAddress(dst, KNXAddressType.TYPE_GROUP),
+			new NPDU(0x00, 0x80 | (value ? 0x01 : 0x00), null),
+		)
+		return KNXProtocol.newKNXTunnelingRequest(
+			this.channelId,
+			this.nextTunnelSeq(),
+			cemi,
+		).toBuffer()
+	}
+
+	/** Send a wrapped SESSION_STATUS with the given status code. */
+	sendSessionStatus(status: number): void {
+		if (!this.socket) throw new Error('No socket')
+		this.socket.write(
+			this.wrapFrame(
+				Buffer.from([0x06, 0x10, 0x09, 0x54, 0x00, 0x08, status, 0x00]),
+			),
+		)
+	}
+
 	/** Wrap an arbitrary inner KNX/IP frame in a fresh SecureWrapper. */
 	wrapInner(inner: Buffer): Buffer {
 		return this.wrapFrame(inner)
+	}
+
+	/** Wrap an inner frame claiming another secure session id. */
+	wrapInnerWithSessionId(inner: Buffer, sessionId: number): Buffer {
+		return this.wrapFrame(inner, sessionId)
 	}
 
 	/** Send raw bytes directly on the socket, bypassing wrapping. */
@@ -344,9 +388,9 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		})
 		const sessionHash = crypto.createHash('sha256').update(secret).digest()
 		this.sessionKey = sessionHash.subarray(0, 16)
-		// Body = session id (2) + server public key (32) + optional MAC (16).
-		const bodyLen =
-			2 + PUBLIC_KEY_LEN + (this.deviceAuthCode ? MAC_LEN_FULL : 0)
+		// Body = session id (2) + server public key (32) + MAC (16). Without a
+		// device auth code the MAC is all zeros (cannot be verified).
+		const bodyLen = 2 + PUBLIC_KEY_LEN + MAC_LEN_FULL
 		const responseLen = KNXIP_HEADER_AND_BODY_LEN(bodyLen)
 		let response = Buffer.concat([
 			Buffer.from('06100952', 'hex'),
@@ -354,11 +398,15 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 			Buffer.from([this.sessionId >> 8, this.sessionId & 0xff]),
 			this.serverPublicKeyRaw,
 		])
-		if (this.deviceAuthCode) {
-			response = Buffer.concat([
-				response,
-				this.buildSessionResponseMac(responseLen),
-			])
+		response = Buffer.concat([
+			response,
+			this.deviceAuthCode
+				? this.buildSessionResponseMac(responseLen)
+				: Buffer.alloc(MAC_LEN_FULL, 0),
+		])
+		if (this.truncateSessionResponse) {
+			response = response.subarray(0, 6 + 2 + PUBLIC_KEY_LEN)
+			response.writeUInt16BE(response.length, 4)
 		}
 		this.socket?.write(response)
 	}
@@ -431,17 +479,22 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 			type === KNXIP.TUNNELING_ACK &&
 			this.handshakeState === 'connected'
 		) {
+			this.emit('tunnelAck')
 			return
 		}
 		if (
-			type === KNXIP.CONNECTIONSTATE_REQUEST &&
+			type === KNX_CONSTANTS.CONNECTIONSTATE_REQUEST &&
 			this.handshakeState === 'connected'
 		) {
 			const stateResponse = this.buildConnectionStateResponse(inner)
 			this.socket?.write(this.wrapFrame(stateResponse))
 			return
 		}
-		if (type === KNXIP.DISCONNECT_REQUEST) {
+		if (type === KNXIP.SECURE_SESSION_STATUS) {
+			this.emit('sessionStatus', inner[6])
+			return
+		}
+		if (type === KNX_CONSTANTS.DISCONNECT_REQUEST) {
 			const disconnect = this.buildDisconnectResponse(inner)
 			this.socket?.write(this.wrapFrame(disconnect))
 		}
@@ -636,7 +689,7 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		return response.toBuffer()
 	}
 
-	private wrapFrame(inner: Buffer): Buffer {
+	private wrapFrame(inner: Buffer, sessionId = this.sessionId): Buffer {
 		if (!this.sessionKey) {
 			throw new Error('Session key missing')
 		}
@@ -649,7 +702,7 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		])
 		const additional = Buffer.concat([
 			hdr,
-			Buffer.from([this.sessionId >> 8, this.sessionId & 0xff]),
+			Buffer.from([sessionId >> 8, sessionId & 0xff]),
 		])
 		const block0 = Buffer.concat([
 			seq,
@@ -681,7 +734,7 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		const encData = ctrKey.update(inner)
 		return Buffer.concat([
 			hdr,
-			Buffer.from([this.sessionId >> 8, this.sessionId & 0xff]),
+			Buffer.from([sessionId >> 8, sessionId & 0xff]),
 			seq,
 			this.serial,
 			SECURE_WRAPPER_TAG,

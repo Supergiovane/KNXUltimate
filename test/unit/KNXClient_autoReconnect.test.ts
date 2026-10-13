@@ -115,7 +115,8 @@ describe('KNXClient autoReconnect', () => {
 		)
 
 		client.Connect()
-		await clock.tickAsync(10000)
+		// CONNECT_REQUEST goes out after 2 s, then the 10 s timeout runs
+		await clock.tickAsync(12000)
 		assert.strictEqual(
 			client['_connectionState'],
 			ConncetionState.DISCONNECTED,
@@ -128,7 +129,7 @@ describe('KNXClient autoReconnect', () => {
 			ConncetionState.CONNECTING,
 		)
 
-		await clock.tickAsync(10000)
+		await clock.tickAsync(12000)
 		await clock.tickAsync(5000)
 		assert.strictEqual(socketCreations, 3)
 		assert.strictEqual(

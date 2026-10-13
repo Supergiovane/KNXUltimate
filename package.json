@@ -28,6 +28,8 @@
     "prepack": "npm run build && node scripts/cleanupPackArtifacts.js",
     "example:secure:multicast": "node -r esbuild-register -e \"require('./examples/sampleSecureMulticast.ts')\"",
     "example:secure:tunnel": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCP.ts')\"",
+    "example:secure:tunnel:groupkeys": "node -r esbuild-register -e \"require('./examples/sampleSecureTunnelTCPGroupKeys.ts')\"",
+    "example:tunnel:tcp": "node -r esbuild-register -e \"require('./examples/samplePlainTunnelTCP.ts')\"",
     "example:writeRaw": "node -r esbuild-register -e \"require('./examples/writeRaw.ts')\"",
     "example:respondRaw": "node -r esbuild-register -e \"require('./examples/respondRaw.ts')\"",
     "example:bridge:noderedmsg": "node -r esbuild-register -e \"require('./examples/bridgeTunnelToNodeRedMsg.ts')\"",

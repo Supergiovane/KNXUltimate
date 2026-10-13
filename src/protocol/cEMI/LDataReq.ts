@@ -62,7 +62,7 @@ export default class LDataReq extends CEMIMessage {
 		let additionalInfo = null
 		if (addLength > 0) {
 			additionalInfo = new KNXDataBuffer(
-				buffer.subarray(offset, addLength),
+				buffer.subarray(offset, offset + addLength),
 			)
 			offset += addLength
 		}

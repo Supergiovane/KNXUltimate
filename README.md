@@ -58,11 +58,12 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 ## Requirements
 
 - **Node.js 18+**
-- For **KNX Secure / Data Secure**: an ETS keyring (`.knxkeys`) file and its password
+- For **KNX Secure / Data Secure**: an ETS keyring (`.knxkeys`) file and its password, or the manual tunnel credentials (plus `groupKeys` for Data Secure)
 - For **TP serial (FT1.2/KBerry)**: a supported serial interface (the `serialport` dependency is used under the hood)
 
 ## Table of Contents
 
+- [Unreleased changes planned for v6.1.0](#unreleased-changes-planned-for-v610-protocol-and-knx-secure-hardening)
 - [Breaking changes in v6.0.0](#️-breaking-changes-in-v600-knx-secure-validation)
 - [Changelog](#changelog)
 - [Support this project](#support-this-project)
@@ -78,6 +79,33 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 - [Using kBerry on Raspberry Pi (UART / FT1.2)](#using-knx-ultimate-with-kberry-on-raspberry-pi-3-uart--ft12)
 - [How to collaborate](#how-to-collaborate)
 - [License](#license)
+
+## Unreleased changes planned for v6.1.0 (protocol and KNX Secure hardening)
+
+> This unreleased set applies findings from an external audit against the KNXnet/IP
+> specification (ISO 22510:2019), aligned with XKNX. Most stricter checks are opt-in;
+> these are the changes you may notice:
+>
+> - **Keyring signature:** keyrings are verified as XKNX does. A wrong `knxkeys_password`
+>   now fails with `Keyring signature verification failed`. A keyring **without a
+>   signature** (not exported by ETS) is rejected unless you set
+>   `secureTunnelConfig.knxkeys_validate_signature: false`. Keyring passwords shorter than
+>   8 characters now work.
+> - **Data Secure:** a secure telegram for a keyed group address that is truncated, has an
+>   unsupported SCF or fails decryption is dropped instead of being delivered undecrypted.
+> - **TCP tunnelling:** no `TUNNELING_ACK` is sent over TCP (as the specification and XKNX
+>   require). `TunnelTCP` with `isSecureKNXEnabled: false` now tunnels over plain TCP.
+>   Manual secure configurations (no keyring) no longer need
+>   `tunnelInterfaceIndividualAddress`.
+> - **UDP tunnelling:** a frame repeating the previous sequence number is ACKed but not
+>   emitted twice; the connect timeout runs the full 10 s from the request; after
+>   `E_NO_MORE_CONNECTIONS` reconnects back off up to 60 s; a failed heartbeat sends a
+>   `DISCONNECT_REQUEST`.
+> - **New options:** `secureTunnelConfig.groupKeys`, `requireDeviceAuthentication`,
+>   `strictSecurity` and `knxkeys_validate_signature` (see
+>   [Additional secure options](#additional-secure-options)).
+>
+> Full list in the [CHANGELOG](./CHANGELOG.md).
 
 ## ⚠️ BREAKING CHANGES IN v6.0.0 (KNX Secure validation)
 
@@ -95,7 +123,7 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 >   source address. Forged, tampered or replayed telegrams are **no longer delivered**
 >   as `indication` events.
 > - Inside an established secure session, unprotected KNX/IP frames are dropped.
->   Gateways such as Apricum may send Data Secure group indications without an IP
+>   Gateways such as Apricum/MDT may send Data Secure group indications without an IP
 >   wrapper: these are accepted only on the active tunnel, with a known group key,
 >   a valid Data Secure MAC and a fresh sender sequence. Unwrapped session/control
 >   frames and plain group data remain rejected.
@@ -155,6 +183,7 @@ Start from one of these 4 cases:
 | Plain tunnelling over UDP | `hostProtocol: 'TunnelUDP'`, `ipAddr`, `ipPort` |
 | Plain routing over multicast | `hostProtocol: 'Multicast'`, `ipAddr: '224.0.23.12'`, `ipPort: 3671`, `physAddr` |
 | KNX/IP Secure over TCP | `hostProtocol: 'TunnelTCP'`, `ipAddr`, `ipPort`, `isSecureKNXEnabled: true`, `secureTunnelConfig` |
+| Plain tunnelling over TCP | `hostProtocol: 'TunnelTCP'`, `ipAddr`, `ipPort`, `isSecureKNXEnabled: false` |
 | Direct KNX TP serial (FT1.2 / KBerry / BAOS) | `hostProtocol: 'SerialFT12'`, `serialInterface`, `physAddr` |
 
 If you're unsure, start with `TunnelUDP`.
@@ -179,7 +208,7 @@ These are the properties most people will touch first:
 
 | Property | Applies to | Description |
 | -------- | ---------- | ----------- |
-| `hostProtocol` (string) | all | One of: `"TunnelUDP"` (plain tunnelling via UDP), `"Multicast"` (plain routing via multicast `224.0.23.12`), `"TunnelTCP"` (KNX/IP Secure tunnelling over TCP), `"SerialFT12"` (direct TP/FT1.2 serial interface such as `/dev/ttyAMA0`). |
+| `hostProtocol` (string) | all | One of: `"TunnelUDP"` (plain tunnelling via UDP), `"Multicast"` (plain routing via multicast `224.0.23.12`), `"TunnelTCP"` (tunnelling over TCP: KNX/IP Secure with `isSecureKNXEnabled: true`, plain otherwise), `"SerialFT12"` (direct TP/FT1.2 serial interface such as `/dev/ttyAMA0`). |
 | `ipAddr` (string) | IP transports | KNX/IP peer address. Use `"224.0.23.12"` for routing (multicast), or the interface/router IP for tunnelling. |
 | `ipPort` (number/string) | IP transports | KNX/IP port. Default `3671`. |
 | `physAddr` (string) | multicast, serial, optional elsewhere | Source IA on bus (for example `"1.1.200"`). Multicast: required. TunnelUDP: used as cEMI source. TunnelTCP secure: ignored as bus source, because the gateway assigns the tunnel IA. |
@@ -582,12 +611,23 @@ client.Connect()
 ### Secure workflow recap
 
 - **KNX IP Tunnelling Secure** protects the TCP channel. The gateway authenticates a tunnel user by ID + password during the `Secure Session Authenticate (0x0953)` step. Provide the password either from the keyring (`secureTunnelConfig.knxkeys_*`) or manually via `secureTunnelConfig.tunnelUserPassword`; in both cases the `tunnelUserId` must match the ETS commissioning data.
-- **KNX Data Secure** protects group-address telegrams. It relies on group keys stored in the ETS keyring, so a `.knxkeys` file plus its password are mandatory whenever you need encrypted group communication.
+- **KNX Data Secure** protects group-address telegrams. It relies on group keys, taken from the ETS keyring or passed directly with `secureTunnelConfig.groupKeys` (see below).
 - **Supported combinations**
   - *Keyring only*: set `knxkeys_file_path` (or `knxkeys_buffer`) + `knxkeys_password` and omit `tunnelUserPassword`. Both the tunnel password and the group keys are loaded from the keyring.
-- *Manual tunnel password only*: set both `tunnelUserPassword` and `tunnelUserId` without a keyring. The IP channel is secured, but Data Secure stays disabled because no group keys are present.
+- *Manual tunnel password only*: set both `tunnelUserPassword` and `tunnelUserId` without a keyring. The IP channel is secured; Data Secure works only for the group addresses listed in `secureTunnelConfig.groupKeys`.
   - *Keyring + manual password*: provide the keyring for Data Secure and override the tunnelling password with `tunnelUserPassword` (useful when the ETS export does not include the tunnel password). Ensure `knxkeys_*` and `tunnelUserPassword` are both configured.
 - To retrieve the tunnel user ID/password pair, open the secure tunnelling interface in ETS (or inspect the `.knxkeys` entry). Default ETS IDs are typically small integers (e.g. `2`, `3`, …) but may differ per installation.
+
+### Additional secure options
+
+| Option (`secureTunnelConfig.*`) | Default | Description |
+| --- | --- | --- |
+| `knxkeys_validate_signature` | `true` | Verify the ETS keyring signature (as XKNX). A keyring without a signature is rejected unless this is `false`; set it only for keyrings that were not exported by ETS. |
+| `groupKeys` | – | Data Secure group keys as `{ "1/2/3": key }`, where the key is a 16-byte `Buffer`, a 32-character hex string, or a base64 string that decodes to 16 bytes. Works with or without a keyring; on conflict these keys win over the keyring ones. |
+| `requireDeviceAuthentication` | `false` | Refuse the `TunnelTCP` handshake when no device authentication code is available (keyring or `deviceAuthenticationPassword`). Without the code the gateway is not authenticated, so a forged gateway would be accepted. |
+| `strictSecurity` | `false` | Stricter receive checks: drop plain telegrams sent to a group address that has a Data Secure key; when the keyring has a sender list for a group address, drop Data Secure telegrams from senders outside that list; with secure routing, drop frames whose timer is older than the backbone latency tolerance. |
+
+Keyring loading checks the ETS keyring signature, as XKNX does: a wrong `knxkeys_password` now fails with `Keyring signature verification failed` instead of loading unusable keys. Keyrings exported by ETS are always signed; a keyring without a signature is rejected unless you set `secureTunnelConfig.knxkeys_validate_signature: false`.
 
 ### 2) Decode datapoints (boolean 1.001) from decrypted payloads
 
@@ -776,17 +816,27 @@ Examples overview:
 - [gatewaydescription](./examples/gatewaydescription.ts): Requests and prints extended gateway information. Safe.
 - [samplePlainTunnelUPD](./examples/samplePlainTunnelUPD.ts): Plain KNX/IP tunnelling over UDP (`hostProtocol: 'TunnelUDP'`). ON/OFF + status read via a KNX interface.
   - Run: `node -r esbuild-register -e "require('./examples/samplePlainTunnelUPD.ts')"`
+- [samplePlainTunnelTCP](./examples/samplePlainTunnelTCP.ts): Plain KNX/IP tunnelling over TCP (`hostProtocol: 'TunnelTCP'` + `isSecureKNXEnabled: false`), for interfaces that offer TCP tunnelling. Writes ON/OFF and prints incoming telegrams. Warning: sends telegrams.
+  - Configure: `KNX_GATEWAY_IP`, optional `KNX_GA_COMMAND`.
+  - Run: `npm run example:tunnel:tcp`
 - [samplePlainMulticast](./examples/samplePlainMulticast.ts): Plain KNX routing over multicast (`hostProtocol: 'Multicast'`). Uses RoutingIndication with cEMI L_DATA_REQ. ON/OFF + status read via a KNX router (no secure).
   - Run: `node -r esbuild-register -e "require('./examples/samplePlainMulticast.ts')"`
 - [sampleSecureTunnelTCP](./examples/sampleSecureTunnelTCP.ts): KNX/IP Secure tunnelling over TCP (`hostProtocol: 'TunnelTCP'` + `isSecureKNXEnabled: true`). Performs session handshake + Secure Wrapper. Applies Data Secure for GA present in the ETS keyring. ON/OFF + status read.
-  - Requires: set `.knxkeys` path + password in the example file. Optionally omit `tunnelInterfaceIndividualAddress` to auto-select a free tunnel from the keyring.
+  - Requires: set `.knxkeys` path + password in the example file. Optionally omit `tunnelInterfaceIndividualAddress` to auto-select a free tunnel from the keyring. The file also shows the optional `requireDeviceAuthentication` and `strictSecurity` settings.
   - Run: `npm run example:secure:tunnel` or `node -r esbuild-register -e "require('./examples/sampleSecureTunnelTCP.ts')"`
-- [sampleSecureTunnelTCPNoDataSecure](./examples/sampleSecureTunnelTCPNoDataSecure.ts): KNX/IP Secure tunnelling over TCP using only the manual tunnel password/ID (no keyring, Data Secure disabled). Demonstrates secure channel establishment when group keys are unavailable.
-  - Configure: set `tunnelInterfaceIndividualAddress`, `tunnelUserPassword`, and `tunnelUserId` in the file.
-  - Run: `node -r esbuild-register -e "require('./examples/sampleSecureTunnelTCPNoDataSecure.ts')"`
+- [sampleSecureTunnelTCPKeyringBuffer](./examples/sampleSecureTunnelTCPKeyringBuffer.ts): Connects using the keyring as a Buffer (`knxkeys_buffer`) and logs incoming indications; it does not send telegrams. Settings come from environment variables.
+  - Run: `KNX_GATEWAY_IP=… KNX_KEYS_PASSWORD=… node -r esbuild-register -e "require('./examples/sampleSecureTunnelTCPKeyringBuffer.ts')"`
+- [sampleSecureTunnelTCPKeepAlive](./examples/sampleSecureTunnelTCPKeepAlive.ts): Keeps a secure TCP tunnel open and logs connection events, to check heartbeat and reconnection behaviour. Safe: does not send telegrams.
+- [sampleSecureTunnelTCPGroupKeys](./examples/sampleSecureTunnelTCPGroupKeys.ts): KNX/IP Secure tunnelling **without a keyring**: manual tunnel user/password, the gateway's device authentication code (with `requireDeviceAuthentication: true`) and Data Secure keys passed in `secureTunnelConfig.groupKeys`. Sends ON/OFF commands and checks status; this writes to the KNX bus.
+  - Configure: `KNX_GATEWAY_IP`, `KNX_TUNNEL_USER_ID`, `KNX_TUNNEL_PASSWORD`, `KNX_DEVICE_AUTH_CODE`, `KNX_GROUP_KEYS` (JSON containing every protected GA used, e.g. `{"1/1/1":"<32 hex>","1/1/2":"<32 hex>"}`), optional `KNX_GA_COMMAND` / `KNX_GA_STATUS`.
+  - Run: `npm run example:secure:tunnel:groupkeys`
+- [sampleSecureTunnelTCPNoDataSecure](./examples/sampleSecureTunnelTCPNoDataSecure.ts): KNX/IP Secure tunnelling over TCP using manual credentials without group keys: the IP channel is secured and plain group addresses work. For Data Secure group addresses see `sampleSecureTunnelTCPGroupKeys`. This example sends ON/OFF commands to the bus.
+  - Configure: `KNX_GATEWAY_IP`, `KNX_TUNNEL_USER_ID`, `KNX_TUNNEL_PASSWORD`; optionally `KNX_DEVICE_AUTH_CODE`, `KNX_GA_COMMAND` and `KNX_GA_STATUS`.
+  - Run: `KNX_GATEWAY_IP=192.168.1.10 KNX_TUNNEL_USER_ID=2 KNX_TUNNEL_PASSWORD='your-password' node -r esbuild-register -e "require('./examples/sampleSecureTunnelTCPNoDataSecure.ts')"`
 - [sampleSecureMulticast](./examples/sampleSecureMulticast.ts): KNX/IP Secure routing over multicast (`hostProtocol: 'Multicast'` + `isSecureKNXEnabled: true`). Synchronizes timer via 0x0955, wraps frames in Secure Wrapper, and applies Data Secure per GA. ON/OFF + status read.
   - Requires: set `.knxkeys` path + password in the example file.
   - Run: `npm run example:secure:multicast` or `node -r esbuild-register -e "require('./examples/sampleSecureMulticast.ts')"`
+- [listSecureGroups](./examples/listSecureGroups.ts): Lists the Data Secure group addresses of a keyring and, per tunnelling interface, the allowed senders of each group address (used by `strictSecurity`). Safe.
 - [dumpKeyringCredentials](./examples/dumpKeyringCredentials.ts): Loads a `.knxkeys` file, decrypts all stored tunnel passwords, authentication codes, device credentials, group keys, and backbone keys, and prints them to the console. Safe.
   - Run: `node -r esbuild-register -e "require('./examples/dumpKeyringCredentials.ts')" [path/to/keyring.knxkeys] [ets-password]`
 
@@ -828,20 +878,23 @@ const objects = await KNXClient.discoverInterfaces(5000)
 - Tips for UDP tunnelling:
   - If your interface times out waiting ACKs on plain `TunnelUDP`, try `suppress_ack_ldatareq: true`.
   - With multiple NICs, set `localIPAddress` (or `interface`) to bind the correct local interface.
+  - A `TUNNELING_REQUEST` that repeats the previous sequence number (the gateway did not get our ACK) is ACKed again but not emitted twice. Frames with any other unexpected sequence number (gaps, older numbers) are still ACKed and emitted, unlike XKNX which drops them: this keeps gateways that number frames loosely working, but an old or reordered frame can reach the application.
 
 ### KNX IP Secure (tunnelling & routing) and Data Secure
 
 `KNXClient` supports KNX/IP Secure and Data Secure.
 
-- Requirements: KNX Secure router/interface and ETS keyring (`.knxkeys`). For `TunnelTCP`, the interface IA is optional — if omitted, the client auto-selects a usable tunnel from the keyring.
-- Data Secure: Group Addresses present in the keyring are encrypted end-to-end; GA not present remain plain.
+- Requirements: KNX Secure router/interface and an ETS keyring (`.knxkeys`), or, for `TunnelTCP`, the manual tunnel credentials (`tunnelUserId` + `tunnelUserPassword`, optionally `deviceAuthenticationPassword` and `groupKeys`). With a keyring, the interface IA is optional — if omitted, the client auto-selects a usable tunnel from the keyring; without a keyring it is not needed.
+- Data Secure: Group Addresses with a key (in the keyring or in `secureTunnelConfig.groupKeys`) are encrypted end-to-end; GA without a key remain plain.
 - Modes:
   - `TunnelTCP` + `isSecureKNXEnabled: true` → secure session (Secure Wrapper) + Data Secure per GA.
+  - `TunnelTCP` + `isSecureKNXEnabled: false` → plain tunnelling over TCP (no `TUNNELING_ACK` over TCP, as the specification requires).
   - `Multicast` + `isSecureKNXEnabled: true` → secure routing (Secure Wrapper over multicast with timer synchronization via 0x0955) + Data Secure per GA.
 
 Routing (Multicast) specifics
 - Outgoing frames are injected as `L_DATA_IND` when using routing (both plain and secure). This mirrors ETS and xKNX behavior and ensures devices react correctly to injected telegrams. Do not use `L_DATA_REQ` for routing injection.
 - Secure routing needs a synchronized timer. By default the client waits until the timer is authenticated before sending. Additionally, on secure multicast startup the client proactively sends a `TimerNotify (0x0955)` once, so the timer can authenticate immediately even if the router doesn't broadcast it right away. Plain multicast is unaffected.
+- The client ignores its own `TimerNotify` when multicast loopback delivers it back, so the timer is taken from the router. If no router answers within the backbone latency tolerance (at least 1 s), the local timer is used and the client connects anyway.
 - Option: `secureRoutingWaitForTimer` (default `true`) controls gating of outgoing frames until the timer is authenticated.
 
 Authorized senders (Data Secure, secure routing)
@@ -861,7 +914,7 @@ Troubleshooting (routing)
 - For secure routing, ensure your ETS keyring contains a Backbone key and that the target Group Addresses are present with keys (Data Secure). You can list them with the example `examples/listSecureGroups.ts`.
 
 Behavior when fields are unset
-- secureTunnelConfig.tunnelInterfaceIndividualAddress (TunnelTCP): if omitted/empty, the client auto-selects a tunnel from the ETS keyring and retries interfaces until authentication and connect succeed. The chosen IA is exposed runtime in `client._options.secureTunnelConfig.tunnelInterfaceIndividualAddress` after connect.
+- secureTunnelConfig.tunnelInterfaceIndividualAddress (TunnelTCP): with a keyring, if omitted/empty, the client auto-selects a tunnel from the ETS keyring and retries interfaces until authentication and connect succeed. Without a keyring (manual credentials) it is not needed. The chosen IA is exposed runtime in `client._options.secureTunnelConfig.tunnelInterfaceIndividualAddress` after connect.
 - physAddr:
   - Multicast: must be provided; it's your node's source IA on the bus.
   - TunnelUDP: optional; used as cEMI source if set.

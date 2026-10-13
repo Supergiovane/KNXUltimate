@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased (6.1.0)
+
+Fixes from an external audit against ISO 22510:2019 (KNXnet/IP, incl. Secure), aligned with XKNX where the specification leaves room. Most stricter receive checks are opt-in. Keyrings without an ETS signature require `knxkeys_validate_signature: false`; malformed or unauthenticated Data Secure telegrams for keyed group addresses are dropped by default.
+
+### Bug Fixes
+
+* **secure:** keyring passwords and device authentication codes shorter than 8 characters were extracted with padding bytes (ETS pads to 32 bytes), so the connection could not be established.
+* **secure:** verify the ETS keyring signature, as XKNX does: a wrong keyring password now fails with a clear error instead of loading unusable keys, and a keyring without a (non-empty) signature is rejected unless `knxkeys_validate_signature: false` is set. The padding of every decrypted password and code is also checked. When the trimmed password fails, the password is also tried exactly as given.
+* **secure:** passwords and device authentication codes read from the keyring are no longer trimmed. A manually entered `deviceAuthenticationPassword` is tried exactly as given and, if different, without surrounding spaces.
+* **secure:** Data Secure telegrams for a keyed group address that are truncated, carry an unsupported SCF or fail during decryption are dropped instead of being delivered undecrypted.
+* **secure:** validate the `SESSION_RESPONSE` length (56 bytes, MAC included) before stopping its timer, so a short or invalid response fails the connection attempt instead of leaving the handshake hanging.
+* **secure:** an invalid KNX/IP header on the TCP stream (length 0–5 or above 4096) closes the connection instead of wedging the parser; frames with a protocol version other than 1.0 are skipped.
+* **secure:** Secure Wrappers carrying another session id are dropped; each new handshake forgets the previous session key and id, and during the handshake only the expected message is accepted, so frames of an earlier session can never be accepted after a reconnection.
+* **secure:** handshake timeouts raised from 5 s to 10 s for slow gateways; minimum Secure Wrapper length is 44 bytes.
+* **secure:** send `SESSION_STATUS` CLOSE when closing a secure TCP session; disconnect when the gateway sends `SESSION_STATUS` TIMEOUT or CLOSE. Status texts now match the specification (3 = timeout, 4 = keep-alive, 5 = close).
+* **secure:** secure routing timer only moves forward; a `TIMER_NOTIFY` can no longer move it backwards.
+* **secure:** secure routing ignores its own `TIMER_NOTIFY` looped back by multicast, so the first telegrams are sent with the router's timer instead of being discarded as outdated. When no router answers within the latency tolerance (at least 1 s), the local timer is used as before.
+* **secure:** manual `TunnelTCP` configurations (no keyring) no longer need `tunnelInterfaceIndividualAddress`; it only selected an interface from the keyring.
+* **secure:** outgoing Secure Wrappers and `TIMER_NOTIFY` use KNXUltimate's own serial number (`00006b6e7875`) instead of the gateway's (keyring mode), as XKNX does with its own; a shared serial could reuse the AES-CTR keystream of the gateway's frames.
+* **secure:** MACs are compared in constant time; `KNX_DEBUG=1` no longer prints passwords, password hashes or keys.
+* **cemi:** the additional information of `L_Data.ind`, `L_Data.con` and `L_Data.req` was sliced with the wrong end offset.
+* **tcp:** no `TUNNELING_ACK` is sent over TCP (plain or secure), as required by the specification and as XKNX does; outgoing requests over TCP already did not wait for an ACK.
+* **tunneling (UDP):** a `TUNNELING_REQUEST` with the same sequence number as the previous one (a repeat after a lost ACK) is ACKed again but not emitted twice, as XKNX does. Unlike XKNX, frames with another unexpected sequence number are still ACKed and emitted, for compatibility with gateways that number frames loosely.
+* **tunneling (UDP):** a `TUNNELING_REQUEST` of our channel whose cEMI cannot be parsed is still ACKed, so the gateway does not repeat it or drop the tunnel.
+* **tunneling:** `DISCONNECT_RESPONSE` (also while disconnecting) and `CONNECTIONSTATE_RESPONSE` for another channel are ignored; only traffic of our channel counts as a heartbeat answer.
+* **tunneling:** frames shorter than the length declared in their KNX/IP header are dropped and extra trailing bytes are ignored (as XKNX); an unparsable `TUNNELING_REQUEST` is ACKed only when its KNX/IP and connection headers are valid.
+* **tunneling:** send a `DISCONNECT_REQUEST` when the heartbeat fails, so gateways with a single tunnel slot free it.
+* **tunneling:** the connect timeout starts when the `CONNECT_REQUEST` is sent (full 10 s); after `E_NO_MORE_CONNECTIONS` reconnects back off from 10 s up to 60 s.
+
+### Features
+
+* **secure:** `secureTunnelConfig.knxkeys_validate_signature` (default `true`) and `Keyring.load(..., { validateSignature })` to load keyrings that were not exported by ETS.
+* **secure:** `secureTunnelConfig.groupKeys` passes Data Secure group keys directly, with or without a keyring.
+* **secure:** `secureTunnelConfig.requireDeviceAuthentication` refuses the handshake when the gateway cannot be authenticated (default `false`).
+* **secure:** `secureTunnelConfig.strictSecurity` drops plain telegrams on keyed group addresses, Data Secure telegrams from senders outside a sender list present in the keyring, and outdated secure routing frames (default `false`).
+* **tcp:** `TunnelTCP` with `isSecureKNXEnabled: false` now tunnels over plain TCP.
+
+### Tests
+
+* Fix the secure gateway mock, which never answered `DISCONNECT_REQUEST` and `CONNECTIONSTATE_REQUEST`, and sign the keyring fixtures as ETS does.
+* Cover keyring signature and short passwords with the ETS keyrings in `documents/`, Data Secure default and strict receive paths, `groupKeys`, `requireDeviceAuthentication`, `SESSION_STATUS` handling, invalid TCP headers, plain TCP tunnelling, repeated and unparsable tunnelling requests, channel checks, heartbeat failure and connect back-off.
+
 ## [6.0.8](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.6...v6.0.8) (2026-09-29)
 
 
@@ -11,7 +53,7 @@
 
 ### Bug Fixes
 
-* **secure:** receive authenticated Data Secure group indications sent without an IP wrapper by Apricum gateways. Require an established tunnel, the matching channel, a known group key, valid MAC and fresh sender sequence; continue rejecting unprotected traffic. Fixes status updates missing in Node-RED after secure writes.
+* **secure:** receive authenticated Data Secure group indications sent without an IP wrapper by Apricum/MDT gateways. Require an established tunnel, the matching channel, a known group key, valid MAC and fresh sender sequence; continue rejecting unprotected traffic. Fixes status updates missing in Node-RED after secure writes.
 
 ### Tests
 
