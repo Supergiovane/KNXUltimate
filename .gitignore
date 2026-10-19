@@ -351,3 +351,7 @@ build
 
 # Ignore all PDF files
 *.[Pp][Dd][Ff]
+
+# Local-only: protocol PDFs and their Markdown chunks (copyrighted), Claude Code guidance
+documents/
+CLAUDE.md
