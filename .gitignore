@@ -355,3 +355,4 @@ build
 # Local-only: protocol PDFs and their Markdown chunks (copyrighted), Claude Code guidance
 documents/
 CLAUDE.md
+scripts/pdfToMarkdown.py
