@@ -22,6 +22,10 @@ export default class NPDU {
 
 	private _data: KNXDataBuffer | null
 
+	// Transport control TPDU (T_Connect, T_Disconnect, T_ACK, T_NAK): only the
+	// TPCI octet, cEMI length L = 0, no APCI (ISO 22510 Annex D.1.1.5.3, as XKNX)
+	private _transportControl = false
+
 	constructor(
 		_tpci: number = 0x0,
 		_apci: number = 0x0,
@@ -48,6 +52,7 @@ export default class NPDU {
 			throw new Error('Invalid APCI')
 		}
 		this._apci = apci
+		this._transportControl = false
 	}
 
 	get apci(): number {
@@ -74,6 +79,7 @@ export default class NPDU {
 		if (!(data instanceof KNXDataBuffer)) {
 			throw new Error('Invalid data Buffer')
 		}
+		this._transportControl = false
 
 		if (
 			data.sixBits() &&
@@ -88,7 +94,15 @@ export default class NPDU {
 		this._data = data
 	}
 
+	/** True for a TPCI-only frame (T_Connect, T_Disconnect, T_ACK, T_NAK) */
+	get isTransportControl(): boolean {
+		return this._transportControl
+	}
+
 	get length(): number {
+		if (this._transportControl) {
+			return 2
+		}
 		if (this._data === null) {
 			return 3
 		}
@@ -96,6 +110,10 @@ export default class NPDU {
 	}
 
 	get action(): number {
+		// No APCI: never report a control TPDU as a group service
+		if (this._transportControl) {
+			return -1
+		}
 		return ((this.apci & 0xc0) >> 6) | ((this.tpci & 0x3) << 2)
 	}
 
@@ -151,6 +169,16 @@ export default class NPDU {
 		return CEMIConstants.TPCI_UNUMBERED_PACKET
 	}
 
+	/**
+	 * Builds a transport control TPDU, e.g. 0x80 T_Connect, 0x81 T_Disconnect,
+	 * 0xC2 | (seq << 2) T_ACK, 0xC3 | (seq << 2) T_NAK
+	 */
+	static createTransportControl(tpci: number): NPDU {
+		const npdu = new NPDU(tpci, 0, null)
+		npdu._transportControl = true
+		return npdu
+	}
+
 	static createFromBuffer(buffer: Buffer, offset: number = 0): NPDU {
 		const sysLogger = logger
 		if (offset > buffer.length) {
@@ -176,6 +204,10 @@ export default class NPDU {
 		} catch (error) {
 			sysLogger.error(`createFromBuffer: error tpci: ${error.message}`)
 		}
+		if (npduLength === 0 && tpci !== null) {
+			// L = 0: no octet after the TPCI, so there is no APCI to read
+			return NPDU.createTransportControl(tpci)
+		}
 		try {
 			apci = buffer.readUInt8(offset++)
 		} catch (error) {
@@ -198,6 +230,9 @@ export default class NPDU {
 	}
 
 	toBuffer(): Buffer {
+		if (this._transportControl) {
+			return Buffer.from([0x00, this.tpci & 0xff])
+		}
 		const length = this._data == null ? 1 : this._data.length + 1
 		const buffer = Buffer.alloc(3)
 		buffer.writeUInt8(length, 0)
