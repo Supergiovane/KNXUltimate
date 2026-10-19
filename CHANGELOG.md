@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.2.1](https://github.com/Supergiovane/KNXUltimate/compare/v6.2.0...v6.2.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* **cemi:** parse TPCI-only transport control frames ([278f92a](https://github.com/Supergiovane/KNXUltimate/commit/278f92a6b7eba49a9b8aef1c934cb571d37b2b67))
+
 # [6.2.0](https://github.com/Supergiovane/KNXUltimate/compare/v6.0.8...v6.2.0) (2026-10-13)
 
 
