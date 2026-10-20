@@ -63,10 +63,7 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 
 ## Table of Contents
 
-- [Changes in v6.1.0](#changes-in-v610-protocol-and-knx-secure-hardening)
-- [Breaking changes in v6.0.0](#️-breaking-changes-in-v600-knx-secure-validation)
-- [Changelog](#changelog)
-- [Support this project](#support-this-project)
+
 - [Connection setup](#connection-setup)
 - [Supported datapoints](#supported-datapoints)
 - [Methods / properties](#methodsproperties-of-knxultimate)
@@ -79,39 +76,13 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 - [Using kBerry on Raspberry Pi (UART / FT1.2)](#using-knx-ultimate-with-kberry-on-raspberry-pi-3-uart--ft12)
 - [How to collaborate](#how-to-collaborate)
 - [License](#license)
+- [Support this project](#support-this-project)
 
-## Changes in v6.2.0 (protocol and KNX Secure hardening)
-
-Version 6.1.0 includes fixes and improvements based on an external audit against the
-KNXnet/IP specification (ISO 22510:2019), aligned with XKNX where appropriate. Most
-stricter receive checks remain opt-in. These are the changes users may notice:
-
-- **Keyring signature:** keyrings are verified as XKNX does. A wrong `knxkeys_password`
-  now fails with `Keyring signature verification failed`. A keyring **without a
-  signature** (not exported by ETS) is rejected unless you set
-  `secureTunnelConfig.knxkeys_validate_signature: false`. Keyring passwords shorter than
-  8 characters now work.
-- **Data Secure:** a secure telegram for a keyed group address that is truncated, has an
-  unsupported SCF or fails decryption is dropped instead of being delivered undecrypted.
-- **TCP tunnelling:** no `TUNNELING_ACK` is sent over TCP (as the specification and XKNX
-  require). `TunnelTCP` with `isSecureKNXEnabled: false` now tunnels over plain TCP.
-  Manual secure configurations (no keyring) no longer need
-  `tunnelInterfaceIndividualAddress`.
-- **UDP tunnelling:** a frame repeating the previous sequence number is ACKed but not
-  emitted twice; the connect timeout runs the full 10 s from the request; after
-  `E_NO_MORE_CONNECTIONS` reconnects back off up to 60 s; a failed heartbeat sends a
-  `DISCONNECT_REQUEST`.
-- **New options:** `secureTunnelConfig.groupKeys`, `requireDeviceAuthentication`,
-  `strictSecurity` and `knxkeys_validate_signature` (see
-  [Additional secure options](#additional-secure-options)).
-
-Full list in the [CHANGELOG](./CHANGELOG.md).
 
 ## CHANGELOG
 
 - [Changelog](https://github.com/Supergiovane/KNXUltimate/blob/master/CHANGELOG.md)
 
-  
 
 | Technology            | Supported                                                            |
 | --------------------- | -------------------------------------------------------------------- |
@@ -136,10 +107,6 @@ Please subscribe to my channel, to learn how to use it [![Youtube][youtube-image
   
 <br/> 
 <br/>   
-<br/> 
-<br/> 
-<br/>   
-<br/> 
 
 ## CONNECTION SETUP
 
