@@ -30,7 +30,7 @@ const config: DatapointConfig = {
 	},
 	fromBuffer: (buf) => {
 		if (buf.length !== 1) {
-			logger.warn(
+			logger.debug(
 				'fromBuffer: buf should be 1 byte (got %d bytes)',
 				buf.length,
 			)

@@ -23,12 +23,15 @@ const logger = module('DPT7')
 
 const config: DatapointConfig = {
 	id: 'DPT7',
-	formatAPDU: (value) => {
+	formatAPDU: (value, context) => {
 		const apdu_data = Buffer.alloc(2)
 		if (!isFinite(value)) {
 			logger.warn('cannot write non-numeric or undefined value')
 		} else {
 			if (value < 0 || value > 65535) {
+				if (context?.strict) {
+					throw new Error(`value ${value} out of range [0, 65535]`)
+				}
 				logger.warn(
 					'value must be between 0 and 65535. Auto adjousting.',
 				)
@@ -43,7 +46,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 2) {
-			logger.warn(
+			logger.debug(
 				'fromBuffer: buf should be 2 bytes long (got %d bytes)',
 				buf.length,
 			)

@@ -13,7 +13,7 @@
  */
 
 import { module } from '../KnxLog'
-import type { DatapointConfig } from '.'
+import type { DatapointConfig, FromBufferContext } from '.'
 
 //
 // DPT238: 1-byte unsigned value
@@ -22,19 +22,55 @@ import type { DatapointConfig } from '.'
 
 const logger = module('DPT238')
 
+// DPT 238.600 DPT_DALI_Control_Gear_Diagnostic (03.07.02 §6.8.1), as XKNX:
+// b7 ballast failure, b6 lamp failure, b5..b0 DALI device address
+const isDaliDiagnostic = (context?: FromBufferContext) =>
+	context?.strict === true && context.subtypeid === '600'
+
 const config: DatapointConfig = {
 	id: 'DPT238',
-	formatAPDU: (value) => {
+	formatAPDU: (value, context) => {
 		const apdu_data = Buffer.alloc(1)
+		if (isDaliDiagnostic(context)) {
+			if (
+				typeof value !== 'object' ||
+				value === null ||
+				!Number.isInteger(value.address) ||
+				value.address < 0 ||
+				value.address > 63
+			) {
+				throw new Error(
+					'Must supply an object of {address: 0..63, lampFailure, ballastFailure}',
+				)
+			}
+			apdu_data[0] =
+				(value.ballastFailure ? 0x80 : 0) |
+				(value.lampFailure ? 0x40 : 0) |
+				value.address
+			return apdu_data
+		}
+		if (
+			context?.strict &&
+			(!Number.isInteger(value) || value < 0 || value > 255)
+		) {
+			throw new Error(`value ${value} out of range [0, 255]`)
+		}
 		apdu_data[0] = value
 		logger.debug(`input value = ${value}   apdu_data = ${apdu_data}`)
 		return apdu_data
 	},
 
-	fromBuffer: (buf) => {
+	fromBuffer: (buf, context) => {
 		if (buf.length !== 1) {
-			logger.error('Buffer should be 1 byte long, got', buf.length)
+			logger.debug('Buffer should be 1 byte long, got', buf.length)
 			return null
+		}
+		if (isDaliDiagnostic(context)) {
+			return {
+				address: buf[0] & 0x3f,
+				lampFailure: (buf[0] & 0x40) !== 0,
+				ballastFailure: (buf[0] & 0x80) !== 0,
+			}
 		}
 		const ret = buf[0]
 		return ret
@@ -91,6 +127,12 @@ const config: DatapointConfig = {
 			desc: 'Value_1_Ucount',
 			name: 'Counter pulses',
 			unit: 'pulses',
+		},
+
+		// 238.600 DALI control gear diagnostic (fields only in strict mode)
+		600: {
+			desc: 'DPT_DALI_Control_Gear_Diagnostic',
+			name: 'DALI Control Gear Diagnostic',
 		},
 	},
 }

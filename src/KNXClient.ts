@@ -245,6 +245,8 @@ export type KNXClientOptions = {
 	isSecureKNXEnabled?: boolean
 	/** Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true */
 	suppress_ack_ldatareq?: boolean
+	/** TunnelUDP: wait for the TUNNELLING_ACK of each request and repeat it once if missing, then disconnect (ISO 22510 §5.4.2.6). Leave unset to follow the legacy behaviour (true, false when suppress_ack_ldatareq is true). Set true together with suppress_ack_ldatareq for eibPORT/Loxone gateways. */
+	waitForTunnelingAck?: boolean
 	/** Local IPv4 for UDP binding and multicast interface selection. Takes precedence over interface; leave blank for automatic selection. */
 	localIPAddress?: string
 	/** Specifies the local eth interface to be used to connect to the KNX Bus. */
@@ -261,6 +263,8 @@ export type KNXClientOptions = {
 	secureTunnelConfig?: SecureConfig
 	/** Secure multicast: wait to send until timer is authenticated (default: true) */
 	secureRoutingWaitForTimer?: boolean
+	/** Encode write()/respond() values following the Datapoint Types spec strictly: throw for out-of-range or wrong-type values instead of clamping/truncating (see dptlib APDUTelegramContext.strict). Default false. */
+	strictDatapoints?: boolean
 	/** Serial FT1.2 configuration (used when hostProtocol === 'SerialFT12') */
 	serialInterface?: SerialFT12Options
 } & KNXLoggerOptions
@@ -1000,7 +1004,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		const adpu = {} as DPTLib.APDU
-		DPTLib.populateAPDU(data, adpu, dptid, context)
+		DPTLib.populateAPDU(data, adpu, dptid, {
+			...context,
+			strict: this._options.strictDatapoints === true,
+		})
 		const iDatapointType: number = parseInt(
 			dptid.substring(0, dptid.indexOf('.')),
 		)
@@ -1703,11 +1710,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				seqNum,
 				cEMIMessage,
 			)
-			if (!this._options.suppress_ack_ldatareq) {
-				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
-			} else {
-				this.send(knxPacketRequest, undefined, false, seqNum)
-			}
+			this.send(
+				knxPacketRequest,
+				this.waitsForTunnelingAck() ? knxPacketRequest : undefined,
+				false,
+				seqNum,
+			)
 			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
 			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
 			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
@@ -1802,11 +1810,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				seqNum,
 				cEMIMessage,
 			)
-			if (!this._options.suppress_ack_ldatareq) {
-				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
-			} else {
-				this.send(knxPacketRequest, undefined, false, seqNum)
-			}
+			this.send(
+				knxPacketRequest,
+				this.waitsForTunnelingAck() ? knxPacketRequest : undefined,
+				false,
+				seqNum,
+			)
 			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
 			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
 			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
@@ -1922,11 +1931,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				seqNum,
 				cEMIMessage,
 			)
-			if (!this._options.suppress_ack_ldatareq) {
-				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
-			} else {
-				this.send(knxPacketRequest, undefined, false, seqNum)
-			}
+			this.send(
+				knxPacketRequest,
+				this.waitsForTunnelingAck() ? knxPacketRequest : undefined,
+				false,
+				seqNum,
+			)
 			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
 			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
 			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
@@ -2016,11 +2026,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				seqNum,
 				cEMIMessage,
 			)
-			if (!this._options.suppress_ack_ldatareq) {
-				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
-			} else {
-				this.send(knxPacketRequest, undefined, false, seqNum)
-			}
+			this.send(
+				knxPacketRequest,
+				this.waitsForTunnelingAck() ? knxPacketRequest : undefined,
+				false,
+				seqNum,
+			)
 			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
 			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
 			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
@@ -2144,11 +2155,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				seqNum,
 				cEMIMessage,
 			)
-			if (!this._options.suppress_ack_ldatareq) {
-				this.send(knxPacketRequest, knxPacketRequest, false, seqNum)
-			} else {
-				this.send(knxPacketRequest, undefined, false, seqNum)
-			}
+			this.send(
+				knxPacketRequest,
+				this.waitsForTunnelingAck() ? knxPacketRequest : undefined,
+				false,
+				seqNum,
+			)
 			// 06/12/2021 Echo the sent telegram. Emit entire telegram with plain cEMI
 			this.ensurePlainCEMI(knxPacketRequest.cEMIMessage)
 			this.emit(KNXClientEvents.indication, knxPacketRequest as any, true)
@@ -3514,6 +3526,17 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/**
+	 * Whether outgoing TUNNELING_REQUESTs wait for the TUNNELLING_ACK.
+	 * Unset keeps the legacy coupling with suppress_ack_ldatareq.
+	 */
+	private waitsForTunnelingAck(): boolean {
+		if (typeof this._options.waitForTunnelingAck === 'boolean') {
+			return this._options.waitForTunnelingAck
+		}
+		return !this._options.suppress_ack_ldatareq
+	}
+
+	/**
 	 * Setup a timer while waiting for an ACK of `knxTunnelingRequest`
 	 */
 	private setTimerWaitingForACK(knxTunnelingRequest: KNXTunnelingRequest) {
@@ -3537,7 +3560,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			() => {
 				if (this.pendingTunnelingRequest !== knxTunnelingRequest) return
 				this._numFailedTelegramACK += 1
-				if (this._numFailedTelegramACK > 2) {
+				// Repeat once, then DISCONNECT (ISO 22510 §5.4.2.6)
+				if (this._numFailedTelegramACK > 1) {
 					this.failTunnelingRequest(knxTunnelingRequest, timeoutErr)
 				} else {
 					// Retry the same request without releasing other application telegrams.

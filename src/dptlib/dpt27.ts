@@ -88,7 +88,7 @@ const config: DatapointConfig = {
 	fromBuffer: (buf) => {
 		try {
 			if (!Buffer.isBuffer(buf) || buf.length !== 4) {
-				logger.warn('Buffer should be 4 bytes long, got', buf?.length)
+				logger.debug('Buffer should be 4 bytes long, got', buf?.length)
 				return null
 			}
 

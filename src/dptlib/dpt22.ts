@@ -121,7 +121,7 @@ const config: DatapointConfig = {
 	fromBuffer: (buf) => {
 		// RX from BUS
 		if (buf.length !== 2) {
-			logger.warn('Buffer should be 2 bytes long, got', buf.length)
+			logger.debug('Buffer should be 2 bytes long, got', buf.length)
 			return null
 		}
 		const byte1 = reverseString(buf[1].toString(2).padStart(8, '0')).split(

@@ -71,6 +71,10 @@ const config: DatapointConfig = {
 
 	// RX from BUS
 	fromBuffer(buf) {
+		if (buf.length !== 6) {
+			logger.debug('Buffer should be 6 bytes long, got', buf.length)
+			return null
+		}
 		try {
 			// Preparo per l'avvento di Gozer il gozeriano.
 			const activeElectricalEnergy = buf.subarray(0, 4).readInt32BE() // First 4x8 bits signed integer

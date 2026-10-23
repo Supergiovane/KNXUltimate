@@ -159,7 +159,8 @@ You can ignore this section until you actually need one of these behaviors.
 | `localIPAddress` (string) | TunnelUDP, Multicast | Local IPv4 address for UDP tunnel binding and multicast interface selection. Takes precedence over `interface` for local address selection; leave blank to select automatically. |
 | `interface` (string) | IP transports | Local interface name to select the NIC. When `localIPAddress` is blank, uses the first non-internal IPv4 address reported for this interface. |
 | `autoReconnect` (bool) | all | After the first `Connect()`, reconnect indefinitely every 5 seconds following an unexpected disconnection or failed connection attempt. An explicit `Disconnect()` stops retrying. Default `false`. |
-| `suppress_ack_ldatareq` (bool) | tunnelling, serial | Controls the cEMI `L_DATA_REQ` bus ACK bit. In plain `TunnelUDP`, when `false` the client also waits for the corresponding tunnelling ACK; set `true` only if your interface needs it. Default `false`. |
+| `suppress_ack_ldatareq` (bool) | tunnelling, serial | Controls the cEMI `L_DATA_REQ` bus ACK bit. In plain `TunnelUDP`, unless `waitForTunnelingAck` is set, `false` also makes the client wait for the corresponding tunnelling ACK; set `true` only if your interface needs it. Default `false`. |
+| `waitForTunnelingAck` (bool) | TunnelUDP | Wait for the `TUNNELLING_ACK` of each request, repeat it once if it is missing, then disconnect (ISO 22510 §5.4.2.6). Unset follows the legacy behaviour (`!suppress_ack_ldatareq`). Set `true` together with `suppress_ack_ldatareq: true` for eibPORT/Loxone gateways. |
 | `theGatewayIsKNXVirtual` (bool) | tunnelling | Special handling for ETS KNX Virtual (adds `localIPAddress` to the tunnel endpoint). Default `false`. |
 
 If an interface has multiple IPv4 addresses (for example, a host address plus a VRRP/keepalived VIP), later addresses no longer replace its first suitable IPv4. Node.js does not expose primary/secondary or VRRP flags, so automatic selection still depends on the order reported by the OS. For UDP tunnelling with a fixed host address, set `localIPAddress: '192.168.178.252'` in the `KNXClient` options to select that address regardless of ordering. The address must be assigned locally. TCP socket source selection follows the OS routing table.
@@ -171,6 +172,7 @@ You can ignore this unless you want to tune send pacing.
 | Property | Applies to | Description |
 | -------- | ---------- | ----------- |
 | `KNXQueueSendIntervalMilliseconds` (number) | all | Inter-telegram delay in ms. Default about `25`. Don't go below `20`. In `TunnelUDP`, ACKs, heartbeats and disconnect packets are sent immediately and do not affect application telegram spacing. |
+| `strictDatapoints` (bool) | all | `write`/`respond` throw for values outside the datapoint's range or of the wrong type, instead of clamping or truncating them (see [Strict datapoints](#strict-datapoints)). Default `false`. |
 
 ### Secure options
 
@@ -724,6 +726,22 @@ let dpt = dptlib.resolve("1.001");
 let jsValue = dptlib.fromBuffer(RAW VALUE (SEE SAMPLES), dpt); // THIS IS THE DECODED VALUE
 ```
 
+### Strict datapoints
+
+By default dptlib keeps its legacy behaviour. Pass `{ strict: true }` as the context to follow the Datapoint Types specification (03.07.02):
+
+- `populateAPDU` throws for a value outside the subtype's range (or the base type's), a reserved enumeration value, or a value of the wrong type for a composite DPT, instead of clamping, truncating or returning `null`.
+- `fromBuffer` returns `null` for DPT 9 invalid data (7FFFh) and for reserved DPT 20 enumeration values.
+- 21.102 uses the `DPT_StatusRHC` fields (`fault`, `statusEco`, `tempFlowLimit`, `tempReturnLimit`, `statusMorningBoost`, `statusStartOptim`, `statusStopOptim`, `summerMode`) and 238.600 the DALI diagnostic fields (`address`, `lampFailure`, `ballastFailure`).
+
+```javascript
+const apdu = {};
+dptlib.populateAPDU(128, apdu, "5.001", { strict: true }); // throws: out of range [0, 100]
+dptlib.fromBuffer(Buffer.from("7fff", "hex"), dptlib.resolve("9.001"), { strict: true }); // null
+```
+
+`KNXClient` applies the same rules to `write`/`respond` with the `strictDatapoints` option.
+
 ## EXAMPLES
 
 All examples live in the [examples](./examples/) folder. You can run them directly with TypeScript via esbuild-register (no build step needed).
@@ -812,7 +830,7 @@ const objects = await KNXClient.discoverInterfaces(5000)
 - TunnelUDP: uses `physAddr` as the source IA on the bus.
 - TunnelTCP (secure): after a successful connect, uses the tunnel-assigned IA as the cEMI source on the bus; the Data Secure authentication, however, uses the interface IA from the ETS keyring (not the dynamic tunnel IA).
 - Tips for UDP tunnelling:
-  - If your interface times out waiting ACKs on plain `TunnelUDP`, try `suppress_ack_ldatareq: true`.
+  - If your interface times out waiting ACKs on plain `TunnelUDP`, try `suppress_ack_ldatareq: true`. Add `waitForTunnelingAck: true` to keep the KNXnet/IP repetition (for example with eibPORT/Loxone gateways).
   - With multiple NICs, set `localIPAddress` (or `interface`) to bind the correct local interface.
   - A `TUNNELING_REQUEST` that repeats the previous sequence number (the gateway did not get our ACK) is ACKed again but not emitted twice. Frames with any other unexpected sequence number (gaps, older numbers) are still ACKed and emitted, unlike XKNX which drops them: this keeps gateways that number frames loosely working, but an old or reordered frame can reach the application.
 
