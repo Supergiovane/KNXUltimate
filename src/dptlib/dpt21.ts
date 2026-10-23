@@ -26,11 +26,40 @@ import { hasProp } from '../utils'
 // Bit 6: reserved (0)
 // Bit 7: reserved (0)
 
+// DPT 21.102 DPT_StatusRHC (03.07.02 §4.4.3), bit 0 first, as XKNX
+const STATUS_RHC_FIELDS = [
+	'fault',
+	'statusEco',
+	'tempFlowLimit',
+	'tempReturnLimit',
+	'statusMorningBoost',
+	'statusStartOptim',
+	'statusStopOptim',
+	'summerMode',
+]
+
 const logger = module('DPT21')
 
 const config: DatapointConfig = {
 	id: 'DPT21',
-	formatAPDU: (value) => {
+	formatAPDU: (value, context) => {
+		// The legacy layout uses the 21.001 fields for every subtype
+		if (context?.strict && context.subtypeid === '102') {
+			if (typeof value !== 'object' || value === null) {
+				throw new Error(
+					`Must supply an object of {${STATUS_RHC_FIELDS.join(', ')}}`,
+				)
+			}
+			let bits = 0
+			STATUS_RHC_FIELDS.forEach((field, bit) => {
+				if (value[field] === undefined) return
+				if (typeof value[field] !== 'boolean') {
+					throw new Error(`${field} must be a boolean`)
+				}
+				if (value[field]) bits |= 1 << bit
+			})
+			return Buffer.from([bits])
+		}
 		if (!value) {
 			logger.error('cannot write null value')
 			return null
@@ -64,10 +93,17 @@ const config: DatapointConfig = {
 		return null
 	},
 
-	fromBuffer: (buf) => {
+	fromBuffer: (buf, context) => {
 		if (buf.length !== 1) {
 			logger.debug('Buffer should be 8 bit long, got', buf.length)
 			return null
+		}
+		if (context?.strict && context.subtypeid === '102') {
+			const status: Record<string, boolean> = {}
+			STATUS_RHC_FIELDS.forEach((field, bit) => {
+				status[field] = (buf[0] & (1 << bit)) !== 0
+			})
+			return status
 		}
 		const sBit = Array.from(
 			parseInt(buf.toString('hex').toUpperCase(), 16)

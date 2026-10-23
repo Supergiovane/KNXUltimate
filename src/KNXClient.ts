@@ -263,6 +263,8 @@ export type KNXClientOptions = {
 	secureTunnelConfig?: SecureConfig
 	/** Secure multicast: wait to send until timer is authenticated (default: true) */
 	secureRoutingWaitForTimer?: boolean
+	/** Encode write()/respond() values following the Datapoint Types spec strictly: throw for out-of-range or wrong-type values instead of clamping/truncating (see dptlib APDUTelegramContext.strict). Default false. */
+	strictDatapoints?: boolean
 	/** Serial FT1.2 configuration (used when hostProtocol === 'SerialFT12') */
 	serialInterface?: SerialFT12Options
 } & KNXLoggerOptions
@@ -1002,7 +1004,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 
 		const adpu = {} as DPTLib.APDU
-		DPTLib.populateAPDU(data, adpu, dptid, context)
+		DPTLib.populateAPDU(data, adpu, dptid, {
+			...context,
+			strict: this._options.strictDatapoints === true,
+		})
 		const iDatapointType: number = parseInt(
 			dptid.substring(0, dptid.indexOf('.')),
 		)

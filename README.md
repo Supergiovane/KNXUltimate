@@ -172,6 +172,7 @@ You can ignore this unless you want to tune send pacing.
 | Property | Applies to | Description |
 | -------- | ---------- | ----------- |
 | `KNXQueueSendIntervalMilliseconds` (number) | all | Inter-telegram delay in ms. Default about `25`. Don't go below `20`. In `TunnelUDP`, ACKs, heartbeats and disconnect packets are sent immediately and do not affect application telegram spacing. |
+| `strictDatapoints` (bool) | all | `write`/`respond` throw for values outside the datapoint's range or of the wrong type, instead of clamping or truncating them (see [Strict datapoints](#strict-datapoints)). Default `false`. |
 
 ### Secure options
 
@@ -724,6 +725,22 @@ import { dptlib } from "knxultimate";
 let dpt = dptlib.resolve("1.001");
 let jsValue = dptlib.fromBuffer(RAW VALUE (SEE SAMPLES), dpt); // THIS IS THE DECODED VALUE
 ```
+
+### Strict datapoints
+
+By default dptlib keeps its legacy behaviour. Pass `{ strict: true }` as the context to follow the Datapoint Types specification (03.07.02):
+
+- `populateAPDU` throws for a value outside the subtype's range (or the base type's), a reserved enumeration value, or a value of the wrong type for a composite DPT, instead of clamping, truncating or returning `null`.
+- `fromBuffer` returns `null` for DPT 9 invalid data (7FFFh) and for reserved DPT 20 enumeration values.
+- 21.102 uses the `DPT_StatusRHC` fields (`fault`, `statusEco`, `tempFlowLimit`, `tempReturnLimit`, `statusMorningBoost`, `statusStartOptim`, `statusStopOptim`, `summerMode`) and 238.600 the DALI diagnostic fields (`address`, `lampFailure`, `ballastFailure`).
+
+```javascript
+const apdu = {};
+dptlib.populateAPDU(128, apdu, "5.001", { strict: true }); // throws: out of range [0, 100]
+dptlib.fromBuffer(Buffer.from("7fff", "hex"), dptlib.resolve("9.001"), { strict: true }); // null
+```
+
+`KNXClient` applies the same rules to `write`/`respond` with the `strictDatapoints` option.
 
 ## EXAMPLES
 

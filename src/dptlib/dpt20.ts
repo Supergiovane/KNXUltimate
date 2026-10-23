@@ -23,8 +23,19 @@ const logger = module('DPT20')
 
 const config: DatapointConfig = {
 	id: 'DPT20',
-	formatAPDU: (value) => {
+	formatAPDU: (value, context) => {
 		const apdu_data = Buffer.alloc(1)
+		if (context?.strict) {
+			const enc = config.subtypes?.[context.subtypeid]?.enc
+			if (
+				!Number.isInteger(value) ||
+				value < 0 ||
+				value > 255 ||
+				(enc && !(value in enc))
+			) {
+				throw new Error(`value ${value} is not a valid enumeration`)
+			}
+		}
 		apdu_data[0] = value
 		logger.debug(
 			`./knx/src/dpt20.js : input value = ${value}   apdu_data = ${apdu_data}`,
@@ -32,12 +43,15 @@ const config: DatapointConfig = {
 		return apdu_data
 	},
 
-	fromBuffer: (buf) => {
+	fromBuffer: (buf, context) => {
 		if (buf.length !== 1) {
 			logger.debug('Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		const ret = buf.readUInt8(0)
+		// Strict: reserved values of the subtype's enumeration are invalid
+		const enc = config.subtypes?.[context?.subtypeid]?.enc
+		if (context?.strict && enc && !(ret in enc)) return null
 		return ret
 	},
 

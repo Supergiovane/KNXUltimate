@@ -14,45 +14,68 @@
 
 import { module } from '../KnxLog'
 import type { DatapointConfig } from '.'
-import { frexp, ldexp, round } from '../utils'
+import { ldexp } from '../utils'
 
 //
 // DPT9.*: 2-byte floating point value
 //
 
+// 7FFFh denotes invalid data; the valid range is F800h..7FFEh (03.07.02)
+const DPT9_INVALID_DATA = 0x7fff
+const DPT9_MIN = -671088.64
+const DPT9_MAX = 670433.28
+
 const logger = module('DPT9')
+
+// Round half to even, as Python's round() used by XKNX (1562.5 -> 1562)
+const roundHalfEven = (x: number): number => {
+	const r = Math.round(x)
+	return Math.abs(x % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r
+}
 
 const config: DatapointConfig = {
 	id: 'DPT9',
-	formatAPDU: (value) => {
+	formatAPDU: (value, context) => {
 		const apdu_data = Buffer.alloc(2)
 		value = Number(value) // Expect a number
+		if (
+			context?.strict &&
+			(!isFinite(value) || value < DPT9_MIN || value > DPT9_MAX)
+		) {
+			throw new Error(
+				`value ${value} out of range [${DPT9_MIN}, ${DPT9_MAX}]`,
+			)
+		}
 		if (!isFinite(value)) {
 			logger.warn('cannot write non-numeric or undefined value')
-		} else {
-			value = round(value, 2) // Fix issue with float having too many decimals.
-			const arr = frexp(value)
-			const mantissa = arr[0]
-			const exponent = arr[1]
-			// find the minimum exponent that will upsize the normalized mantissa (0,5 to 1 range)
-			// in order to fit in 11 bits ([-2048, 2047])
-			let max_mantissa = 0
-			let e: number
-			for (e = exponent; e >= -15; e--) {
-				max_mantissa = ldexp(100 * mantissa, e)
-				if (max_mantissa > -2048 && max_mantissa < 2047) break
-			}
-			const sign = mantissa < 0 ? 1 : 0
-			const mant = mantissa < 0 ? ~(max_mantissa ^ 2047) : max_mantissa
-			const exp = exponent - e
-			// yucks
-			apdu_data[0] = (sign << 7) + (exp << 3) + (mant >> 8)
-			apdu_data[1] = mant % 256
+			return apdu_data
 		}
+		if (value < DPT9_MIN || value > DPT9_MAX) {
+			logger.warn(
+				`value ${value} must be between ${DPT9_MIN} and ${DPT9_MAX}. Auto adjusting.`,
+			)
+			value = Math.min(Math.max(value, DPT9_MIN), DPT9_MAX)
+		}
+		// Encoding as XKNX: the 0.01 resolution mantissa is halved until it
+		// fits 12 bits signed, then rounded (not truncated)
+		let mantissa = value * 100
+		// |value| <= 0.005 is sent as 0000h, never as -0 (8000h = -20.48), as ETS
+		if (Math.abs(mantissa) <= 0.5) return apdu_data
+		let exponent = 0
+		while (mantissa < -2048 || mantissa > 2047) {
+			exponent++
+			mantissa /= 2
+		}
+		mantissa = roundHalfEven(mantissa)
+		apdu_data[0] =
+			(mantissa < 0 ? 0x80 : 0) |
+			(exponent << 3) |
+			((mantissa & 0x7ff) >> 8)
+		apdu_data[1] = mantissa & 0xff
 		return apdu_data
 	},
 
-	fromBuffer: (buf) => {
+	fromBuffer: (buf, context) => {
 		if (buf.length !== 2) {
 			logger.debug(
 				'fromBuffer: buf should be 2 bytes long (got %d bytes)',
@@ -69,6 +92,9 @@ const config: DatapointConfig = {
 		// let value = Number.parseFloat(significand << esponente) / 100
 		// return value;
 
+		if (context?.strict && buf.readUInt16BE(0) === DPT9_INVALID_DATA) {
+			return null
+		}
 		const sign = buf[0] >> 7
 		const exponent = (buf[0] & 0b01111000) >> 3
 		let mantissa = 256 * (buf[0] & 0b00000111) + buf[1]

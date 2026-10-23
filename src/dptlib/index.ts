@@ -66,15 +66,25 @@ const logger = module('DPTLib')
 export interface APDUTelegramContext {
 	groupAddress?: string
 	sourceAddress?: string
+	/**
+	 * Follow the Datapoint Types spec (03.07.02) strictly. Encode: throw for
+	 * values outside the subtype's range or of the wrong type, instead of
+	 * clamping/truncating. Decode: return null for invalid data (DPT 9 7FFFh)
+	 * and reserved enum values, and use the spec field layout for 21.102 and
+	 * 238.600. Default false keeps the legacy behaviour.
+	 */
+	strict?: boolean
 }
 
 export interface FormatAPDUContext extends APDUTelegramContext {
 	dptid?: number | string
+	subtypeid?: string
 	logSuffix?: string
 }
 
 export interface FromBufferContext extends APDUTelegramContext {
 	dptid?: number | string
+	subtypeid?: string
 	logSuffix?: string
 }
 
@@ -320,6 +330,36 @@ export function resetDptErrorStats(): void {
 	dptErrorStats.clear()
 }
 
+function isNumericRange(range: unknown): range is [number, number] {
+	return (
+		Array.isArray(range) &&
+		typeof range[0] === 'number' &&
+		typeof range[1] === 'number'
+	)
+}
+
+/** Strict mode: throw if a numeric value is outside the subtype's range (or the base type's) */
+function assertStrictRange(
+	value: any,
+	dpt: DatapointConfig,
+	dptLabel: string,
+): void {
+	if (typeof value !== 'number') return
+	if (!Number.isFinite(value)) {
+		throw new Error(`${dptLabel}: value ${logValue(value)} is not finite`)
+	}
+	const range = [
+		dpt.subtype?.scalar_range,
+		dpt.subtype?.range,
+		dpt.basetype.range,
+	].find(isNumericRange)
+	if (range && (value < range[0] || value > range[1])) {
+		throw new Error(
+			`${dptLabel}: value ${logValue(value)} out of range [${range[0]}, ${range[1]}]`,
+		)
+	}
+}
+
 function markErrorLogged(error: unknown): void {
 	if (error && typeof error === 'object') {
 		try {
@@ -356,6 +396,20 @@ export function populateAPDU(
 	apdu.data = Buffer.alloc(nbytes)
 	apdu.bitlength = (dpt.basetype && dpt.basetype.bitlength) || 1
 	let tgtvalue = value
+	const strict = context?.strict === true
+	if (strict) {
+		try {
+			assertStrictRange(value, dpt, dptLabel)
+		} catch (error) {
+			recordDptError(
+				dptLabel,
+				'encode',
+				getErrorMessage(error),
+				logSuffix,
+			)
+			throw error
+		}
+	}
 	logger.debug(
 		'populateAPDU start: dpt=%s inputType=%s input=%s expectedBytes=%d%s',
 		dptLabel,
@@ -372,8 +426,10 @@ export function populateAPDU(
 		try {
 			apdu.data = dpt.formatAPDU(value, {
 				dptid,
+				subtypeid: dpt.subtypeid,
 				groupAddress: context?.groupAddress,
 				sourceAddress: context?.sourceAddress,
+				strict,
 				logSuffix,
 			}) as Buffer
 		} catch (error) {
@@ -411,6 +467,11 @@ export function populateAPDU(
 				logValue(apdu.data),
 				logSuffix,
 			)
+			if (strict) {
+				const message = `${dptLabel}: cannot encode value ${logValue(value)}`
+				recordDptError(dptLabel, 'encode', message, logSuffix)
+				throw new Error(message)
+			}
 		}
 		// knxLog.get().debug('<<< custom formatAPDU(%s): %j', dptid, apdu.data);
 	} else {
@@ -461,6 +522,11 @@ export function populateAPDU(
 					dpt.id,
 					dpt.subtypeid,
 				)
+				if (strict) {
+					const message = `${dptLabel}: value ${logValue(value)} out of range [${range[0]}, ${range[1]}]`
+					recordDptError(dptLabel, 'encode', message, logSuffix)
+					throw new Error(message)
+				}
 			}
 		}
 		// generic APDU is assumed to convey an unsigned integer of arbitrary bitlength
@@ -533,8 +599,10 @@ export function fromBuffer(
 			// nothing to do here, DPT-specific fromBuffer implementation will handle everything
 			value = dpt.fromBuffer(buf, {
 				dptid: context?.dptid || dptLabel,
+				subtypeid: dpt.subtypeid,
 				groupAddress: context?.groupAddress,
 				sourceAddress: context?.sourceAddress,
+				strict: context?.strict === true,
 				logSuffix,
 			})
 			logger.debug(

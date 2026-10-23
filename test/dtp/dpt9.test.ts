@@ -149,4 +149,55 @@ describe('DPT9 (16-bit floating point value)', () => {
 			assert.ok(minResult < 0, 'Max negative value should be negative')
 		})
 	})
+
+	describe('XKNX test vectors', () => {
+		// xknx test/dpt_tests/dpt_9_float_test.py
+		const vectors: [number, string][] = [
+			[-30, '8a24'],
+			[16.96, '06a0'],
+			[0, '0000'],
+			[0.0002, '0000'],
+			[0.005, '0000'],
+			[0.00501, '0001'],
+			[-0.0002, '0000'],
+			[-0.005, '0000'],
+			[-0.00501, '87ff'],
+			[21, '0c1a'],
+			[500, '2e1a'],
+			[499.84, '2e1a'],
+			[500.16, '2e1b'],
+			[-10, '8418'],
+			[-1000, 'b1e6'],
+			[-999.68, 'b1e6'],
+			[-1000.32, 'b1e5'],
+			[670433.28, '7ffe'],
+			[20.48, '0c00'],
+			[-20.48, '8000'],
+			[-671088.64, 'f800'],
+			[-670760.96, 'f801'],
+		]
+		vectors.forEach(([value, hex]) => {
+			test(`${value} -> ${hex}`, () => {
+				assert.equal(
+					(DPT9.formatAPDU!(value) as Buffer).toString('hex'),
+					hex,
+				)
+			})
+		})
+
+		test('clamps out-of-range values instead of flipping the sign', () => {
+			assert.equal(
+				(DPT9.formatAPDU!(700000) as Buffer).toString('hex'),
+				'7ffe',
+			)
+			assert.equal(
+				(DPT9.formatAPDU!(3.4e38) as Buffer).toString('hex'),
+				'7ffe',
+			)
+			assert.equal(
+				(DPT9.formatAPDU!(-1e9) as Buffer).toString('hex'),
+				'f800',
+			)
+		})
+	})
 })
