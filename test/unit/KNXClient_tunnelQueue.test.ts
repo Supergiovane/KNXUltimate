@@ -345,16 +345,15 @@ describe('KNXClient TunnelUDP queue and acknowledgements', () => {
 			assert.equal(h.client['timers'].get(KNXTimer.ACK), ackTimer)
 			assert.equal(h.client['_numFailedTelegramACK'], 1)
 			assert.deepEqual(h.acknowledgements, [])
-			await clock.tickAsync(1000)
 			assert.deepEqual(
 				h.requests().map((p) => p.seq),
-				[194, 194, 194],
+				[194, 194],
 			)
 			h.ack(194)
 			await clock.tickAsync(100)
 			assert.deepEqual(
 				h.requests().map((p) => p.seq),
-				[194, 194, 194, 195],
+				[194, 194, 195],
 			)
 		})
 	})
@@ -429,14 +428,19 @@ describe('KNXClient TunnelUDP queue and acknowledgements', () => {
 		h.write()
 		h.write(false)
 		await clock.tickAsync(3000)
+		// Repeated once, then DISCONNECT (ISO 22510 §5.4.2.6)
 		assert.deepEqual(
-			h.requests().map((p) => p.seq),
-			[194, 194, 194],
+			h.requests().map((p) => [p.time, p.seq]),
+			[
+				[0, 194],
+				[1000, 194],
+			],
 		)
 		assert.equal(
 			h.sent[h.sent.length - 1].type,
 			KNX_CONSTANTS.DISCONNECT_REQUEST,
 		)
+		assert.equal(h.sent[h.sent.length - 1].time, 2000)
 		assert.deepEqual(h.acknowledgements, [{ seq: 194, success: false }])
 		assert.equal(h.errors.length, 1)
 		assert.match(h.errors[0].message, /seqCounter:194/)
@@ -527,5 +531,42 @@ describe('KNXClient TunnelUDP queue and acknowledgements', () => {
 		)
 		assert.equal(h.client['timers'].has(KNXTimer.ACK), false)
 		assert.deepEqual(h.acknowledgements, [])
+	})
+
+	it('clears the cEMI ack-request bit but keeps TUNNELLING_ACK handling when waitForTunnelingAck is set', async () => {
+		const h = setup({
+			suppress_ack_ldatareq: true,
+			waitForTunnelingAck: true,
+		})
+		h.write()
+		h.write(false)
+		await clock.tickAsync(3000)
+		const req = KNXProtocol.parseMessage(h.requests()[0].buffer)
+			.knxMessage as KNXTunnelingRequest
+		assert.equal(req.cEMIMessage.control.ack, 0)
+		assert.deepEqual(
+			h.requests().map((p) => p.seq),
+			[194, 194],
+		)
+		assert.equal(
+			h.sent[h.sent.length - 1].type,
+			KNX_CONSTANTS.DISCONNECT_REQUEST,
+		)
+		assert.deepEqual(h.acknowledgements, [{ seq: 194, success: false }])
+	})
+
+	it('sets the cEMI ack-request bit and skips TUNNELLING_ACK handling when waitForTunnelingAck is false', async () => {
+		const h = setup({ waitForTunnelingAck: false })
+		h.write()
+		h.write(false)
+		await clock.tickAsync(200)
+		const req = KNXProtocol.parseMessage(h.requests()[0].buffer)
+			.knxMessage as KNXTunnelingRequest
+		assert.equal(req.cEMIMessage.control.ack, 1)
+		assert.deepEqual(
+			h.requests().map((p) => p.seq),
+			[194, 195],
+		)
+		assert.equal(h.client['timers'].has(KNXTimer.ACK), false)
 	})
 })

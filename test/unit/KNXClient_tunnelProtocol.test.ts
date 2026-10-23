@@ -23,6 +23,8 @@ import KNXProtocol from '../../src/protocol/KNXProtocol'
 import KNXConnectionStateResponse from '../../src/protocol/KNXConnectionStateResponse'
 import { KNX_CONSTANTS } from '../../src/protocol/KNXConstants'
 import LDataInd from '../../src/protocol/cEMI/LDataInd'
+import LDataCon from '../../src/protocol/cEMI/LDataCon'
+import LDataReq from '../../src/protocol/cEMI/LDataReq'
 
 const CHANNEL = 81
 
@@ -267,5 +269,23 @@ describe('cEMI additional information', () => {
 		)
 		assert.equal(ind.srcAddress.toString(), '1.1.1')
 		assert.equal(ind.dstAddress.toString(), '0/0/1')
+	})
+
+	const frames = [
+		{ name: 'L_Data.req', parser: LDataReq, code: '11' },
+		{ name: 'L_Data.con', parser: LDataCon, code: '2e' },
+		{ name: 'L_Data.ind', parser: LDataInd, code: '29' },
+	]
+	frames.forEach(({ name, parser, code }) => {
+		;['00', '0403020102'].forEach((addInfo) => {
+			it(`round-trips ${name} with additional info length ${addInfo.slice(0, 2)}`, () => {
+				const cemi = Buffer.from(
+					`${code}${addInfo}bce011010001010081`,
+					'hex',
+				)
+				const msg = parser.createFromBuffer(cemi, 1)
+				assert.deepEqual(msg.toBuffer(), cemi)
+			})
+		})
 	})
 })

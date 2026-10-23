@@ -82,7 +82,7 @@ export default class LDataCon extends CEMIMessage {
 	}
 
 	toBuffer(): Buffer {
-		const buffer = Buffer.alloc(1)
+		const buffer = Buffer.alloc(2)
 		const msgBuffer: Buffer[] = [buffer]
 		let offset = 0
 		buffer.writeUInt8(this.msgCode, offset++)
