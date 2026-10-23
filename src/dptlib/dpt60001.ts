@@ -307,7 +307,7 @@ const config: DatapointConfig = {
 	// RX from BUS
 	fromBuffer(buf) {
 		if (buf.length !== 6) {
-			logger.warn(
+			logger.debug(
 				'DPTGriesser.fromBuffer: buf should be 6 bytes long (got %d bytes)',
 				buf.length,
 			)

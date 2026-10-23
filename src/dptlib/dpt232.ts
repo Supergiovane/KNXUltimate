@@ -55,7 +55,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 3) {
-			logger.error('Buffer should be 3 byte long, got', buf.length)
+			logger.debug('Buffer should be 3 byte long, got', buf.length)
 			return null
 		}
 		const ret = { red: buf[0], green: buf[1], blue: buf[2] }

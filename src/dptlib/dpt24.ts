@@ -54,7 +54,7 @@ const config: DatapointConfig = {
 	fromBuffer: (buf) => {
 		try {
 			if (!Buffer.isBuffer(buf) || buf.length < 1) {
-				logger.warn(
+				logger.debug(
 					'Buffer should contain at least 1 byte, got',
 					buf?.length,
 				)

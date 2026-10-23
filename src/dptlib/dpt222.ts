@@ -67,7 +67,7 @@ const config: DatapointConfig = {
 	// RX from BUS
 	fromBuffer: (buf) => {
 		if (buf.length !== 6) {
-			logger.warn(
+			logger.debug(
 				'fromBuffer: buf should be 3x2 bytes long (got %d bytes)',
 				buf.length,
 			)

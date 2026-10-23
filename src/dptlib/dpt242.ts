@@ -84,7 +84,7 @@ const config: DatapointConfig = {
 
 	fromBuffer(buf) {
 		if (buf.length !== 6) {
-			logger.error('Buffer should be 6 bytes long, got', buf.length)
+			logger.debug('Buffer should be 6 bytes long, got', buf.length)
 			return null
 		}
 		const bufTotale = buf.toString('hex')

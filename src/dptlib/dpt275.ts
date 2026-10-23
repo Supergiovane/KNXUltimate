@@ -55,7 +55,7 @@ const config: DatapointConfig = {
 	fromBuffer(buf) {
 		// Get the telegram from the KNX bus and create a javascript object.
 		if (buf.length !== 8) {
-			logger.warn(
+			logger.debug(
 				'fromBuffer: buf should be 8 bytes long (got %d bytes)',
 				buf.length,
 			)

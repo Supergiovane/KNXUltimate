@@ -66,7 +66,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 3) {
-			logger.error(
+			logger.debug(
 				`Buffer should be 3 bytes long. Received ${buf.length}`,
 			)
 			return null

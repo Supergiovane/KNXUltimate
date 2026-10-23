@@ -76,7 +76,7 @@ const config: DatapointConfig = {
 	// If day of week is 0, then the KNX device has not sent this optional value (Supergiovane)
 	fromBuffer: (buf) => {
 		if (buf.length !== 3) {
-			logger.error('Buffer should be 3 bytes long, got', buf.length)
+			logger.debug('Buffer should be 3 bytes long, got', buf.length)
 			return null
 		}
 		const d = new Date()

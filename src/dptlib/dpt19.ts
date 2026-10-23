@@ -74,7 +74,7 @@ const config: DatapointConfig = {
 
 	fromBuffer: (buf) => {
 		if (buf.length !== 8) {
-			logger.warn('Buffer should be 8 bytes long, got', buf.length)
+			logger.debug('Buffer should be 8 bytes long, got', buf.length)
 			return null
 		}
 		return new Date(

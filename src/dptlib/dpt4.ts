@@ -35,7 +35,7 @@ const config: DatapointConfig = {
 	},
 	fromBuffer: (buf: Buffer) => {
 		if (buf.length !== 1) {
-			logger.warn('Buffer should be 1 byte long, got', buf.length)
+			logger.debug('Buffer should be 1 byte long, got', buf.length)
 			return null
 		}
 		return String.fromCharCode(buf[0])
