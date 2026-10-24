@@ -243,9 +243,9 @@ export type KNXClientOptions = {
 	hostProtocol?: KNXClientProtocol
 	/** True: enables KNX/IP Secure (TunnelTCP: secure session; Multicast: secure routing) and Data Secure for keyed group addresses. */
 	isSecureKNXEnabled?: boolean
-	/** Avoid sending/receive the ACK telegram. Leave false. If you encounter issues with old interface, set it to true */
+	/** Bus ACK (Multicast, TunnelUDP, serial): true clears the ACK request bit of the telegrams sent to the bus (cEMI L_Data.req), so the receiving devices are not asked to acknowledge them. TunnelTCP never sets this bit. In TunnelUDP, while waitForTunnelingAck is unset, true also stops waiting for the interface's TUNNELLING_ACK. Leave false unless your interface needs it. */
 	suppress_ack_ldatareq?: boolean
-	/** TunnelUDP: wait for the TUNNELLING_ACK of each request and repeat it once if missing, then disconnect (ISO 22510 §5.4.2.6). Leave unset to follow the legacy behaviour (true, false when suppress_ack_ldatareq is true). Set true together with suppress_ack_ldatareq for eibPORT/Loxone gateways. */
+	/** Interface ACK (TunnelUDP): true waits for the interface to confirm each telegram with a TUNNELLING_ACK; an unconfirmed telegram is sent once more, then the connection is closed (ISO 22510 §5.4.2.6). false never waits. Unset: waits only when suppress_ack_ldatareq is false, as in previous versions. eibPORT/Loxone gateways need suppress_ack_ldatareq: true together with waitForTunnelingAck: true. */
 	waitForTunnelingAck?: boolean
 	/** Local IPv4 for UDP binding and multicast interface selection. Takes precedence over interface; leave blank for automatic selection. */
 	localIPAddress?: string
