@@ -1,5 +1,12 @@
 # Changelog
 
+# [6.3.0](https://github.com/Supergiovane/KNXUltimate/compare/v6.2.1...v6.3.0) (2026-10-24)
+
+
+### Features
+
+* **dptlib:** strict datapoint mode; fix tunnelling ACK retry, LDataCon and DPT 9 encoder ([#116](https://github.com/Supergiovane/KNXUltimate/issues/116)) ([931b612](https://github.com/Supergiovane/KNXUltimate/commit/931b612ae6802c919ac5bc4272a5d28211195299)), closes [#115](https://github.com/Supergiovane/KNXUltimate/issues/115) [#113](https://github.com/Supergiovane/KNXUltimate/issues/113) [#114](https://github.com/Supergiovane/KNXUltimate/issues/114)
+
 ## [6.2.1](https://github.com/Supergiovane/KNXUltimate/compare/v6.2.0...v6.2.1) (2026-10-19)
 
 
