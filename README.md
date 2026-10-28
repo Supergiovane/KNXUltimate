@@ -46,7 +46,7 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 
 ## Features
 
-- **KNX/IP Tunnelling** over UDP (plain) and TCP (secure)
+- **KNX/IP Tunnelling** over UDP and TCP (plain or secure)
 - **KNX/IP Routing** over multicast (plain and secure)
 - **KNX/IP Secure** full stack (session handshake + Secure Wrapper)
 - **KNX Data Secure** — per-GA end-to-end encryption via ETS keyring
@@ -271,6 +271,7 @@ You should see something like this in the console window (the **msg.payload** is
 | .read (GA)                         | Sends a READ telegram to the BUS. **GA** is the group address (for example "0/0/1").                 |
 | .discover()                        | Sends a discover request on the KNX default multicast port and returns the results as an array. This is an async method. See the example in the **examples** folder |
 | .getGatewayDescription()           | Sends a gateway description request. It works after an established connection. The async results will be sent to the *descriptionResponse* event. There is an example in the **examples** folder named **gatewaydescription.ts** . |
+| .checkConnection()                 | Sends a CONNECTIONSTATE_REQUEST now and restarts the heartbeat cycle from that moment (tunnelling only). The answer is handled like a normal heartbeat: if the gateway refuses the channel, or does not answer after the usual retries, the client disconnects and, with `autoReconnect`, reconnects. Useful right after a known network interruption (for example a VPN restart). Returns `false` and does nothing if not connected. |
 | .getCurrentItemHandledByTheQueue()  | Returns the sequence number awaiting a tunnelling ACK, or `undefined` when none is pending. Retained for compatibility with Node-RED queue diagnostics; calling it does not change the queue or ACK state. |
 
 ### writeRaw notes

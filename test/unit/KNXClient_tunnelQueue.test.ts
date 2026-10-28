@@ -476,6 +476,46 @@ describe('KNXClient TunnelUDP queue and acknowledgements', () => {
 		assert.equal(h.client['pendingTunnelingRequest'], undefined)
 	})
 
+	it('checkConnection sends a CONNECTIONSTATE_REQUEST at once and restarts the heartbeat silently', async () => {
+		const h = setup()
+		const warn = sinon.stub(h.client['sysLogger'], 'warn')
+		h.heartbeat()
+		await clock.tickAsync(1000)
+		// Library heartbeat and its CONNECTIONSTATE_RESPONSE timeout still pending
+		assert.equal(h.client['timers'].has(KNXTimer.CONNECTION_STATE), true)
+		assert.equal(h.client.checkConnection(), true)
+		const requests = h.sent.filter(
+			(p) => p.type === KNX_CONSTANTS.CONNECTIONSTATE_REQUEST,
+		)
+		assert.equal(requests.length, 2)
+		assert.equal(requests[1].time, 1000)
+		assert.equal(warn.callCount, 0)
+		assert.equal(h.client['_heartbeatFailures'], 0)
+		h.receive(new KNXConnectionStateResponse(81, 0).toBuffer())
+		assert.equal(h.client['timers'].has(KNXTimer.CONNECTION_STATE), false)
+		assert.equal(h.client['timers'].has(KNXTimer.HEARTBEAT), true)
+	})
+
+	it('checkConnection disconnects at once when the gateway refuses the channel', async () => {
+		const h = setup()
+		assert.equal(h.client.checkConnection(), true)
+		h.receive(
+			new KNXConnectionStateResponse(
+				81,
+				KNX_CONSTANTS.E_CONNECTION_ID,
+			).toBuffer(),
+		)
+		assert.equal(h.client.isConnected(), false)
+		assert.equal(h.errors.length, 1)
+	})
+
+	it('checkConnection is a no-op when not connected', () => {
+		const h = setup()
+		h.client['_connectionState'] = ConncetionState.DISCONNECTED
+		assert.equal(h.client.checkConnection(), false)
+		assert.equal(h.sent.length, 0)
+	})
+
 	it('acknowledges a gateway disconnect without sending queued applications or retries', async () => {
 		const h = setup()
 		h.write()

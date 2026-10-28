@@ -2175,6 +2175,27 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.runHeartbeat()
 	}
 
+	/**
+	 * Send a CONNECTIONSTATE_REQUEST now and restart the heartbeat cycle from
+	 * this moment. The answer is handled like a normal heartbeat: a refused
+	 * request or a timeout after the usual retries disconnects and, with
+	 * autoReconnect, reconnects. Useful right after a known network interruption.
+	 * Tunnelling only (UDP or TCP).
+	 * @returns true if the request was sent, false if not connected or not applicable
+	 */
+	public checkConnection(): boolean {
+		if (
+			!this.isConnected() ||
+			this.isSerialTransport() ||
+			this._options.hostProtocol === 'Multicast' ||
+			this._options.sniffingMode
+		) {
+			return false
+		}
+		this.startHeartBeat()
+		return this._heartbeatRunning
+	}
+
 	private stopHeartBeat(): void {
 		this._heartbeatRunning = false
 		this.clearTimer(KNXTimer.HEARTBEAT)
