@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.3.2](https://github.com/Supergiovane/KNXUltimate/compare/v6.3.1...v6.3.2) (2026-10-30)
+
+
+### Bug Fixes
+
+* DESCRIPTION_REQUEST announces the bound UDP port ([#117](https://github.com/Supergiovane/KNXUltimate/issues/117)) ([be29b41](https://github.com/Supergiovane/KNXUltimate/commit/be29b41f7920ab3be8c6fc1c09da7dca9a552551))
+
 ## [6.3.1](https://github.com/Supergiovane/KNXUltimate/compare/v6.3.0...v6.3.1) (2026-10-28)
 
 
