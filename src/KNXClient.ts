@@ -5911,9 +5911,31 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	private sendDescriptionRequestMessage() {
+		// The HPAI in DESCRIPTION_REQUEST must contain the local control
+		// endpoint (IP + local UDP port): the server sends the response there.
+		// Right after the client is created the socket may still be binding,
+		// so wait for it to listen before reading its port.
+		const socket = this.udpSocket
+		if (socket && !this.socketReady) {
+			socket.once(SocketEvents.listening, () => {
+				try {
+					this.sendDescriptionRequestMessage()
+				} catch {}
+			})
+			return
+		}
+		let localPort = 0
+		try {
+			const addr: any = socket?.address?.()
+			if (addr && typeof addr.port === 'number') localPort = addr.port
+		} catch {}
+
 		this.send(
 			KNXProtocol.newKNXDescriptionRequest(
-				new HPAI(this._options.localIPAddress),
+				new HPAI(
+					this._options.localIPAddress,
+					localPort || KNX_CONSTANTS.KNX_PORT,
+				),
 			),
 			undefined,
 			false,
