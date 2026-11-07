@@ -318,7 +318,7 @@ try {
 
 With `waitForTunnelingAck` off (or unset together with `suppress_ack_ldatareq: true`) the TUNNELLING_ACK is not awaited, so only the L_Data.con counts. An interface that doesn't send L_Data.con at all makes every awaited telegram reject with `RequestTimeoutError`, even though it went out: the connection isn't affected, and callers that ignore the Promise notice nothing.
 
-Over a secure tunnel, some gateways (for example Apricum) send L_Data.con outside the Secure Wrapper. As in XKNX, this is accepted until the gateway wraps a tunnelling frame, and from then on such frames are dropped for that session. It only settles the Promise of the matching telegram: nothing else is done with it.
+Over a secure tunnel, some gateways (for example Apricum) send L_Data.con outside the Secure Wrapper. It's accepted as described in [KNX IP Secure](#knx-ip-secure-tunnelling--routing-and-data-secure), and it only settles the Promise of the matching telegram.
 
 All of them also reject if the connection drops first. These methods still **throw** straight away if the client isn't connected or the value is invalid, so with `.catch()` instead of `await` you need a `try/catch` as well. Errors can be told apart by `error.name`. A failed telegram still follows the usual path, so a missing TUNNELLING_ACK closes the tunnel and emits `error` and `disconnected` as well.
 
@@ -872,6 +872,11 @@ const objects = await KNXClient.discoverInterfaces(5000)
   - `TunnelTCP` + `isSecureKNXEnabled: true` → secure session (Secure Wrapper) + Data Secure per GA.
   - `TunnelTCP` + `isSecureKNXEnabled: false` → plain tunnelling over TCP (no `TUNNELING_ACK` over TCP, as the specification requires).
   - `Multicast` + `isSecureKNXEnabled: true` → secure routing (Secure Wrapper over multicast with timer synchronization via 0x0955) + Data Secure per GA.
+
+Secure tunnel: frames outside the Secure Wrapper
+- The specification requires every frame of a secure session to be wrapped, but some gateways (for example Apricum) send tunnelling frames without it. As XKNX does, the client tolerates these until the gateway wraps a tunnelling frame, and from then on it drops them for that session.
+- What is tolerated: plain group telegrams, L_Data.con and a gateway's DisconnectRequest. Plain group telegrams are never accepted for a group address with a Data Secure key, nor with `strictSecurity`.
+- Data Secure telegrams are always accepted, because they authenticate themselves.
 
 Routing (Multicast) specifics
 - Outgoing frames are injected as `L_DATA_IND` when using routing (both plain and secure). This mirrors ETS and xKNX behavior and ensures devices react correctly to injected telegrams. Do not use `L_DATA_REQ` for routing injection.

@@ -11,6 +11,7 @@ import { afterEach, describe, it } from 'node:test'
 import assert from 'assert'
 import KNXClient, { KNXClientEvents } from '../../src/KNXClient'
 import { ConfirmationError } from '../../src/errors'
+import KNXProtocol from '../../src/protocol/KNXProtocol'
 import { MockSecureGateway } from './MockSecureGateway'
 
 const GROUP_KEY = Buffer.from('00112233445566778899aabbccddeeff', 'hex')
@@ -33,6 +34,7 @@ describe('KNX Secure telegram outcome', () => {
 	async function setup(
 		lDataCon: MockSecureGateway['lDataCon'],
 		lDataConUnwrapped = false,
+		strictSecurity = false,
 	) {
 		const gw = new MockSecureGateway({
 			groupKeys: { [GA]: GROUP_KEY },
@@ -53,6 +55,7 @@ describe('KNX Secure telegram outcome', () => {
 				tunnelUserPassword: 'anyPassword',
 				tunnelUserId: 5,
 				groupKeys: { [GA]: GROUP_KEY.toString('hex') },
+				strictSecurity,
 			},
 			loglevel: 'disable',
 		})
@@ -183,6 +186,86 @@ describe('KNX Secure telegram outcome', () => {
 		gw.writeRaw(con)
 		await outcome
 		assert.deepEqual(indications, [])
+	})
+
+	/** Collect the plain indications that reach the application */
+	function collect(cli: KNXClient) {
+		const received: string[] = []
+		cli.on(KNXClientEvents.indication, (packet: any, echoed) => {
+			if (!echoed) received.push(packet.cEMIMessage.dstAddress.toString())
+		})
+		return received
+	}
+
+	const settle = () =>
+		new Promise((resolve) => {
+			setTimeout(resolve, 120)
+		})
+
+	it('delivers plain group data outside the SecureWrapper, as Apricum sends it', async () => {
+		const { gw, cli } = await setup('none')
+		const received = collect(cli)
+		gw.writeRaw(gw.buildPlainGroupWriteInner(GA_WITHOUT_KEY, true))
+		await settle()
+		assert.deepEqual(received, [GA_WITHOUT_KEY])
+	})
+
+	it('never delivers plain data for a group address with a key', async () => {
+		const { gw, cli } = await setup('none')
+		const received = collect(cli)
+		gw.writeRaw(gw.buildPlainGroupWriteInner(GA, true))
+		await settle()
+		assert.deepEqual(received, [])
+	})
+
+	it('does not deliver unwrapped plain group data with strictSecurity', async () => {
+		const { gw, cli } = await setup('none', false, true)
+		const received = collect(cli)
+		gw.writeRaw(gw.buildPlainGroupWriteInner(GA_WITHOUT_KEY, true))
+		await settle()
+		assert.deepEqual(received, [])
+	})
+
+	it('stops delivering unwrapped plain group data once the server wrapped a frame', async () => {
+		const { gw, cli } = await setup('positive')
+		const received = collect(cli)
+		await cli.write(GA, true, '1.001')
+		gw.writeRaw(gw.buildPlainGroupWriteInner(GA_WITHOUT_KEY, true))
+		await settle()
+		assert.deepEqual(received, [])
+	})
+
+	it('still delivers Data Secure telegrams outside the SecureWrapper after that', async () => {
+		const { gw, cli } = await setup('positive')
+		const received = collect(cli)
+		await cli.write(GA, true, '1.001')
+		gw.writeRaw(gw.buildSecureGroupWriteInner(GA, true).inner)
+		await settle()
+		assert.deepEqual(received, [GA])
+	})
+
+	it('accepts a DisconnectRequest outside the SecureWrapper', async () => {
+		const { gw, cli } = await setup('none')
+		const disconnected = new Promise<void>((resolve) => {
+			cli.once(KNXClientEvents.disconnected, () => resolve())
+		})
+		gw.writeRaw(
+			KNXProtocol.newKNXDisconnectRequest(cli.channelID).toBuffer(),
+		)
+		await disconnected
+		assert.equal(cli.isConnected(), false)
+	})
+
+	it('ignores an unwrapped DisconnectRequest once the server wrapped a frame', async () => {
+		const { gw, cli } = await setup('positive')
+		await cli.write(GA, true, '1.001')
+		gw.writeRaw(
+			KNXProtocol.newKNXDisconnectRequest(cli.channelID).toBuffer(),
+		)
+		await new Promise((resolve) => {
+			setTimeout(resolve, 1300)
+		})
+		assert.equal(cli.isConnected(), true)
 	})
 
 	it('resolves for a group address without Data Secure', async () => {

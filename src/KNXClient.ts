@@ -4975,11 +4975,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.processInboundMessage(inner, rinfo)
 				}
 			} else if (this._options.isSecureKNXEnabled) {
-				// Some gateways (e.g. Apricum) send Data Secure indications without
-				// an IP wrapper. Accept only authenticated group data on our active
-				// tunnel; unprotected data and session/control frames remain rejected.
+				// Some gateways (e.g. Apricum) send tunnelling frames without an IP
+				// wrapper. Data Secure indications are authenticated by themselves.
+				// The others are tolerated only as far as these methods allow; all
+				// remaining frames, such as session control, stay rejected.
 				if (this.receiveUnwrappedDataSecureIndication(frame)) continue
+				if (this.receiveUnwrappedPlainIndication(frame)) continue
 				if (this.receiveUnwrappedLDataCon(frame)) continue
+				if (this.receiveUnwrappedDisconnectRequest(frame)) continue
 				try {
 					this.sysLogger.warn(
 						`[${getTimestamp()}] Dropping plaintext frame type=0x${type.toString(16)} inside secure session`,
@@ -5039,17 +5042,71 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	}
 
 	/**
-	 * Apricum also sends L_Data.con without an IP wrapper. As XKNX does, this is tolerated
-	 * until the server wraps a tunnelling frame, so a conforming server stays protected.
-	 * It only settles the Promise of a telegram it matches: nothing is emitted.
+	 * As XKNX does, unauthenticated tunnelling frames without an IP wrapper are tolerated
+	 * until the server wraps one, so a conforming server stays protected.
 	 */
-	private receiveUnwrappedLDataCon(frame: Buffer): boolean {
+	private toleratesUnwrappedTunnelling(): boolean {
+		return (
+			this.isConnected() &&
+			!!this._secureSessionKey &&
+			!this._secureWrappedTunnellingReceived
+		)
+	}
+
+	/**
+	 * Group data of the addresses without Data Secure, as Apricum sends it. Never for a
+	 * group address with a key: that would let a forged frame replace a secured one.
+	 */
+	private receiveUnwrappedPlainIndication(frame: Buffer): boolean {
 		if (
-			!this.isConnected() ||
-			!this._secureSessionKey ||
-			this._secureWrappedTunnellingReceived
+			!this.toleratesUnwrappedTunnelling() ||
+			this._options.secureTunnelConfig?.strictSecurity
 		)
 			return false
+		try {
+			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(frame)
+			if (knxHeader.service_type !== KNX_CONSTANTS.TUNNELING_REQUEST)
+				return false
+			const packet = knxMessage as KNXTunnelingRequest
+			const cemi = packet.cEMIMessage
+			const { npdu } = cemi
+			if (
+				packet.channelID !== this._channelID ||
+				cemi.msgCode !== CEMIConstants.L_DATA_IND ||
+				cemi.control.addressType !== KNXAddress.TYPE_GROUP ||
+				this._secureGroupKeys.has(cemi.dstAddress.get()) ||
+				(npdu.tpci === APCI_SEC.HIGH && npdu.apci === APCI_SEC.LOW) ||
+				!(npdu.isGroupRead || npdu.isGroupResponse || npdu.isGroupWrite)
+			)
+				return false
+			this.emit(KNXClientEvents.indication, packet, false)
+			return true
+		} catch {
+			return false
+		}
+	}
+
+	private receiveUnwrappedDisconnectRequest(frame: Buffer): boolean {
+		if (
+			!this.toleratesUnwrappedTunnelling() ||
+			frame.readUInt16BE(2) !== KNX_CONSTANTS.DISCONNECT_REQUEST
+		)
+			return false
+		this.processInboundMessage(frame, {
+			address: this._peerHost,
+			port: this._peerPort,
+			family: 'IPv4',
+			size: frame.length,
+		})
+		return true
+	}
+
+	/**
+	 * Apricum also sends L_Data.con without an IP wrapper. It only settles the Promise
+	 * of a telegram it matches: nothing is emitted.
+	 */
+	private receiveUnwrappedLDataCon(frame: Buffer): boolean {
+		if (!this.toleratesUnwrappedTunnelling()) return false
 		try {
 			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(frame)
 			if (knxHeader.service_type !== KNX_CONSTANTS.TUNNELING_REQUEST)
