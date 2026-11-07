@@ -86,6 +86,12 @@ type SecureGatewayOptions = {
 const X25519_SPKI_PREFIX_DER = Buffer.from('302a300506032b656e032100', 'hex')
 
 export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
+	/** The L_Data.con answering each L_Data.req. 'altered' changes its last APDU octet. */
+	lDataCon: 'none' | 'positive' | 'negative' | 'altered' = 'none'
+
+	/** Send the L_Data.con outside the SecureWrapper, as an Apricum gateway does. */
+	lDataConUnwrapped = false
+
 	private server: Server | null = null
 
 	private socket: Socket | null = null
@@ -513,6 +519,7 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 		if (cemi.msgCode !== CEMIConstants.L_DATA_REQ) {
 			return
 		}
+		this.sendLDataCon(inner)
 		const npdu = cemi.npdu
 		const isSecure =
 			npdu.tpci === APCI_SEC.HIGH && npdu.apci === APCI_SEC.LOW
@@ -525,6 +532,18 @@ export class MockSecureGateway extends TypedEventEmitter<GatewayEvents> {
 			value: result.value,
 			plainApdu: result.plainApdu,
 		})
+	}
+
+	/** An L_Data.con is a copy of the L_Data.req, as transmitted by the client. */
+	private sendLDataCon(inner: Buffer) {
+		if (this.lDataCon === 'none') return
+		const con = Buffer.from(inner)
+		// 6 octets of header, 4 of connection header, then the cEMI message
+		con[8] = this.nextTunnelSeq()
+		con[10] = CEMIConstants.L_DATA_CON
+		if (this.lDataCon === 'negative') con[12] |= 0x01
+		if (this.lDataCon === 'altered') con[con.length - 1] ^= 0xff
+		this.socket?.write(this.lDataConUnwrapped ? con : this.wrapFrame(con))
 	}
 
 	private decryptDataSecure(cemi: LDataReq | LDataInd) {

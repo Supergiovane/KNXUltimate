@@ -318,6 +318,8 @@ try {
 
 With `waitForTunnelingAck` off (or unset together with `suppress_ack_ldatareq: true`) the TUNNELLING_ACK is not awaited, so only the L_Data.con counts. An interface that doesn't send L_Data.con at all makes every awaited telegram reject with `RequestTimeoutError`, even though it went out: the connection isn't affected, and callers that ignore the Promise notice nothing.
 
+Over a secure tunnel, some gateways (for example Apricum) send L_Data.con outside the Secure Wrapper. As in XKNX, this is accepted until the gateway wraps a tunnelling frame, and from then on such frames are dropped for that session. It only settles the Promise of the matching telegram: nothing else is done with it.
+
 All of them also reject if the connection drops first. These methods still **throw** straight away if the client isn't connected or the value is invalid, so with `.catch()` instead of `await` you need a `try/catch` as well. Errors can be told apart by `error.name`. A failed telegram still follows the usual path, so a missing TUNNELLING_ACK closes the tunnel and emits `error` and `disconnected` as well.
 
 ## EVENTS
@@ -874,6 +876,7 @@ const objects = await KNXClient.discoverInterfaces(5000)
 Routing (Multicast) specifics
 - Outgoing frames are injected as `L_DATA_IND` when using routing (both plain and secure). This mirrors ETS and xKNX behavior and ensures devices react correctly to injected telegrams. Do not use `L_DATA_REQ` for routing injection.
 - Flow control: after a `ROUTING_BUSY` the client holds back routing telegrams for the wait time announced in the frame, plus a random extra time that grows when more of them arrive (ISO 22510 §5.5.2.3.5). They stay in the queue and leave in order. The `error` event still reports `ROUTING_BUSY`, but the connection stays up. On secure routing, a `ROUTING_BUSY` that isn't in a Secure Wrapper is discarded, because anyone on the network could have sent it.
+- Secure routing discards a Secure Wrapper that fails verification and carries on, without an `error` event, because anyone on the network could have sent it. So a wrong backbone key doesn't disconnect the client: telegrams just don't arrive. The first discarded frame of a connection is logged as an error, the others at debug level.
 - Secure routing needs a synchronized timer. By default the client waits until the timer is authenticated before sending. Additionally, on secure multicast startup the client proactively sends a `TimerNotify (0x0955)` once, so the timer can authenticate immediately even if the router doesn't broadcast it right away. Plain multicast is unaffected.
 - The client ignores its own `TimerNotify` when multicast loopback delivers it back, so the timer is taken from the router. If no router answers within the backbone latency tolerance (at least 1 s), the local timer is used and the client connects anyway.
 - Option: `secureRoutingWaitForTimer` (default `true`) controls gating of outgoing frames until the timer is authenticated.

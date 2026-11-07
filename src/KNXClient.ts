@@ -399,6 +399,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 
 	private routingFlowControl = new RoutingFlowControl()
 
+	private _secureRoutingDropLogged = false
+
+	// This session's server wraps its tunnelling frames, as it should
+	private _secureWrappedTunnellingReceived = false
+
 	private exitProcessingKNXQueueLoop: boolean
 
 	private pendingTunnelingRequest?: KNXTunnelingRequest
@@ -3580,6 +3585,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this.exitProcessingKNXQueueLoop = true
 		this.commandQueue = []
 		this.routingFlowControl.reset()
+		this._secureRoutingDropLogged = false
+		this._secureWrappedTunnellingReceived = false
 		this.failConfirmations(new Error(`Disconnected: ${_sReason}`))
 
 		// Emit `disconnected` BEFORE awaiting socket teardown so consumers always
@@ -4987,6 +4994,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 						)
 					} catch {}
 				} else {
+					if (innerType === KNX_CONSTANTS.TUNNELING_REQUEST) {
+						this._secureWrappedTunnellingReceived = true
+					}
 					// Feed decrypted inner KNX/IP frames into the regular pipeline
 					const rinfo: RemoteInfo = {
 						address: this._peerHost,
@@ -5001,6 +5011,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				// an IP wrapper. Accept only authenticated group data on our active
 				// tunnel; unprotected data and session/control frames remain rejected.
 				if (this.receiveUnwrappedDataSecureIndication(frame)) continue
+				if (this.receiveUnwrappedLDataCon(frame)) continue
 				try {
 					this.sysLogger.warn(
 						`[${getTimestamp()}] Dropping plaintext frame type=0x${type.toString(16)} inside secure session`,
@@ -5057,6 +5068,35 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 		this.emit(KNXClientEvents.indication, packet, false)
 		return true
+	}
+
+	/**
+	 * Apricum also sends L_Data.con without an IP wrapper. As XKNX does, this is tolerated
+	 * until the server wraps a tunnelling frame, so a conforming server stays protected.
+	 * It only settles the Promise of a telegram it matches: nothing is emitted.
+	 */
+	private receiveUnwrappedLDataCon(frame: Buffer): boolean {
+		if (
+			!this.isConnected() ||
+			!this._secureSessionKey ||
+			this._secureWrappedTunnellingReceived
+		)
+			return false
+		try {
+			const { knxHeader, knxMessage } = KNXProtocol.parseMessage(frame)
+			if (knxHeader.service_type !== KNX_CONSTANTS.TUNNELING_REQUEST)
+				return false
+			const packet = knxMessage as KNXTunnelingRequest
+			if (
+				packet.channelID !== this._channelID ||
+				packet.cEMIMessage.msgCode !== CEMIConstants.L_DATA_CON
+			)
+				return false
+			this.handleLDataCon(packet.cEMIMessage as LDataCon)
+			return true
+		} catch {
+			return false
+		}
 	}
 
 	private secureWrap(frame: Buffer): Buffer {
@@ -5349,6 +5389,22 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		return plain
 	}
 
+	/**
+	 * With a wrong backbone key the client stays connected and only drops frames, so
+	 * the first drop must be visible. Later ones are not, or a flood would fill the log.
+	 */
+	private logDroppedRoutingWrapper(rinfo: RemoteInfo, error: Error) {
+		const reason = `Dropping SecureWrapper from ${rinfo.address}: ${error.message}`
+		if (this._secureRoutingDropLogged) {
+			this.sysLogger.debug(`[${getTimestamp()}] ${reason}`)
+			return
+		}
+		this._secureRoutingDropLogged = true
+		this.sysLogger.error(
+			`[${getTimestamp()}] ${reason}. If no telegrams arrive, check the backbone key. Further drops are logged at debug level.`,
+		)
+	}
+
 	private secureOnUdpData(msg: Buffer, rinfo: RemoteInfo) {
 		try {
 			if (!msg || msg.length < 6) return
@@ -5356,7 +5412,15 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			if (service === KNX_CONSTANTS.SECURE_WRAPPER) {
 				if (!this._options.isSecureKNXEnabled) return
 				// Decrypt and forward inner KNX/IP frame
-				const inner = this.secureDecryptRouting(msg)
+				let inner: Buffer
+				try {
+					inner = this.secureDecryptRouting(msg)
+				} catch (e) {
+					// Anyone on the network can send these: drop them and keep
+					// going, as the TCP path does (§5.7.2.1)
+					this.logDroppedRoutingWrapper(rinfo, e as Error)
+					return
+				}
 				// Timer handling: the multicast timer only moves forward
 				try {
 					// Extract sequence information to update timer offset
