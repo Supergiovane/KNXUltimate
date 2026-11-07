@@ -127,6 +127,63 @@ describe('KNX Secure routing receive path', () => {
 		assert.equal(inner.readUInt16BE(2), KNX_CONSTANTS.ROUTING_INDICATION)
 	})
 
+	describe('timer synchronization', () => {
+		function starting() {
+			const h = router(BACKBONE_KEY, '010203040506')
+			const notify = sinon.stub(h.client as any, 'secureSendTimerNotify')
+			h.client['_secureRoutingTimerAuthenticated'] = false
+			h.client['_connectionState'] = ConncetionState.DISCONNECTED
+			h.client['_secureRoutingLatencyMs'] = 2000
+			return { ...h, notify }
+		}
+
+		it('waits for Connect(), however late it comes', async () => {
+			const h = starting()
+			h.client['secureRoutingStartTimerSync']()
+			await clock.tickAsync(10000)
+			assert.equal(h.notify.callCount, 0)
+			assert.equal(h.client['_secureRoutingTimerAuthenticated'], false)
+
+			h.client['_connectionState'] = ConncetionState.CONNECTING
+			h.client['secureRoutingStartTimerSync']()
+			await clock.tickAsync(120)
+			assert.equal(h.notify.callCount, 1)
+		})
+
+		it('waits for the backbone key', async () => {
+			const h = starting()
+			h.client['_connectionState'] = ConncetionState.CONNECTING
+			h.client['_secureBackboneKey'] = undefined
+			h.client['secureRoutingStartTimerSync']()
+			await clock.tickAsync(10000)
+			assert.equal(h.notify.callCount, 0)
+		})
+
+		it('falls back to the local timer after the latency tolerance', async () => {
+			const h = starting()
+			const connected = sinon.spy()
+			h.client.on(KNXClientEvents.connected, connected)
+			h.client['_connectionState'] = ConncetionState.CONNECTING
+			h.client['secureRoutingStartTimerSync']()
+			await clock.tickAsync(2119)
+			assert.equal(connected.callCount, 0)
+			await clock.tickAsync(1)
+			assert.equal(connected.callCount, 1)
+			assert.equal(h.client['_secureRoutingTimerAuthenticated'], true)
+		})
+
+		it('connects again when the timer is already authenticated', async () => {
+			const h = starting()
+			const connected = sinon.spy()
+			h.client.on(KNXClientEvents.connected, connected)
+			h.client['_secureRoutingTimerAuthenticated'] = true
+			h.client['_connectionState'] = ConncetionState.CONNECTING
+			h.client['secureRoutingStartTimerSync']()
+			await clock.tickAsync(2120)
+			assert.equal(connected.callCount, 1)
+		})
+	})
+
 	it('delivers an authentic ROUTING_INDICATION', () => {
 		const h = setup()
 		h.local.receive(h.wrap(GROUP_READ))

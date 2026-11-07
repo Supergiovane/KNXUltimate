@@ -717,41 +717,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.emit(KNXClientEvents.connected, this._options)
 				}
 
-				// If secure routing, proactively send a TimerNotify once to authenticate timer
-				if (
-					this._options.hostProtocol === 'Multicast' &&
-					this._options.isSecureKNXEnabled
-				) {
-					// small delay to ensure keyring/backbone key are loaded
-					try {
-						clearTimeout(this._secureRoutingSyncTimer as any)
-					} catch {}
-					this._secureRoutingSyncTimer = setTimeout(() => {
-						try {
-							// Ensure backbone key available
-							if (!this._secureBackboneKey)
-								this.secureEnsureKeyring()
-							this.secureSendTimerNotify()
-						} catch {}
-					}, 120)
-					// Nobody answered: our own timer becomes the reference
-					try {
-						clearTimeout(this._secureRoutingFallbackTimer as any)
-					} catch {}
-					this._secureRoutingFallbackTimer = setTimeout(
-						() => {
-							if (this._secureRoutingTimerAuthenticated) return
-							this._secureRoutingTimerAuthenticated = true
-							try {
-								this.sysLogger.debug(
-									`[${getTimestamp()}] Secure routing: no TimerNotify answer, using the local timer`,
-								)
-							} catch {}
-							this.secureRoutingEmitConnectedIfPending()
-						},
-						120 + Math.max(1000, this._secureRoutingLatencyMs),
-					)
-				}
+				this.secureRoutingStartTimerSync()
 			})
 			this.udpSocket.on(
 				SocketEvents.message,
@@ -3406,7 +3372,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 									'No Backbone key found in keyring for secure multicast',
 								),
 							)
+							return
 						}
+						this.secureRoutingStartTimerSync()
 					})
 					.catch((err) =>
 						this.handleConnectionAttemptFailure(
@@ -5195,6 +5163,45 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		const v = Math.floor(now + this._secureRoutingTimerOffsetMs)
 		// Constrain to 48-bit range
 		return Math.max(0, Math.min(v, 0xffffffffffff))
+	}
+
+	/**
+	 * Ask the routers for their timer. This needs the socket, the backbone key and a
+	 * Connect() call, in any order: `new KNXClient()` already opens the socket, and
+	 * a client calling Connect() later must not fall back to an unsynchronized timer.
+	 */
+	private secureRoutingStartTimerSync() {
+		if (
+			this._options.hostProtocol !== 'Multicast' ||
+			!this._options.isSecureKNXEnabled ||
+			!this.socketReady ||
+			!this._secureBackboneKey ||
+			this._connectionState !== ConncetionState.CONNECTING
+		)
+			return
+		clearTimeout(this._secureRoutingSyncTimer)
+		clearTimeout(this._secureRoutingFallbackTimer)
+		this._secureRoutingSyncTimer = setTimeout(() => {
+			try {
+				this.secureSendTimerNotify()
+			} catch {}
+		}, 120)
+		// Nobody answered: our own timer becomes the reference
+		this._secureRoutingFallbackTimer = setTimeout(
+			() => {
+				if (!this._secureRoutingTimerAuthenticated) {
+					this._secureRoutingTimerAuthenticated = true
+					try {
+						this.sysLogger.debug(
+							`[${getTimestamp()}] Secure routing: no TimerNotify answer, using the local timer`,
+						)
+					} catch {}
+				}
+				// Also after a reconnection, when the timer is already authenticated
+				this.secureRoutingEmitConnectedIfPending()
+			},
+			120 + Math.max(1000, this._secureRoutingLatencyMs),
+		)
 	}
 
 	private secureRoutingEmitConnectedIfPending() {
