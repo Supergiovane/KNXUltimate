@@ -34,6 +34,9 @@ import KnxLog, {
 } from './KnxLog'
 import { KNXDescriptionResponse, KNXPacket } from './protocol'
 import KNXRoutingIndication from './protocol/KNXRoutingIndication'
+import KNXRoutingBusy from './protocol/KNXRoutingBusy'
+import LDataCon from './protocol/cEMI/LDataCon'
+import RoutingFlowControl from './RoutingFlowControl'
 import KNXConnectRequest from './protocol/KNXConnectRequest'
 import KNXTunnelingRequest from './protocol/KNXTunnelingRequest'
 import { TypedEventEmitter } from './TypedEmitter'
@@ -305,6 +308,8 @@ export enum KNXTimer {
 	GATEWAYDESCRIPTION = 'GatewayDescription',
 	/** Delay before reconnecting after an unexpected disconnection */
 	RECONNECT = 'reconnect',
+	/** Resumes the queue when the ROUTING_BUSY wait time is over */
+	ROUTING_BUSY = 'routing_busy',
 }
 
 export type SnifferPacket = {
@@ -322,6 +327,16 @@ interface KNXQueueItem {
 	knxPacket: KNXPacket
 	ACK: KNXTunnelingRequest
 	expectedSeqNumberForACK: number
+}
+
+/** A telegram whose outcome is not known yet */
+interface PendingConfirmation {
+	resolve: () => void
+	reject: (error: Error) => void
+	knxPacket?: KNXPacket
+	/** The NPDU as transmitted (Data Secure applied), set once it left the queue */
+	transmittedNpdu?: Buffer
+	timer?: ReturnType<typeof setTimeout>
 }
 
 export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks> {
@@ -376,6 +391,13 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	public theGatewayIsKNXVirtual: boolean
 
 	private commandQueue: Array<KNXQueueItem> = []
+
+	private pendingConfirmations: Array<PendingConfirmation> = []
+
+	// Handed to the next send() call by trackOutcome()
+	private nextConfirmation: PendingConfirmation | undefined
+
+	private routingFlowControl = new RoutingFlowControl()
 
 	private exitProcessingKNXQueueLoop: boolean
 
@@ -1473,6 +1495,26 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				break
 			}
 
+			// Routing flow control applies to ROUTING_INDICATION only: other
+			// frames, such as system broadcasts, are not held back (§5.5.2.4.5)
+			const routingPauseMs = this.routingFlowControl.remainingPauseMs
+			if (
+				routingPauseMs > 0 &&
+				nextItem.knxPacket instanceof KNXRoutingIndication
+			) {
+				this.sysLogger.debug(
+					`[${getTimestamp()}] ` +
+						`KNXClient: handleKNXQueue: ROUTING_BUSY, pausing for ${Math.ceil(routingPauseMs)} ms.`,
+				)
+				this.clearTimer(KNXTimer.ROUTING_BUSY)
+				this.setTimer(
+					KNXTimer.ROUTING_BUSY,
+					() => this.handleKNXQueue(),
+					Math.ceil(routingPauseMs),
+				)
+				break
+			}
+
 			const item = this.commandQueue.pop()
 
 			// Secure multicast gating: wait for timer authentication before sending RoutingIndication
@@ -1520,13 +1562,32 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this.setTimerWaitingForACK(item.ACK)
 			}
 
-			if (!(await this.processKnxPacketQueueItem(item.knxPacket))) {
+			const transmission = this.processKnxPacketQueueItem(item.knxPacket)
+			// Right after the (synchronous) socket call: Data Secure is applied
+			// and the L_Data.con cannot have been received yet
+			this.waitForLDataCon(item.knxPacket)
+			if (!(await transmission)) {
 				this.sysLogger.error(
 					`KNXClient: handleKNXQueue: returning from processKnxPacketQueueItem ${JSON.stringify(item)}`,
 				)
 				// Clear the queue
 				this.commandQueue = []
+				this.failConfirmations(
+					new Error('The telegram could not be sent'),
+					(confirmation) =>
+						confirmation.knxPacket === item.knxPacket ||
+						!confirmation.transmittedNpdu,
+				)
 				break
+			}
+			// Routing and FT1.2 have no L_Data.con to wait for here
+			if (!(item.knxPacket instanceof KNXTunnelingRequest)) {
+				this.settleConfirmation(
+					this.pendingConfirmations.find(
+						(confirmation) =>
+							confirmation.knxPacket === item.knxPacket,
+					),
+				)
 			}
 
 			await wait(this._options.KNXQueueSendIntervalMilliseconds)
@@ -1599,6 +1660,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		}
 		this.recordOutgoingPacket(_knxPacket)
 
+		if (this.nextConfirmation) {
+			this.nextConfirmation.knxPacket = _knxPacket
+			this.pendingConfirmations.push(this.nextConfirmation)
+			this.nextConfirmation = undefined
+		}
+
 		if (_priority) {
 			this.commandQueue.push(toBeAdded) // Put the item as first to be sent.
 		} else {
@@ -1613,12 +1680,122 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		)
 	}
 
+	/**
+	 * Queue a telegram and return a Promise for its outcome. Whatever `queueTelegram`
+	 * throws (not connected, invalid value) is thrown to the caller, as it always was.
+	 */
+	private trackOutcome(queueTelegram: () => void): Promise<void> {
+		const confirmation = {} as PendingConfirmation
+		const outcome = new Promise<void>((resolve, reject) => {
+			confirmation.resolve = resolve
+			confirmation.reject = reject
+		})
+		// Most callers ignore the outcome: that must not be an unhandled rejection
+		outcome.catch(() => {})
+		this.nextConfirmation = confirmation
+		try {
+			queueTelegram()
+		} finally {
+			this.nextConfirmation = undefined
+		}
+		if (!confirmation.knxPacket) {
+			confirmation.reject(new Error('No telegram sent: invalid data'))
+		}
+		return outcome
+	}
+
+	/** Settle a confirmation: with an `error` it rejects, otherwise it resolves. */
+	private settleConfirmation(
+		confirmation: PendingConfirmation | undefined,
+		error?: Error,
+	) {
+		if (!confirmation) return
+		clearTimeout(confirmation.timer)
+		this.pendingConfirmations = this.pendingConfirmations.filter(
+			(pending) => pending !== confirmation,
+		)
+		if (error) {
+			confirmation.reject(error)
+		} else {
+			confirmation.resolve()
+		}
+	}
+
+	private failConfirmations(
+		error: Error,
+		filter: (confirmation: PendingConfirmation) => boolean = () => true,
+	) {
+		this.pendingConfirmations
+			.filter(filter)
+			.forEach((confirmation) =>
+				this.settleConfirmation(confirmation, error),
+			)
+	}
+
+	/** Start the L_Data.con timeout of a tunnelling request that left the queue. */
+	private waitForLDataCon(knxPacket: KNXPacket) {
+		if (!(knxPacket instanceof KNXTunnelingRequest)) return
+		const confirmation = this.pendingConfirmations.find(
+			(pending) => pending.knxPacket === knxPacket,
+		)
+		// A retransmission keeps the deadline of the first transmission
+		if (!confirmation || confirmation.transmittedNpdu) return
+		confirmation.transmittedNpdu = knxPacket.cEMIMessage.npdu.toBuffer()
+		const dstAddress = knxPacket.cEMIMessage.dstAddress.toString()
+		confirmation.timer = setTimeout(() => {
+			this.settleConfirmation(
+				confirmation,
+				new errors.RequestTimeoutError(
+					`DestAddr:${dstAddress}, no L_Data.con received from ${this._peerHost}`,
+				),
+			)
+		}, KNX_CONSTANTS.L_DATA_CON_TIMEOUT * 1000)
+		confirmation.timer.unref()
+	}
+
+	/**
+	 * L_Data.con is a copy of the L_Data.req, and more requests can be in flight
+	 * because the queue does not wait for it: match it to the oldest identical one.
+	 */
+	private handleLDataCon(lDataCon: LDataCon) {
+		const npdu = lDataCon.npdu.toBuffer()
+		const confirmation = this.pendingConfirmations.find(
+			({ knxPacket, transmittedNpdu }) =>
+				transmittedNpdu?.equals(npdu) &&
+				(
+					knxPacket as KNXTunnelingRequest
+				).cEMIMessage.dstAddress.get() === lDataCon.dstAddress.get(),
+		)
+		this.settleConfirmation(
+			confirmation,
+			lDataCon.control.error
+				? new errors.ConfirmationError(
+						`DestAddr:${lDataCon.dstAddress.toString()}, the KNX interface could not send the telegram to the bus`,
+					)
+				: undefined,
+		)
+	}
+
 	/** Sends a WRITE telegram to the BUS.
 	 * `dstAddress` is the group address (for example "0/0/1"),
 	 * `data` is the value you want to send (for example true),
 	 * `dptid` is a string/number representing the datapoint (for example "5.001")
+	 *
+	 * Throws if not connected or if the value is invalid. The returned Promise can be
+	 * ignored, or awaited to learn the outcome. Tunnelling: resolves on the positive
+	 * L_Data.con, rejects on a negative one, on a missing TUNNELLING_ACK or L_Data.con,
+	 * and if the connection drops first. Routing and serial FT1.2: resolves when the
+	 * frame has been handed over, since no L_Data.con is awaited there.
 	 */
 	write(
+		dstAddress: KNXAddress | string,
+		data: any,
+		dptid: string | number,
+	): Promise<void> {
+		return this.trackOutcome(() => this.queueWrite(dstAddress, data, dptid))
+	}
+
+	private queueWrite(
 		dstAddress: KNXAddress | string,
 		data: any,
 		dptid: string | number,
@@ -1727,8 +1904,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * `dstAddress` is the group address (for example "0/0/1"),
 	 * `data` is the value you want to send (for example true),
 	 * `dptid` is a string/number representing the datapoint (for example "5.001")
+	 * The returned Promise reports the outcome as in `write()`.
 	 */
 	respond(
+		dstAddress: KNXAddress | string,
+		data: Buffer,
+		dptid: string | number,
+	): Promise<void> {
+		return this.trackOutcome(() =>
+			this.queueRespond(dstAddress, data, dptid),
+		)
+	}
+
+	private queueRespond(
 		dstAddress: KNXAddress | string,
 		data: Buffer,
 		dptid: string | number,
@@ -1827,8 +2015,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * `dstAddress` is the group address (for example "0/0/1"),
 	 * `rawDataBuffer` is the buffer you want to send,
 	 * `bitlength` is the payload length in bits (used especially for payloads <= 6 bits)
+	 * The returned Promise reports the outcome as in `write()`.
 	 */
 	respondRaw(
+		dstAddress: KNXAddress | string,
+		rawDataBuffer: Buffer,
+		bitlength: number,
+	): Promise<void> {
+		return this.trackOutcome(() =>
+			this.queueRespondRaw(dstAddress, rawDataBuffer, bitlength),
+		)
+	}
+
+	private queueRespondRaw(
 		dstAddress: KNXAddress | string,
 		rawDataBuffer: Buffer,
 		bitlength: number,
@@ -1946,7 +2145,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	/**
 	 * Sends a READ telegram to the BUS. GA is the group address (for example "0/0/1").
 	 */
-	read(dstAddress: KNXAddress | string): void {
+	read(dstAddress: KNXAddress | string): Promise<void> {
+		return this.trackOutcome(() => this.queueRead(dstAddress))
+	}
+
+	private queueRead(dstAddress: KNXAddress | string): void {
 		if (this._connectionState !== ConncetionState.CONNECTED)
 			throw new Error(
 				'The socket is not connected. Unable to access the KNX BUS',
@@ -2043,8 +2246,19 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 	 * `dstAddress` is the group address (for example "0/0/1"),
 	 * `rawDataBuffer` is the buffer you want to send,
 	 * `bitlength` is the payload length in bits (used especially for payloads <= 6 bits)
+	 * The returned Promise reports the outcome as in `write()`.
 	 */
 	writeRaw(
+		dstAddress: KNXAddress | string,
+		rawDataBuffer: Buffer,
+		bitlength: number,
+	): Promise<void> {
+		return this.trackOutcome(() =>
+			this.queueWriteRaw(dstAddress, rawDataBuffer, bitlength),
+		)
+	}
+
+	private queueWriteRaw(
 		dstAddress: KNXAddress | string,
 		rawDataBuffer: Buffer,
 		bitlength: number,
@@ -3290,6 +3504,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		if (this.isSerialTransport()) {
 			this._connectionState = ConncetionState.DISCONNECTING
 			this.exitProcessingKNXQueueLoop = true
+			this.failConfirmations(new Error('Disconnected'))
 			await this.closeSerialTransport()
 			this._connectionState = ConncetionState.DISCONNECTED
 			this.emit(KNXClientEvents.disconnected, 'Serial interface closed')
@@ -3364,6 +3579,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._lastRxTunnelSeq = undefined
 		this.exitProcessingKNXQueueLoop = true
 		this.commandQueue = []
+		this.routingFlowControl.reset()
+		this.failConfirmations(new Error(`Disconnected: ${_sReason}`))
 
 		// Emit `disconnected` BEFORE awaiting socket teardown so consumers always
 		// learn about the disconnect even if closeSocket() hangs (defensive — the
@@ -3526,6 +3743,7 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 		this._connectionState = ConncetionState.DISCONNECTING
 		this.exitProcessingKNXQueueLoop = true
 		this.commandQueue = []
+		this.failConfirmations(error)
 		this.clearAllTimers()
 		this.emit(KNXClientEvents.ackReceived, knxTunnelingRequest, false)
 		this.emit(KNXClientEvents.error, error)
@@ -3683,6 +3901,12 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				return
 			}
 			if (knxHeader.service_type === KNX_CONSTANTS.ROUTING_BUSY) {
+				if (this._options.hostProtocol === 'Multicast') {
+					this.routingFlowControl.handleRoutingBusy(
+						(knxMessage as KNXRoutingBusy).waitTime,
+					)
+				}
+				// The queue pauses by itself, this is only a notification
 				this.emit(KNXClientEvents.error, new Error('ROUTING_BUSY'))
 				// this._setDisconnected("Routing Busy"); // 31/03/2022 Commented, because it doesn't matter. Non need to disconnect.
 				return
@@ -3936,9 +4160,8 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					knxTunnelingRequest.cEMIMessage.msgCode ===
 					CEMIConstants.L_DATA_CON
 				) {
-					this.sysLogger.debug(
-						`[${getTimestamp()}] ` +
-							`Received KNX packet: TUNNELING: L_DATA_CON, dont' care.`,
+					this.handleLDataCon(
+						knxTunnelingRequest.cEMIMessage as LDataCon,
 					)
 				}
 			} else if (knxHeader.service_type === KNX_CONSTANTS.TUNNELING_ACK) {
@@ -5252,6 +5475,14 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				} catch (e) {
 					// ignore timer errors
 				}
+				return
+			}
+
+			// Unauthenticated, so it must not stop a secure router (as XKNX does)
+			if (service === KNX_CONSTANTS.ROUTING_BUSY) {
+				this.sysLogger.debug(
+					`[${getTimestamp()}] Discarding plain ROUTING_BUSY from ${rinfo.address}`,
+				)
 				return
 			}
 

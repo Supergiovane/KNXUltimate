@@ -28,6 +28,7 @@ import KNXDisconnectResponse from './KNXDisconnectResponse'
 import KNXTunnelingRequest from './KNXTunnelingRequest'
 import KNXTunnelingAck from './KNXTunnelingAck'
 import KNXRoutingIndication from './KNXRoutingIndication'
+import KNXRoutingBusy from './KNXRoutingBusy'
 import { validateKNXAddress } from './KNXUtils'
 
 export {
@@ -50,5 +51,6 @@ export {
 	KNXTunnelingRequest,
 	KNXTunnelingAck,
 	KNXRoutingIndication,
+	KNXRoutingBusy,
 	validateKNXAddress,
 }

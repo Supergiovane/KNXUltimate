@@ -8,6 +8,7 @@
  */
 
 import BufferLengthError from './BufferLengthError'
+import ConfirmationError from './ConfirmationError'
 import DateFormatError from './DateFormatError'
 import DuplicateRequestError from './DuplicateRequestError'
 import InvalidValueError from './InvalidValueError'
@@ -16,6 +17,7 @@ import RequestTimeoutError from './RequestTimeoutError'
 
 export {
 	BufferLengthError,
+	ConfirmationError,
 	DateFormatError,
 	DuplicateRequestError,
 	InvalidValueError,

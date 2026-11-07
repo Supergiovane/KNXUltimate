@@ -23,6 +23,7 @@ import KNXDisconnectResponse from './KNXDisconnectResponse'
 import KNXTunnelingRequest from './KNXTunnelingRequest'
 import KNXTunnelingAck from './KNXTunnelingAck'
 import KNXRoutingIndication from './KNXRoutingIndication'
+import KNXRoutingBusy from './KNXRoutingBusy'
 // Legacy SecureSessionRequest removed; use SecureTunnelTCP instead
 import HPAI from './HPAI'
 import { KNX_CONSTANTS } from './KNXConstants'
@@ -46,7 +47,7 @@ export type KnxRequest =
 	| KNXDisconnectRequest
 	| KNXTunnelingRequest
 
-export type KnxMessage = KnxResponse | KnxRequest
+export type KnxMessage = KnxResponse | KnxRequest | KNXRoutingBusy
 
 export default class KNXProtocol {
 	static parseMessage(buffer: Buffer) {
@@ -96,6 +97,9 @@ export default class KNXProtocol {
 				break
 			case KNX_CONSTANTS.ROUTING_INDICATION:
 				knxMessage = KNXRoutingIndication.createFromBuffer(knxData)
+				break
+			case KNX_CONSTANTS.ROUTING_BUSY:
+				knxMessage = KNXRoutingBusy.createFromBuffer(knxData)
 				break
 			case KNX_CONSTANTS.ROUTING_LOST_MESSAGE:
 				break

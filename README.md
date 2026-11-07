@@ -47,7 +47,7 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 ## Features
 
 - **KNX/IP Tunnelling** over UDP and TCP (plain or secure)
-- **KNX/IP Routing** over multicast (plain and secure)
+- **KNX/IP Routing** over multicast (plain and secure), with ROUTING_BUSY flow control
 - **KNX/IP Secure** full stack (session handshake + Secure Wrapper)
 - **KNX Data Secure** — per-GA end-to-end encryption via ETS keyring
 - **KNX TP serial** FT1.2 / KBerry / BAOS, with Data Secure on TP
@@ -171,7 +171,7 @@ You can ignore this unless you want to tune send pacing.
 
 | Property | Applies to | Description |
 | -------- | ---------- | ----------- |
-| `KNXQueueSendIntervalMilliseconds` (number) | all | Inter-telegram delay in ms. Default about `25`. Don't go below `20`. In `TunnelUDP`, ACKs, heartbeats and disconnect packets are sent immediately and do not affect application telegram spacing. |
+| `KNXQueueSendIntervalMilliseconds` (number) | all | Inter-telegram delay in ms. Default about `25`. Don't go below `20`. In `TunnelUDP`, ACKs, heartbeats and disconnect packets are sent immediately and do not affect application telegram spacing. In `Multicast`, a `ROUTING_BUSY` adds a pause on top of this delay (see [Routing specifics](#knx-ip-secure-tunnelling--routing-and-data-secure)). |
 | `strictDatapoints` (bool) | all | `write`/`respond` throw for values outside the datapoint's range or of the wrong type, instead of clamping or truncating them (see [Strict datapoints](#strict-datapoints)). Default `false`. |
 
 ### Secure options
@@ -274,6 +274,8 @@ You should see something like this in the console window (the **msg.payload** is
 | .checkConnection()                 | Sends a CONNECTIONSTATE_REQUEST now and restarts the heartbeat cycle from that moment (tunnelling only). The answer is handled like a normal heartbeat: if the gateway refuses the channel, or does not answer after the usual retries, the client disconnects and, with `autoReconnect`, reconnects. Useful right after a known network interruption (for example a VPN restart). Returns `false` and does nothing if not connected. |
 | .getCurrentItemHandledByTheQueue()  | Returns the sequence number awaiting a tunnelling ACK, or `undefined` when none is pending. Retained for compatibility with Node-RED queue diagnostics; calling it does not change the queue or ACK state. |
 
+`.write`, `.writeRaw`, `.respond`, `.respondRaw` and `.read` return a Promise for the outcome of the telegram, which you can await or ignore. See [Telegram outcome](#telegram-outcome).
+
 ### writeRaw notes
 
 `writeRaw(GA, payloadBuffer, bitlength)` sends a GroupValue_Write with a raw APDU payload.
@@ -292,8 +294,31 @@ You should see something like this in the console window (the **msg.payload** is
 | Property       | Description                                                                                          |
 | -------------- | ---------------------------------------------------------------------------------------------------- |
 | .isConnected() | Returns **true** if you the client is connected to the KNX Gateway Router/Interface, **false** if not connected. |
-| .clearToSend   | **true** if you can send a telegram, **false** if the client is still waiting for the last telegram's ACK or whenever the client cannot temporary send the telegram. In tunneling mode, you could also refer to the event **KNXClientEvents.ackReceived**, that is fired everytime a telegram has been succesfully acknowledge or not acknowledge. See the sample.js file. |
+| .clearToSend   | **true** if you can send a telegram, **false** if the client is still waiting for the last telegram's ACK or whenever the client cannot temporary send the telegram. In tunneling mode, you could also refer to the event **KNXClientEvents.ackReceived**, that is fired everytime a telegram has been succesfully acknowledge or not acknowledge. See the sample.js file. It stays **true** during a `ROUTING_BUSY` pause: telegrams are accepted and wait in the queue. |
 | .channelID     | The actual Channel ID. Only defined after a successfull connection                                   |
+
+### Telegram outcome
+
+`write()`, `respond()`, `read()` and their raw variants queue the telegram and return a Promise for what happens to it. You can ignore it, as before: a failure then goes unnoticed and never becomes an unhandled rejection. To know the outcome, await it:
+
+```ts
+try {
+  await client.write('1/0/1', true, '1.001')
+} catch (error) {
+  // Not connected, invalid value, or the telegram didn't reach the bus
+}
+```
+
+| Transport | Resolves | Rejects |
+| --------- | -------- | ------- |
+| `TunnelUDP` | On the positive L_Data.con | `ConfirmationError` on a negative L_Data.con. `RequestTimeoutError` when the TUNNELLING_ACK is still missing after the retry, or when no L_Data.con arrives within 3 seconds. |
+| `TunnelTCP` | On the positive L_Data.con | `ConfirmationError` on a negative L_Data.con. `RequestTimeoutError` when no L_Data.con arrives within 3 seconds. |
+| `Multicast` | When the frame has been sent, after any ROUTING_BUSY pause. Routing has no acknowledgement, so this doesn't prove that anyone received it. | If the frame can't be sent |
+| `SerialFT12` | When the module has acknowledged the FT1.2 frame | If the frame can't be sent |
+
+With `waitForTunnelingAck` off (or unset together with `suppress_ack_ldatareq: true`) the TUNNELLING_ACK is not awaited, so only the L_Data.con counts. An interface that doesn't send L_Data.con at all makes every awaited telegram reject with `RequestTimeoutError`, even though it went out: the connection isn't affected, and callers that ignore the Promise notice nothing.
+
+All of them also reject if the connection drops first. These methods still **throw** straight away if the client isn't connected or the value is invalid, so with `.catch()` instead of `await` you need a `try/catch` as well. Errors can be told apart by `error.name`. A failed telegram still follows the usual path, so a missing TUNNELLING_ACK closes the tunnel and emits `error` and `disconnected` as well.
 
 ## EVENTS
 
@@ -307,7 +332,7 @@ List of events raised by KNXultimate, in proper order. For the signatures, pleas
 | ackReceived  | Reports `(packet, success)` for a tunnelling request. `success` is `true` after a matching successful gateway ACK, or `false` after two retries without a successful ACK. On retry exhaustion, `TunnelUDP` closes the tunnel and emits `error` and `disconnected`; `autoReconnect` reconnects when enabled. |
 | disconnected | The KNX connection has been disconnected.                                                            |
 | close        | The main KNXUltimate socket has been closed.                                                         |
-| error        | KNXUltimate has raised an error. The error description is provided as well.                         |
+| error        | KNXUltimate has raised an error. The error description is provided as well. `ROUTING_BUSY` and `ROUTING_LOST_MESSAGE` are notifications: the connection stays up and, on `ROUTING_BUSY`, routing telegrams wait in the queue for the requested time. |
 | descriptionResponse | Gather the *getGatewayDescription* responses. There is an example in the **examples** folder named **gatewaydescription.ts** . |
 
 ## LOG STREAM
@@ -848,6 +873,7 @@ const objects = await KNXClient.discoverInterfaces(5000)
 
 Routing (Multicast) specifics
 - Outgoing frames are injected as `L_DATA_IND` when using routing (both plain and secure). This mirrors ETS and xKNX behavior and ensures devices react correctly to injected telegrams. Do not use `L_DATA_REQ` for routing injection.
+- Flow control: after a `ROUTING_BUSY` the client holds back routing telegrams for the wait time announced in the frame, plus a random extra time that grows when more of them arrive (ISO 22510 §5.5.2.3.5). They stay in the queue and leave in order. The `error` event still reports `ROUTING_BUSY`, but the connection stays up. On secure routing, a `ROUTING_BUSY` that isn't in a Secure Wrapper is discarded, because anyone on the network could have sent it.
 - Secure routing needs a synchronized timer. By default the client waits until the timer is authenticated before sending. Additionally, on secure multicast startup the client proactively sends a `TimerNotify (0x0955)` once, so the timer can authenticate immediately even if the router doesn't broadcast it right away. Plain multicast is unaffected.
 - The client ignores its own `TimerNotify` when multicast loopback delivers it back, so the timer is taken from the router. If no router answers within the backbone latency tolerance (at least 1 s), the local timer is used and the client connects anyway.
 - Option: `secureRoutingWaitForTimer` (default `true`) controls gating of outgoing frames until the timer is authenticated.
