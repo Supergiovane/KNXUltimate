@@ -52,7 +52,7 @@ async function main() {
 
   // KNX Secure routing (multicast) config - uses Backbone key from ETS keyring
   const secureCfg: SecureConfig = {
-    knxkeys_file_path: path.join(process.cwd(), 'documents', 'Secure Test.knxkeys'),
+    knxkeys_file_path: path.join(process.cwd(), 'examples', 'Secure Test.knxkeys'),
     knxkeys_password: 'passwordprogetto'
   }
 

@@ -45,7 +45,7 @@ async function waitForStatus(client: KNXClient, ga: string, timeoutMs = 5000): P
 
 async function main() {
   // KNX Secure + Data Secure configuration
-  const knxkeysPath = path.join(process.cwd(), 'documents', 'Secure Test.knxkeys')
+  const knxkeysPath = path.join(process.cwd(), 'examples', 'Secure Test.knxkeys')
   const secureCfg: SecureConfig = {
     knxkeys_buffer: fs.readFileSync(knxkeysPath),
     // Alternative to knxkeys_buffer:
@@ -64,7 +64,7 @@ async function main() {
   const client = new KNXClient({
     // Secure tunnel over TCP with Data Secure support from the keyring
     hostProtocol: 'TunnelTCP',
-    ipAddr: '192.168.1.4',
+    ipAddr: '192.168.1.11',
     ipPort: 3671,
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,

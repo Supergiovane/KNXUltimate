@@ -15,7 +15,7 @@ async function main() {
 	// Fall back to the sample assets if no CLI args are provided
 	const defaultKeyring = path.resolve(
 		__dirname,
-		'../documents/Secure Test.knxkeys',
+		'Secure Test.knxkeys',
 	)
 	const file = fileArg || defaultKeyring
 	const password = passwordArg || 'passwordprogetto'

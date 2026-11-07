@@ -530,7 +530,7 @@ const secureCfg: SecureConfig = {
 // 2) Create a KNX/IP Secure TCP client
 const client = new KNXClient({
   hostProtocol: 'TunnelTCP',
-  ipAddr: '192.168.1.4',
+  ipAddr: '192.168.1.11',
   ipPort: 3671,
   isSecureKNXEnabled: true,
   secureTunnelConfig: secureCfg,
@@ -582,7 +582,7 @@ const secureCfg: SecureConfig = {
 
 const client = new KNXClient({
   hostProtocol: 'TunnelTCP',
-  ipAddr: '192.168.1.4',
+  ipAddr: '192.168.1.11',
   ipPort: 3671,
   isSecureKNXEnabled: true,
   secureTunnelConfig: secureCfg,
@@ -631,7 +631,7 @@ const secureCfg: SecureConfig = {
 
 const client = new KNXClient({
   hostProtocol: 'TunnelTCP',
-  ipAddr: '192.168.1.4',
+  ipAddr: '192.168.1.11',
   ipPort: 3671,
   isSecureKNXEnabled: true,
   secureTunnelConfig: secureCfg,
@@ -705,7 +705,7 @@ const secureCfg: SecureConfig = {
 
 const client = new KNXClient({
   hostProtocol: 'TunnelTCP',
-  ipAddr: '192.168.1.4',
+  ipAddr: '192.168.1.11',
   ipPort: 3671,
   isSecureKNXEnabled: true,
   secureTunnelConfig: secureCfg,

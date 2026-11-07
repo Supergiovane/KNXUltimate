@@ -19,7 +19,7 @@ async function main() {
   // KNX Secure + Data Secure configuration (adjust to your environment)
   const secureCfg: SecureConfig = {
     tunnelInterfaceIndividualAddress: '1.1.254',
-    knxkeys_file_path: path.join(process.cwd(), 'documents', 'Secure Test.knxkeys'),
+    knxkeys_file_path: path.join(process.cwd(), 'examples', 'Secure Test.knxkeys'),
     knxkeys_password: 'passwordprogetto',
   }
 
@@ -33,7 +33,7 @@ async function main() {
 
   const client = new KNXClient({
     hostProtocol: 'TunnelTCP',
-    ipAddr: '192.168.1.4',
+    ipAddr: '192.168.1.11',
     ipPort: 3671,
     isSecureKNXEnabled: true,
     secureTunnelConfig: secureCfg,
@@ -41,7 +41,7 @@ async function main() {
   })
 
   client.on('connecting', () =>
-    console.log(`[${now()}] Connecting to ${'192.168.1.4:3671'} (secure TCP)`),
+    console.log(`[${now()}] Connecting to ${'192.168.1.11:3671'} (secure TCP)`),
   )
   client.on('connected', () =>
     console.log(`[${now()}] ✓ KNXClient connected (secure TCP)`),

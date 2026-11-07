@@ -14,19 +14,19 @@ import KNXClient, { KNXClientEvents, type SecureConfig } from '../src/KNXClient'
 
 /**
  * Usage:
- * - Set `KNX_GATEWAY_IP` (e.g. 192.168.1.4)
+ * - Set `KNX_GATEWAY_IP` (e.g. 192.168.1.11)
  * - Set `KNX_KEYS_PASSWORD` (ETS keyring password)
- * - Optional: `KNX_KEYS_PATH` (defaults to `documents/Secure Test.knxkeys`)
+ * - Optional: `KNX_KEYS_PATH` (defaults to `examples/Secure Test.knxkeys`)
  * - Optional: `KNX_TUNNEL_IA` (e.g. 1.1.254). If omitted, the client auto-selects from the keyring.
  */
 
 async function main() {
-  const ipAddr = (process.env.KNX_GATEWAY_IP || '192.168.1.4').trim()
+  const ipAddr = (process.env.KNX_GATEWAY_IP || '192.168.1.11').trim()
   const ipPort = Number(process.env.KNX_GATEWAY_PORT || 3671)
 
   const knxkeysPath =
     (process.env.KNX_KEYS_PATH || '').trim() ||
-    path.join(process.cwd(), 'documents', 'Secure Test.knxkeys')
+    path.join(process.cwd(), 'examples', 'Secure Test.knxkeys')
 
   // Preserve whitespace: the keyring password may intentionally contain it.
   const knxkeysPassword = process.env.KNX_KEYS_PASSWORD

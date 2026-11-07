@@ -10,7 +10,7 @@
 import { Keyring } from '../src/secure/keyring'
 
 async function main() {
-  const path = './documents/Secure Test.knxkeys'
+  const path = './examples/Secure Test.knxkeys'
   const password = 'passwordprogetto'
   const kr = new Keyring()
   // Load ETS secure key material for inspection

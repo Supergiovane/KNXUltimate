@@ -54,7 +54,7 @@ async function waitForStatus(
 async function main() {
 	// KNX Data Secure configuration for Serial FT1.2 (KBerry)
 	const secureCfg: SecureConfig = {
-		knxkeys_file_path: path.join(process.cwd(), 'documents', 'Secure Test.knxkeys'),
+		knxkeys_file_path: path.join(process.cwd(), 'examples', 'Secure Test.knxkeys'),
 		knxkeys_password: 'passwordprogetto',
 	}
 
