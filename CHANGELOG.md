@@ -1,5 +1,19 @@
 # Changelog
 
+# [6.4.0](https://github.com/Supergiovane/KNXUltimate/compare/v6.3.2...v6.4.0) (2026-11-07)
+
+
+### Bug Fixes
+
+* **secure:** accept plain group data outside the SecureWrapper ([3dfa8fd](https://github.com/Supergiovane/KNXUltimate/commit/3dfa8fd0fe5df51ab56b7fbdbcdc7795bf08d2da))
+* **secure:** accept unwrapped L_Data.con, drop invalid routing SecureWrappers ([13e8dbc](https://github.com/Supergiovane/KNXUltimate/commit/13e8dbc26d5383ba4ab31acd6d45b364c73f5719))
+* **secure:** synchronize the routing timer from Connect() ([56039d0](https://github.com/Supergiovane/KNXUltimate/commit/56039d0e7bdf125b424a0546d312519a92fb57c3))
+
+
+### Features
+
+* write() reports the telegram outcome, routing honours ROUTING_BUSY ([#118](https://github.com/Supergiovane/KNXUltimate/issues/118), [#119](https://github.com/Supergiovane/KNXUltimate/issues/119)) ([0c89871](https://github.com/Supergiovane/KNXUltimate/commit/0c89871d2d89f0a8a08e6eabd1e82786e0dbac91))
+
 ## [6.3.2](https://github.com/Supergiovane/KNXUltimate/compare/v6.3.1...v6.3.2) (2026-10-30)
 
 
