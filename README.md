@@ -489,9 +489,31 @@ Below are progressively richer examples to connect to a KNX/IP Secure gateway an
 
 Important notes
 - The client emits the full datagram on `indication`, and its `cEMIMessage` is already plain (decrypted) when keys are available in your ETS keyring.
-- Never commit your `.knxkeys` file. Keep its path/password in environment variables or local config.
+- Never commit the `.knxkeys` file of a real installation. Keep its path/password in environment variables or local config. The [test keyring](#test-keyring) below is the only exception: it's public on purpose.
 - Alternative to `knxkeys_file_path`: pass the raw keyring bytes via `secureTunnelConfig.knxkeys_buffer` (still requires `knxkeys_password`).
 - Secure TCP tunnel auto-select: if `secureTunnelConfig.tunnelInterfaceIndividualAddress` is omitted or empty, the client tries all interfaces found in the ETS keyring until authentication and connect succeed, then proceeds and keeps the tunnel open. The chosen IA is exposed on `client._options.secureTunnelConfig.tunnelInterfaceIndividualAddress` after connect.
+
+### Test keyring
+
+To try KNX Secure without creating your own project, import this keyring into your KNX gateway:
+
+| | |
+| --- | --- |
+| **File** | [`examples/Secure Test.knxkeys`](./examples/Secure%20Test.knxkeys) |
+| **Password** | `passwordprogetto` |
+| **Gateway** | Individual address `1.1.0` |
+| **Secure tunnels** | `1.1.252`, `1.1.253`, `1.1.254`, `1.1.255` |
+| **Data Secure group addresses** | `1/1/1` (command), `1/1/2` (status) |
+| **Other device** | `1.1.1` |
+
+```ts
+secureTunnelConfig: {
+  knxkeys_file_path: 'examples/Secure Test.knxkeys',
+  knxkeys_password: 'passwordprogetto',
+}
+```
+
+> **Test use only.** This file and its password are public, so anyone can read its keys. Never use it on a real installation.
 
 ### 1) Minimal secure tunnelling (TCP) listener
 

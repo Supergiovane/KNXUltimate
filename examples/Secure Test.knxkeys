@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Keyring Project="Secure Test" CreatedBy="6.4.1" Created="2026-11-07T08:32:39" Signature="9TcDVHFrLGM5FzIQr0O0Cw==" xmlns="http://knx.org/xml/keyring/1">
+  <Backbone MulticastAddress="224.0.23.12" Latency="2000" Key="pxvnURWT7HJV+/CMQMNC1g==" />
+  <Interface IndividualAddress="1.1.252" Type="Tunneling" Host="1.1.0" UserID="5" Password="oHpHv9MRnK7p2BwthxoYgbystnyng3olXnlWCas5K04=" Authentication="6RW6bvoaW56iJhguOfXUITaHCC7/dDgd2kvR/Qwl4jk=">
+    <Group Address="2305" Senders="1.1.1 1.1.253 1.1.254 1.1.255" />
+    <Group Address="2306" Senders="1.1.1 1.1.253 1.1.254 1.1.255" />
+  </Interface>
+  <Interface IndividualAddress="1.1.253" Type="Tunneling" Host="1.1.0" UserID="4" Password="khHh21huCNn9Bfdvq5ilKRoLLwOzloNmW/T9dt+IRd4=" Authentication="Ue60nrfJOnLhjqxmDCKJT3SEVouJaf4eTkdL/Yp/0qI=">
+    <Group Address="2305" Senders="1.1.1 1.1.252 1.1.254 1.1.255" />
+    <Group Address="2306" Senders="1.1.1 1.1.252 1.1.254 1.1.255" />
+  </Interface>
+  <Interface IndividualAddress="1.1.254" Type="Tunneling" Host="1.1.0" UserID="3" Password="xDz3lpymC1EU01FDAuIRVZ3Dwip7FKeRVj08yQPfQRg=" Authentication="o0i+s5k9DOrjC+jmCO9rbVbfFX0+FOl0X7boNncA2J0=">
+    <Group Address="2305" Senders="1.1.1 1.1.252 1.1.253 1.1.255" />
+    <Group Address="2306" Senders="1.1.1 1.1.252 1.1.253 1.1.255" />
+  </Interface>
+  <Interface IndividualAddress="1.1.255" Type="Tunneling" Host="1.1.0" UserID="2" Password="Ub8CfCuOzcr+DQI13kCTurhew9HJvdb9QqHUv7akwR0=" Authentication="VwHE+VoS4U9CxZrx1ULOyTNpVZU9ftagx9SEEpJAGic=">
+    <Group Address="2305" Senders="1.1.1 1.1.252 1.1.253 1.1.254" />
+    <Group Address="2306" Senders="1.1.1 1.1.252 1.1.253 1.1.254" />
+  </Interface>
+  <GroupAddresses>
+    <Group Address="2305" Key="74ME01aUh54ctPltvy8k7w==" />
+    <Group Address="2306" Key="M0rAzxkd27ZqHH3gb8l3OQ==" />
+  </GroupAddresses>
+  <Devices>
+    <Device IndividualAddress="1.1.0" ToolKey="TELhORBU4qyZgQer0hEjog==" ManagementPassword="fMOtivlVa9YJJq36g0JboHRqU6p1w+VthZEIHtHTQ/U=" Authentication="d/VdPusrvt7ytFZ+l3Q27X8Dd0VKYwZZzlBM6HWOess=" SequenceNumber="0" />
+    <Device IndividualAddress="1.1.1" ToolKey="Xf0Ofo5ZmT8pcqOMdOEEFw==" SequenceNumber="240662589120" />
+  </Devices>
+</Keyring>
