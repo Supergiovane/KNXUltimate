@@ -16,3 +16,6 @@ export * from './protocol'
 export * from './bridge'
 
 export { KNXClient, dptlib, logStream }
+
+// Default export so `import KNXClient from 'knxultimate'` works in TypeScript/bundlers (#120)
+export default KNXClient

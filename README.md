@@ -127,7 +127,7 @@ If you're unsure, start with `TunnelUDP`.
 Smallest possible starting point:
 
 ```ts
-import KNXClient from 'knxultimate'
+import { KNXClient } from 'knxultimate'
 
 const client = new KNXClient({
   hostProtocol: 'TunnelUDP',
@@ -201,7 +201,7 @@ This transport supports KNX Data Secure on TP: set `isSecureKNXEnabled: true` an
 List all available serial devices before connecting:
 
 ```ts
-import KNXClient from 'knxultimate'
+import { KNXClient } from 'knxultimate'
 
 async function connectSerial() {
   const ports = await KNXClient.listSerialInterfaces()
@@ -366,7 +366,7 @@ Below are short, progressively richer examples to connect in plain (non-secure) 
 ### 1) Minimal tunnelling (UDP) listener
 
 ```ts
-import KNXClient from 'knxultimate'
+import { KNXClient } from 'knxultimate'
 
 const client = new KNXClient({
   hostProtocol: 'TunnelUDP',
@@ -396,7 +396,7 @@ client.Connect()
 ### 2) Decode a boolean datapoint (1.001)
 
 ```ts
-import KNXClient, { KNXClientEvents } from 'knxultimate'
+import { KNXClient, KNXClientEvents } from 'knxultimate'
 import { dptlib } from 'knxultimate'
 
 const client = new KNXClient({ hostProtocol: 'TunnelUDP', ipAddr: '192.168.1.117', ipPort: 3671 })
@@ -420,7 +420,7 @@ client.Connect()
 ### 3) Plain routing (Multicast) listener
 
 ```ts
-import KNXClient from 'knxultimate'
+import { KNXClient } from 'knxultimate'
 
 const client = new KNXClient({
   hostProtocol: 'Multicast',
@@ -446,7 +446,7 @@ client.Connect()
 ### 4) Write and then READ a status (plain)
 
 ```ts
-import KNXClient from 'knxultimate'
+import { KNXClient } from 'knxultimate'
 import { dptlib } from 'knxultimate'
 
 const client = new KNXClient({ hostProtocol: 'TunnelUDP', ipAddr: '192.168.1.117', ipPort: 3671 })
@@ -518,7 +518,7 @@ secureTunnelConfig: {
 ### 1) Minimal secure tunnelling (TCP) listener
 
 ```ts
-import KNXClient, { SecureConfig } from 'knxultimate'
+import { KNXClient, SecureConfig } from 'knxultimate'
 
 // 1) Configure ETS keyring + the interface IA used in your project
 const secureCfg: SecureConfig = {
@@ -567,7 +567,7 @@ main().catch(console.error)
 When you do not have access to the ETS keyring you can still negotiate KNX/IP Secure by providing the tunnel IA and password directly. This gives you encrypted tunnelling, while Data Secure and secure multicast stay disabled. `2` is the standard KNX Secure tunnel account and a common default, but ETS assigns a dedicated `tunnelUserId` per interface, so always verify yours in ETS and set it explicitly (see the note below).
 
 ```ts
-import KNXClient, { SecureConfig } from 'knxultimate'
+import { KNXClient, SecureConfig } from 'knxultimate'
 
 const tunnelPassword = process.env.KNX_TUNNEL_PASSWORD
 if (!tunnelPassword) {
@@ -620,7 +620,7 @@ Keyring loading checks the ETS keyring signature, as XKNX does: a wrong `knxkeys
 ### 2) Decode datapoints (boolean 1.001) from decrypted payloads
 
 ```ts
-import KNXClient, { SecureConfig } from 'knxultimate'
+import { KNXClient, SecureConfig } from 'knxultimate'
 import { dptlib } from 'knxultimate'
 
 const secureCfg: SecureConfig = {
@@ -661,7 +661,7 @@ client.Connect()
 For routers supporting KNX Secure routing (multicast 224.0.23.12). The ETS keyring must include the Backbone key; the client will automatically use it to decrypt SecureWrapper frames and present decrypted cEMI payloads.
 
 ```ts
-import KNXClient, { SecureConfig } from 'knxultimate'
+import { KNXClient, SecureConfig } from 'knxultimate'
 
 const secureCfg: SecureConfig = {
   knxkeys_file_path: process.env.KNX_KEYS_PATH || '/path/to/Project.knxkeys',
@@ -694,7 +694,7 @@ client.Connect()
 ### 4) Send a READ and get a decrypted status
 
 ```ts
-import KNXClient, { SecureConfig } from 'knxultimate'
+import { KNXClient, SecureConfig } from 'knxultimate'
 import { dptlib } from 'knxultimate'
 
 const secureCfg: SecureConfig = {
@@ -857,7 +857,7 @@ Examples overview:
 
 Example usage
 ```ts
-import KNXClient from 'knxultimate'
+import { KNXClient } from 'knxultimate'
 
 // Simple list with security + transport
 const list = await KNXClient.discover(5000)
