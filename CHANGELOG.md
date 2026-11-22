@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.4.2](https://github.com/Supergiovane/KNXUltimate/compare/v6.4.1...v6.4.2) (2026-11-22)
+
+
+### Bug Fixes
+
+* bound logStream memory (no buffering without a reader, max 1000 entries) ([0de44c8](https://github.com/Supergiovane/KNXUltimate/commit/0de44c8ad980aab7a8901fabe8eba8a03d70633e))
+
 ## [6.4.1](https://github.com/Supergiovane/KNXUltimate/compare/v6.4.0...v6.4.1) (2026-11-22)
 
 
