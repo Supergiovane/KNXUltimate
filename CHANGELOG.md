@@ -1,5 +1,13 @@
 # Changelog
 
+## [6.4.1](https://github.com/Supergiovane/KNXUltimate/compare/v6.4.0...v6.4.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* avoid pre-allocated Error objects in heartbeat/connect timers (memory leak, [#121](https://github.com/Supergiovane/KNXUltimate/issues/121)) ([4cbe9f2](https://github.com/Supergiovane/KNXUltimate/commit/4cbe9f205b9c417a32e949f4092868ba5309f382))
+* default export for KNXClient, README uses named imports ([#120](https://github.com/Supergiovane/KNXUltimate/issues/120)) ([b816229](https://github.com/Supergiovane/KNXUltimate/commit/b8162293522ee6626ad937decafdb1246d23cb90))
+
 # [6.4.0](https://github.com/Supergiovane/KNXUltimate/compare/v6.3.2...v6.4.0) (2026-11-07)
 
 
