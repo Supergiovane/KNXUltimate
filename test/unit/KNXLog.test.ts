@@ -13,6 +13,7 @@ import {
 	module as createLogger,
 	setLogLevel,
 	logStream,
+	LOG_STREAM_MAX_BUFFERED,
 } from '../../src/KnxLog'
 import winston from 'winston'
 
@@ -99,5 +100,58 @@ describe('KNX Logger Functionality Tests', async () => {
 		process.env.LOG_LEVEL = 'debug'
 		const logger = createLogger('EnvTestLogger')
 		assert.strictEqual(logger.transports[0].level, 'debug')
+	})
+
+	describe('logStream memory bounds', () => {
+		const settle = () =>
+			new Promise<void>((r) => {
+				setTimeout(r, 50)
+			})
+		const quietLogger = (name: string) => {
+			const logger = createLogger(name)
+			setLogLevel('warn')
+			logger.transports[0].silent = true // keep Console quiet
+			return logger
+		}
+		const buffered = () =>
+			logStream.readableLength + logStream.writableLength
+
+		it('does not buffer lines when nobody reads logStream', async () => {
+			const logger = quietLogger('NoReader')
+			assert.strictEqual(logStream.listenerCount('data'), 0)
+			for (let i = 0; i < 500; i++) logger.warn('line %d', i)
+			await settle()
+			assert.strictEqual(buffered(), 0)
+		})
+
+		it('delivers lines once a reader is attached', async () => {
+			const logger = quietLogger('WithReader')
+			const received: any[] = []
+			const onData = (d: any) => received.push(d)
+			logStream.on('data', onData)
+			for (let i = 0; i < 10; i++) logger.warn('line %d', i)
+			await settle()
+			logStream.off('data', onData)
+			assert.strictEqual(received.length, 10)
+		})
+
+		it('caps the buffer when the reader stops consuming', async () => {
+			const logger = quietLogger('PausedReader')
+			const onData = () => {}
+			logStream.on('data', onData)
+			logStream.pause()
+			for (let i = 0; i < LOG_STREAM_MAX_BUFFERED * 3; i++)
+				logger.warn('line %d', i)
+			await settle()
+			const size = buffered()
+			logStream.resume()
+			await settle()
+			logStream.off('data', onData)
+			assert.ok(size > 0, 'some lines should be buffered')
+			assert.ok(
+				size <= LOG_STREAM_MAX_BUFFERED,
+				`buffered ${size} > ${LOG_STREAM_MAX_BUFFERED}`,
+			)
+		})
 	})
 })

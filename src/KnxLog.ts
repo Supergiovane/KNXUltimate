@@ -21,6 +21,33 @@ const MODULES = process.env.LOG_MODULES
 
 export const logStream = new PassThrough({ objectMode: true })
 
+/**
+ * Maximum number of log entries kept in logStream's buffers. When a reader is
+ * attached but does not consume (e.g. paused), newer entries are dropped
+ * instead of growing the heap without bound.
+ */
+export const LOG_STREAM_MAX_BUFFERED = 1000
+
+/**
+ * Lets an entry through to logStream only when someone is reading it and the
+ * buffer is below LOG_STREAM_MAX_BUFFERED. Without a reader a PassThrough
+ * never drains, so every log line would be kept in memory forever.
+ * pipe() and on('data') add a 'data' listener, async iteration adds 'readable'.
+ */
+const logStreamGate = format((info) => {
+	if (
+		logStream.listenerCount('data') === 0 &&
+		logStream.listenerCount('readable') === 0
+	)
+		return false
+	if (
+		logStream.readableLength + logStream.writableLength >=
+		LOG_STREAM_MAX_BUFFERED
+	)
+		return false
+	return info
+})
+
 export interface KNXLogger extends Logger {
 	module: string
 }
@@ -97,7 +124,7 @@ export function customTransports(moduleName: string): transport[] {
 		}),
 		new winston.transports.Stream({
 			stream: logStream,
-			format: combine(...formats),
+			format: combine(logStreamGate(), ...formats),
 		}),
 	]
 

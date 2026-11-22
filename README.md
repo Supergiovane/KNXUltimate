@@ -351,6 +351,8 @@ logStream.on('data', (log) => {
 }) 
 ```
 
+Log lines are passed to `logStream` only while something is reading it (`on('data')`, `pipe()` or async iteration): lines logged before you attach are not kept. To keep memory bounded, the stream holds at most `LOG_STREAM_MAX_BUFFERED` (1000) unread entries; if your reader stops consuming (e.g. a paused stream), newer lines are dropped until it catches up.
+
 | Field                          | Description                                                   |
 | ------------------------------ | ------------------------------------------------------------- |
 | timestamp                      | ISO formatted date (YYYY-MM-DD HH:mm:ss.SSS)                  |
