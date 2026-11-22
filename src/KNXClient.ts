@@ -3257,10 +3257,10 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			return
 		}
 		if (this._options.hostProtocol === 'TunnelUDP') {
-			// Unicast, need to explicitly create the connection
-			const timeoutError = new Error(
-				`Connection timeout to ${this._peerHost}:${this._peerPort}`,
-			)
+			// Unicast, need to explicitly create the connection.
+			// The timeout Error is built lazily inside the timer callback: a
+			// pre-allocated Error retains its call sites (and their closures)
+			// until .stack is read, see issue #121.
 			this._awaitingResponseType = KNX_CONSTANTS.CONNECT_RESPONSE
 			this._clientTunnelSeqNumber = -1
 			// 27/06/2023, leave some time to the dgram, to do the bind and read local ip and local port
@@ -3272,7 +3272,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 					this.setTimer(
 						KNXTimer.CONNECTION,
 						() => {
-							this.handleConnectionAttemptFailure(timeoutError)
+							this.handleConnectionAttemptFailure(
+								new Error(
+									`Connection timeout to ${this._peerHost}:${this._peerPort}`,
+								),
+							)
 						},
 						1000 * KNX_CONSTANTS.CONNECT_REQUEST_TIMEOUT,
 					)
@@ -3620,11 +3624,11 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 			throw new Error('No client socket defined')
 		}
 
-		const deadError = new Error(
-			`Connection dead with ${this._peerHost}:${this._peerPort}`,
-		)
-
-		// timeout triggered if no connection state response received
+		// timeout triggered if no connection state response received.
+		// NOTE: never pre-allocate an Error here. V8 keeps the un-formatted call
+		// sites of an Error alive until .stack is read; since runHeartbeat() is
+		// invoked from the previous HEARTBEAT timer closure, a pre-allocated Error
+		// would chain every heartbeat to the previous one (memory leak, issue #121).
 		this.setTimer(
 			KNXTimer.CONNECTION_STATE,
 			() => {
@@ -3640,6 +3644,9 @@ export default class KNXClient extends TypedEventEmitter<KNXClientEventCallbacks
 				this._heartbeatFailures++
 				if (this._heartbeatFailures >= this.max_HeartbeatFailures) {
 					this._heartbeatFailures = 0
+					const deadError = new Error(
+						`Connection dead with ${this._peerHost}:${this._peerPort}`,
+					)
 					this.emit(KNXClientEvents.error, deadError)
 					this.disconnectAfterHeartbeatFailure(deadError.message)
 				}
