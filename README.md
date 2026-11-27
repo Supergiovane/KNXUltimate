@@ -64,7 +64,7 @@ This is the official engine of Node-Red's node [node-red-contrib-knx-ultimate](h
 
 ## 📘 Documentation
 
-The full documentation is on **[maxsupervibe.com](https://www.maxsupervibe.com/docs/knxultimate/)**, together with the help of every other Max Supervibe node.
+The full documentation is on **[maxsupervibe.com](https://www.maxsupervibe.com/docs/knxultimate/)**, together with the help of every other Max Supervibe repo.
 
 <p align="left" style="font-size:2.25rem;font-weight:700;line-height:1.9;">
   <a href="https://www.maxsupervibe.com/docs/knxultimate/">📘 Go to the documentation</a>
