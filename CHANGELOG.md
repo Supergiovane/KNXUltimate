@@ -1,5 +1,11 @@
 # Changelog
 
+## [6.4.3](https://github.com/Supergiovane/KNXUltimate/compare/v6.4.2...v6.4.3) (2026-11-27)
+
+### Documentation
+
+* the documentation moved to [maxsupervibe.com](https://www.maxsupervibe.com/docs/knxultimate/): the README keeps the introduction and links there
+
 ## [6.4.2](https://github.com/Supergiovane/KNXUltimate/compare/v6.4.1...v6.4.2) (2026-11-22)
 
 
